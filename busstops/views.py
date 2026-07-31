@@ -70,6 +70,7 @@ from accounts.models import User
 from bustimes.models import Garage, Route, RouteLink, RouteWaypoint, StopTime, Trip
 from bustimes.utils import get_calendars, get_other_trips_in_block
 from departures import live
+from service_logging.models import ServiceLog
 from vehicles.models import Livery, Vehicle, VehicleJourney, VehicleType, get_css
 from vehicles.utils import redis_client
 
@@ -2431,6 +2432,17 @@ class OperatorDetailView(DetailView):
             .defer("geometry", "search_vector")
         )
 
+        if self.request.user.is_authenticated:
+            services = services.annotate(
+                route_ridden=Exists(
+                    ServiceLog.objects.filter(
+                        user=self.request.user,
+                        service_id=OuterRef("pk"),
+                        ridden=True,
+                    )
+                )
+            )
+
         visible_services = []
         non_current_services = []
         event_services = []
@@ -3599,6 +3611,12 @@ class ServiceDetailView(DetailView):
 
         operators = self.object.operator.all()
         context["operators"] = operators
+        context["route_ridden"] = (
+            self.request.user.is_authenticated
+            and ServiceLog.objects.filter(
+                user=self.request.user, service=self.object, ridden=True
+            ).exists()
+        )
 
         context["related"] = self.object.get_similar_services()
         if context["related"]:

@@ -37,7 +37,7 @@
         <strong class="name{% if object.colour_id %} colour colour-{{ object.colour_id }}{% endif %}">{{ object.line_brand }}</strong>
     {% endif %}
     </span>
-    <span class="description">{{ object.description }}</span>
+    <span class="description">{{ object.description }} {% if request.user.is_authenticated %}{% if route_ridden %}<span title="Route ridden" aria-label="Route ridden">&#10003;</span>{% else %}<span title="Route not yet ridden" aria-label="Route not yet ridden">&#10007;</span>{% endif %}{% endif %}</span>
 </h1>
 
 <p>
@@ -50,6 +50,14 @@
         {% for operator in operators %}{% if not loop.first %}{% if loop.last %} and {% else %}, {% endif %}{% endif %}<a href="{{ operator.get_absolute_url() }}">{{ operator }}</a>{% endfor %}
     {% endif %}
 </p>
+
+{% if request.user.is_authenticated %}
+<form action="{{ url('service_logging:toggle_ridden', args=[object.id]) }}" method="POST">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+    <input type="hidden" name="next" value="{{ request.get_full_path() }}">
+    <button type="submit" class="button">{% if route_ridden %}Unlog route{% else %}Log route{% endif %}</button>
+</form>
+{% endif %}
 
 {% if object.actual_public_use is false %}
     <p>🧑‍🎓 This may be a "closed-door" school or works service, not open to the public</p>
