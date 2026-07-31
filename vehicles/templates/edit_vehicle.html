@@ -68,6 +68,7 @@
             {{ form.as_p }}
         </div>
 
+        {% if not request.GET.advanced %}
         <div id="previous-operators-section">
             <h3>Previous Operators</h3>
             <div id="previous-operators-list"></div>
@@ -158,6 +159,7 @@
                 renderPreviousOperators();
             })();
         </script>
+        {% endif %}
 
         <script async src="https://imgbb.com/upload.js" data-auto-insert="viewer-links"></script>
 

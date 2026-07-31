@@ -113,6 +113,8 @@ class AdvancedFieldsMixin:
 
     def get_advanced_field_updates(self):
         updates = {}
+        if not getattr(self, "advanced_field_fields", None):
+            return updates
         for field_name, field in self.advanced_field_fields.items():
             if field_name not in self.changed_data:
                 continue
@@ -491,10 +493,11 @@ link to a picture to prove it. Be polite.""",
             new_order = basic_fields + advanced_field_names + ["summary"]
             self.order_fields(new_order)
 
-        if self.fields["fleet_support_vehicle"].initial:
-            feature_ids = {feature.id for feature in self.fields["features"].initial}
-            feature_ids.add(8)
-            self.fields["features"].initial = VehicleFeature.objects.filter(id__in=feature_ids)
+        if "fleet_support_vehicle" in self.fields and self.fields["fleet_support_vehicle"].initial:
+            if "features" in self.fields:
+                feature_ids = {feature.id for feature in self.fields["features"].initial}
+                feature_ids.add(8)
+                self.fields["features"].initial = VehicleFeature.objects.filter(id__in=feature_ids)
 
         if vehicle.fleet_code:
             self.fields["fleet_number"].initial = vehicle.fleet_code
@@ -502,7 +505,8 @@ link to a picture to prove it. Be polite.""",
             self.fields["fleet_number"].intial = str(vehicle.fleet_number)
 
         if vehicle.vehicle_type_id and not vehicle.is_spare_ticket_machine():
-            del self.fields["spare_ticket_machine"]
+            if "spare_ticket_machine" in self.fields:
+                del self.fields["spare_ticket_machine"]
 
         if not (vehicle.livery_id and vehicle.vehicle_type_id and vehicle.reg):
             self.fields["summary"].required = False
@@ -513,19 +517,21 @@ link to a picture to prove it. Be polite.""",
                 vehicle.notes
                 or vehicle.operator_id in settings.ALLOW_VEHICLE_NOTES_OPERATORS
             ):
-                del self.fields["notes"]
+                if "notes" in self.fields:
+                    del self.fields["notes"]
 
         if vehicle.is_spare_ticket_machine():
-            del self.fields["notes"]
-            if not vehicle.fleet_code:
+            if "notes" in self.fields:
+                del self.fields["notes"]
+            if not vehicle.fleet_code and "fleet_number" in self.fields:
                 del self.fields["fleet_number"]
-            if not vehicle.reg:
+            if not vehicle.reg and "reg" in self.fields:
                 del self.fields["reg"]
-            if not vehicle.vehicle_type_id:
+            if not vehicle.vehicle_type_id and "vehicle_type" in self.fields:
                 del self.fields["vehicle_type"]
-            if not vehicle.name:
+            if not vehicle.name and "name" in self.fields:
                 del self.fields["name"]
-            if not vehicle.prev_registration and not vehicle.data:
+            if not vehicle.prev_registration and not vehicle.data and "previous_reg" in self.fields:
                 del self.fields["previous_reg"]
             if (
                 not vehicle.colours
@@ -533,16 +539,17 @@ link to a picture to prove it. Be polite.""",
                 and "colours" in self.fields
             ):
                 del self.fields["colours"]
-                del self.fields["other_colour"]
-            if not vehicle.branding:
+                if "other_colour" in self.fields:
+                    del self.fields["other_colour"]
+            if not vehicle.branding and "branding" in self.fields:
                 del self.fields["branding"]
-            if not vehicle.rear_advert:
+            if not vehicle.rear_advert and "rear_advert" in self.fields:
                 del self.fields["rear_advert"]
-            if not vehicle.features.all():
+            if not vehicle.features.all() and "features" in self.fields:
                 del self.fields["features"]
             if not vehicle.features.filter(
                 category=VehicleFeature.Category.ACCESSIBILITY
-            ).exists():
+            ).exists() and "accessibility_features" in self.fields:
                 del self.fields["accessibility_features"]
 
         if self.operator_vehicle_column_fields:

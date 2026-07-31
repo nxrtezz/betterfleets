@@ -3187,7 +3187,7 @@ def edit_vehicle(request, **kwargs):
         pass
 
     # Check if advanced mode is requested via query parameter
-    advanced_mode = request.GET.get("advanced") == "1"
+    advanced_mode = "advanced" in request.GET
 
     form = forms.EditVehicleForm(
         form_data,
