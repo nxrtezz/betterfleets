@@ -422,6 +422,32 @@ class VehicleFeature(models.Model):
         ordering = ("category", "name")
 
 
+class AdvancedField(models.Model):
+    class FieldType(models.TextChoices):
+        BOOLEAN = "boolean", "Boolean (true/false)"
+        NUMBER = "number", "Number"
+        TEXT = "text", "Text"
+        DATE = "date", "Date"
+        URL = "url", "URL"
+
+    name = models.CharField(max_length=255, unique=True)
+    slug = models.SlugField(max_length=255, unique=True)
+    field_type = models.CharField(
+        max_length=20,
+        choices=FieldType.choices,
+        default=FieldType.TEXT,
+    )
+    help_text = models.CharField(max_length=500, blank=True)
+    display_order = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        app_label = "vehicles"
+        ordering = ("display_order", "name")
+
+
 class VehicleNamePage(models.Model):
     name = models.CharField(max_length=255, unique=True, db_index=True)
     slug = AutoSlugField(populate_from="name", editable=True, unique=True)

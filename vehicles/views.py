@@ -1932,6 +1932,17 @@ class VehicleDetailView(DetailView):
         )['total'] or 0
         context["total_photo_count"] = total_photos
 
+        # Check if advanced fields should be shown
+        show_advanced = self.request.GET.get("advanced") == "1"
+        if self.request.user.is_authenticated and getattr(self.request.user, "view_advanced", False):
+            show_advanced = True
+        
+        if show_advanced:
+            from .models import AdvancedField
+            advanced_fields = AdvancedField.objects.all().order_by("display_order", "name")
+            context["advanced_fields"] = advanced_fields
+            context["show_advanced"] = True
+
         # Get previous operators from vehicle field or vehicle history events
         previous_operators = []
         if self.object.previous_operators:
@@ -3175,11 +3186,15 @@ def edit_vehicle(request, **kwargs):
     except (KeyError, TypeError):
         pass
 
+    # Check if advanced mode is requested via query parameter
+    advanced_mode = request.GET.get("advanced") == "1"
+
     form = forms.EditVehicleForm(
         form_data,
         vehicle=vehicle,
         user=request.user,
         sibling_vehicles=(context["previous"], context["next"]),
+        advanced=advanced_mode,
     )
 
     context["livery"] = vehicle.livery
@@ -3193,6 +3208,10 @@ def edit_vehicle(request, **kwargs):
             custom_column_updates = form.get_operator_vehicle_column_updates()
             if custom_column_updates:
                 data["operator_vehicle_columns"] = custom_column_updates
+            
+            advanced_field_updates = form.get_advanced_field_updates()
+            if advanced_field_updates:
+                data["advanced"] = advanced_field_updates
 
             revision, features = get_revision(vehicle, data)
 

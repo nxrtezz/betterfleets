@@ -1577,4 +1577,12 @@ class SiriSubscriptionAdmin(admin.ModelAdmin):
         return cache.get(obj.get_status_key())
 
 
+@admin.register(models.AdvancedField)
+class AdvancedFieldAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "field_type", "display_order")
+    list_filter = ("field_type",)
+    search_fields = ("name", "slug")
+    prepopulated_fields = {"slug": ("name",)}
+
+
 admin.site.register(models.VehicleFeature)

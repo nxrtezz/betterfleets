@@ -303,7 +303,6 @@ dependencies = [
     { name = "django-allauth" },
     { name = "django-autoslug" },
     { name = "django-cors-headers" },
-    { name = "django-fido" },
     { name = "django-filter" },
     { name = "django-http-compression" },
     { name = "django-imagekit" },
@@ -315,6 +314,7 @@ dependencies = [
     { name = "django-timezone-field" },
     { name = "django-turnstile" },
     { name = "djangorestframework" },
+    { name = "fido2" },
     { name = "folium" },
     { name = "gtfs-realtime-bindings" },
     { name = "gunicorn" },
@@ -382,7 +382,6 @@ requires-dist = [
     { name = "django-allauth", specifier = ">=0.63.0" },
     { name = "django-autoslug", specifier = ">=1.9.8,<2" },
     { name = "django-cors-headers", specifier = ">=4.2.0,<5" },
-    { name = "django-fido", specifier = ">=1.4.0,<2" },
     { name = "django-filter", specifier = "~=25.1" },
     { name = "django-http-compression", specifier = ">=1.2.0" },
     { name = "django-imagekit", specifier = ">=6.1.0" },
@@ -394,6 +393,7 @@ requires-dist = [
     { name = "django-timezone-field", specifier = ">=7.2.1" },
     { name = "django-turnstile", specifier = ">=0.1.0,<0.2" },
     { name = "djangorestframework", specifier = ">=3.15" },
+    { name = "fido2", specifier = ">=1.0.0" },
     { name = "folium", specifier = ">=0.20.0" },
     { name = "gtfs-realtime-bindings", specifier = "~=2.0.0" },
     { name = "gunicorn", specifier = ">=25.1.0" },
@@ -760,18 +760,6 @@ wheels = [
 ]
 
 [[package]]
-name = "django-app-settings"
-version = "0.7.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "django" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c4/27/7141e90d1e4984722a5d0dc0c50203bdc14832a58e481cd89f2a1c87652d/django-app-settings-0.7.2.tar.gz", hash = "sha256:9223480aeef00dec8f89ee603454309993726b263f4f975ee7be98918c5ae27b", size = 35206, upload-time = "2023-09-07T13:30:41.879Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d9/09/db382672f6d1cb99f4509b9001307550ba084637abdfcfd00bc352449d00/django_app_settings-0.7.2-py2.py3-none-any.whl", hash = "sha256:438a3e1a9168825ad39c7e7ad1bc3c28fc17a128d117c4a702f5958abceee4fe", size = 14573, upload-time = "2023-09-07T13:30:40.302Z" },
-]
-
-[[package]]
 name = "django-appconf"
 version = "1.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -841,24 +829,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/63/0a/5db0aca31dac95fadd63597f51ca082a3ae1b1bb2468858ab899aac4227b/django-debug-toolbar-template-profiler-2.1.0.tar.gz", hash = "sha256:740d4fa90f9c72fe97c896d5a395abc535cf8e9d571c1710186aa775a861d7f4", size = 9239, upload-time = "2022-06-27T08:38:48.959Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8a/76/4e24fab1e9f07610edfaf434614ae94ea7e0a5cfd9ab586a78f803ac397d/django_debug_toolbar_template_profiler-2.1.0-py2.py3-none-any.whl", hash = "sha256:7c77b3d96a0f64a47ed80dec88bad0832fe2834d17da5cd77f86639680b56a8b", size = 11201, upload-time = "2022-06-28T11:38:32.727Z" },
-]
-
-[[package]]
-name = "django-fido"
-version = "1.4.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cryptography" },
-    { name = "django" },
-    { name = "django-app-settings" },
-    { name = "fido2" },
-    { name = "jwcrypto" },
-    { name = "pyopenssl" },
-    { name = "requests" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/eb/97/494a0da5bd69c198956d2d46faa74b35e83c9bc7833b51fc76be704ba4d0/django_fido-1.4.2.tar.gz", hash = "sha256:750f2f1caaa8cfddd8b163eb7c6c70e191071ecd5c7b47e39ad4eb69bafeee98", size = 585622, upload-time = "2026-03-06T17:43:35.719Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/63/c1/5d314a21d554c1b40799d0a3eabaf1f25bba5d14f2d67fc3e11977c671b4/django_fido-1.4.2-py3-none-any.whl", hash = "sha256:e0384559340af978e4f7377dc6fe81e8b19b61c6c7b345ddd43ccf5c6fda2f4d", size = 567717, upload-time = "2026-03-06T17:43:33.927Z" },
 ]
 
 [[package]]
@@ -1048,14 +1018,14 @@ wheels = [
 
 [[package]]
 name = "fido2"
-version = "1.2.0"
+version = "2.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/eb/cc/4529123364d41f342145f2fd775307eaed817cd22810895dea10e15a4d06/fido2-1.2.0.tar.gz", hash = "sha256:e39f95920122d64283fda5e5581d95a206e704fa42846bfa4662f86aa0d3333b", size = 266369, upload-time = "2024-11-27T09:08:21.071Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ba/ea/6f08c354b7aeb8019249d46a86c2153f8218499cced4d21bf16b6d49fc16/fido2-2.2.1.tar.gz", hash = "sha256:85787428a94c3f8eaf72f0ff30afba983b559a1b1b795c93318c81b4ad4062c4", size = 327147, upload-time = "2026-06-29T17:41:11.927Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4c/48/e9b99d66f27d3416a619324568739fd6603e093b2f79138d6f47ccf727b6/fido2-1.2.0-py3-none-any.whl", hash = "sha256:f7c8ee62e359aa980a45773f9493965bb29ede1b237a9218169dbfe60c80e130", size = 219418, upload-time = "2024-11-27T09:08:18.932Z" },
+    { url = "https://files.pythonhosted.org/packages/71/84/198d99c3312557ef6121cf78c38281efe9b3bc88cba0e2c05446f38a024d/fido2-2.2.1-py3-none-any.whl", hash = "sha256:ed397da981b9ab133da6ead7309e41f924b566b749956129efe286fae097749f", size = 238354, upload-time = "2026-06-29T17:41:09.921Z" },
 ]
 
 [[package]]
@@ -1386,19 +1356,6 @@ name = "json2html"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/01/d5/40b617ee19d2d79f606ed37f8a81e51158f126d2af67270c68f2b47ae0d5/json2html-1.3.0.tar.gz", hash = "sha256:8951a53662ae9cfd812685facdba693fc950ffc1c1fd1a8a2d3cf4c34600689c", size = 6977, upload-time = "2019-07-03T20:50:03.023Z" }
-
-[[package]]
-name = "jwcrypto"
-version = "1.5.8"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cryptography" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/de/7e/53c14813521693e931e420d9db00efe317419ff194495903bce03402275e/jwcrypto-1.5.8.tar.gz", hash = "sha256:c3d7114b6f6e65b52f6b7da817eb8cb8423e1da31e1ef13508447c81ecbdcc34", size = 90772, upload-time = "2026-06-24T19:36:50.782Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6e/7c/f87c5db042c4f7b4476346fc0d22f1025a777fee08eebde3720d3b9c4eb5/jwcrypto-1.5.8-py3-none-any.whl", hash = "sha256:85aeb475f808d56bbc2f2ed1f6f73e6a317c4011a4321505f02f0aed695a3742", size = 96133, upload-time = "2026-06-24T19:36:49.519Z" },
-]
 
 [[package]]
 name = "lightningcss-cli"
@@ -2182,18 +2139,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/4c/6f/71f6bcca8754c8bf55a4b7153c61c91f8ac5ba992568e9fa3e54a0ee76fd/pyogrio-0.12.1-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:fc882779075982b93064b3bf3d8642514a6df00d9dd752493b104817072cfb01", size = 31035498, upload-time = "2025-11-28T19:04:45.79Z" },
     { url = "https://files.pythonhosted.org/packages/fd/47/75c1aa165a988347317afab9b938a01ad25dbca559b582ea34473703dc38/pyogrio-0.12.1-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:806f620e0c54b54dbdd65e9b6368d24f344cda84c9343364b40a57eb3e1c4dca", size = 32496390, upload-time = "2025-11-28T19:04:48.786Z" },
     { url = "https://files.pythonhosted.org/packages/31/93/4641dc5d952f6bdb71dabad2c50e3f8a5d58396cdea6ff8f8a08bfd4f4a6/pyogrio-0.12.1-cp314-cp314t-win_amd64.whl", hash = "sha256:5399f66730978d8852ef5f44dbafa0f738e7f28f4f784349f36830b69a9d2134", size = 23620996, upload-time = "2025-11-28T19:04:51.132Z" },
-]
-
-[[package]]
-name = "pyopenssl"
-version = "25.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cryptography" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/04/8c/cd89ad05804f8e3c17dea8f178c3f40eeab5694c30e0c9f5bcd49f576fc3/pyopenssl-25.1.0.tar.gz", hash = "sha256:8d031884482e0c67ee92bf9a4d8cceb08d92aba7136432ffb0703c5280fc205b", size = 179937, upload-time = "2025-05-17T16:28:31.31Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/80/28/2659c02301b9500751f8d42f9a6632e1508aa5120de5e43042b8b30f8d5d/pyopenssl-25.1.0-py3-none-any.whl", hash = "sha256:2b11f239acc47ac2e5aca04fd7fa829800aeee22a2eb30d744572a157bd8a1ab", size = 56771, upload-time = "2025-05-17T16:28:29.197Z" },
 ]
 
 [[package]]

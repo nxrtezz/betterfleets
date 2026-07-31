@@ -9,7 +9,7 @@ from bustimes.models import Garage
 
 from .fields import validate_colours
 from .form_fields import RegField, SummaryField
-from .models import Livery, Vehicle, VehicleFeature, VehicleReview, VehicleType
+from .models import AdvancedField, Livery, Vehicle, VehicleFeature, VehicleReview, VehicleType
 
 
 class AutocompleteWidget(forms.Select):
@@ -60,7 +60,75 @@ class OperatorVehicleColumnFieldsMixin:
         return updates
 
 
-class EditVehicleForm(OperatorVehicleColumnFieldsMixin, forms.Form):
+class AdvancedFieldsMixin:
+    advanced_field_prefix = "advanced_"
+
+    def add_advanced_fields(self, values=None):
+        self.advanced_fields = []
+        self.advanced_field_fields = {}
+        
+        self.advanced_fields = list(
+            AdvancedField.objects.all().order_by("display_order", "name")
+        )
+        values = values or {}
+        
+        for field in self.advanced_fields:
+            field_name = f"{self.advanced_field_prefix}{field.slug}"
+            
+            if field.field_type == AdvancedField.FieldType.BOOLEAN:
+                self.fields[field_name] = forms.BooleanField(
+                    label=field.name,
+                    help_text=field.help_text,
+                    required=False,
+                )
+            elif field.field_type == AdvancedField.FieldType.NUMBER:
+                self.fields[field_name] = forms.IntegerField(
+                    label=field.name,
+                    help_text=field.help_text,
+                    required=False,
+                )
+            elif field.field_type == AdvancedField.FieldType.DATE:
+                self.fields[field_name] = forms.DateField(
+                    label=field.name,
+                    help_text=field.help_text,
+                    required=False,
+                    widget=forms.DateInput(attrs={"type": "date"}),
+                )
+            elif field.field_type == AdvancedField.FieldType.URL:
+                self.fields[field_name] = forms.URLField(
+                    label=field.name,
+                    help_text=field.help_text,
+                    required=False,
+                )
+            else:  # TEXT
+                self.fields[field_name] = forms.CharField(
+                    label=field.name,
+                    help_text=field.help_text,
+                    required=False,
+                    max_length=500,
+                )
+            
+            self.fields[field_name].initial = values.get(field.slug, "")
+            self.advanced_field_fields[field_name] = field
+
+    def get_advanced_field_updates(self):
+        updates = {}
+        for field_name, field in self.advanced_field_fields.items():
+            if field_name not in self.changed_data:
+                continue
+            value = self.cleaned_data.get(field_name)
+            if field.field_type == AdvancedField.FieldType.BOOLEAN:
+                updates[field.slug] = bool(value)
+            elif field.field_type == AdvancedField.FieldType.NUMBER:
+                updates[field.slug] = value if value is not None else None
+            elif field.field_type == AdvancedField.FieldType.DATE:
+                updates[field.slug] = value.isoformat() if value else None
+            else:
+                updates[field.slug] = (value or "").strip() if value else ""
+        return updates
+
+
+class EditVehicleForm(OperatorVehicleColumnFieldsMixin, AdvancedFieldsMixin, forms.Form):
     FLEET_SUPPORT_FEATURE_ID = "8"
 
     @property
@@ -346,7 +414,7 @@ link to a picture to prove it. Be polite.""",
 
         return data
 
-    def __init__(self, data, *args, user, vehicle, sibling_vehicles, **kwargs):
+    def __init__(self, data, *args, user, vehicle, sibling_vehicles, advanced=False, **kwargs):
         super().__init__(self._normalize_bound_data(data), *args, **kwargs)
 
         self.fields["operator"].initial = vehicle.operator
@@ -405,6 +473,23 @@ link to a picture to prove it. Be polite.""",
         self.fields["demonstrator"].initial = vehicle.demonstrator
         self.fields["spare_ticket_machine"].initial = vehicle.is_spare_ticket_machine()
         self.add_operator_vehicle_column_fields(vehicle.operator, vehicle.data)
+        
+        # Add advanced fields if in advanced mode
+        if advanced:
+            self.add_advanced_fields(vehicle.advanced or {})
+            
+            # Hide all non-essential fields in advanced mode
+            # Keep only: vehicle_type, fleet_number, colours (livery), reg, summary
+            fields_to_keep = {"vehicle_type", "fleet_number", "colours", "reg", "summary"}
+            for field_name in list(self.fields.keys()):
+                if field_name not in fields_to_keep and not field_name.startswith(self.advanced_field_prefix):
+                    del self.fields[field_name]
+            
+            # Reorder fields: basic fields first, then advanced fields, then summary at bottom
+            basic_fields = ["vehicle_type", "fleet_number", "colours", "reg"]
+            advanced_field_names = [name for name in list(self.fields.keys()) if name.startswith(self.advanced_field_prefix)]
+            new_order = basic_fields + advanced_field_names + ["summary"]
+            self.order_fields(new_order)
 
         if self.fields["fleet_support_vehicle"].initial:
             feature_ids = {feature.id for feature in self.fields["features"].initial}
@@ -469,6 +554,17 @@ link to a picture to prove it. Be polite.""",
                 ordered_fields.append("summary")
             else:
                 ordered_fields.extend(custom_field_names)
+            self.order_fields(ordered_fields)
+        
+        if getattr(self, 'advanced_field_fields', None):
+            ordered_fields = [name for name in self.field_order if name in self.fields]
+            advanced_field_names = list(self.advanced_field_fields)
+            if "summary" in ordered_fields:
+                ordered_fields.remove("summary")
+                ordered_fields.extend(advanced_field_names)
+                ordered_fields.append("summary")
+            else:
+                ordered_fields.extend(advanced_field_names)
             self.order_fields(ordered_fields)
 
 

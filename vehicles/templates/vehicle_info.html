@@ -146,6 +146,29 @@
             <dd>{{ total_photo_count }}</dd>
         </div>
     {% endif %}
+
+    {% if show_advanced and advanced_fields %}
+        {% for field in advanced_fields %}
+            {% if vehicle.advanced %}
+                {% for key, value in vehicle.advanced.items %}
+                    {% if key == field.slug and value %}
+                        <div>
+                            <dt>{{ field.name }}</dt>
+                            <dd>
+                                {% if field.field_type == 'boolean' %}
+                                    {{ value|yesno:"Yes,No" }}
+                                {% elif field.field_type == 'url' %}
+                                    <a href="{{ value }}" target="_blank" rel="noopener">{{ value }}</a>
+                                {% else %}
+                                    {{ value }}
+                                {% endif %}
+                            </dd>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
 </dl>
 
 {% with flickr_link=vehicle.get_flickr_link %}
@@ -157,7 +180,7 @@
             <li><a href="#" onclick="document.getElementById('suggest-photo-form').style.display='block'; return false;">Suggest photo</a></li>
         {% endif %}
         {% if vehicle.is_editable and request.user.view_advanced %}
-            <li><a href="{% url 'admin:vehicles_vehicle_change' vehicle.pk %}">Advanced Edit</a></li>
+            <li><a href="{{ vehicle.get_edit_url }}?advanced">Advanced Edit</a></li>
         {% endif %}
         {% if vehicle.is_editable and request.user.trusted %}
             <li><a href="{% url 'vehicle_compare' vehicle.id %}">Compare</a></li>

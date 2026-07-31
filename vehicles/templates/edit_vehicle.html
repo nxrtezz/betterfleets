@@ -28,10 +28,30 @@
 
     {% if pending_edits %}
         <p class="message">❗ This vehicle has already been edited recently:</p>
-        {% include 'vehicle_revisions.html' with revisions=pending_edits %}
+        <p>
+            <label>
+                <input type="checkbox" id="show-advanced-edits" onchange="filterPendingEdits()">
+                Show only advanced edits
+            </label>
+        </p>
+        <ul class="revisions-list" id="pending-edits-list">
+            {% for revision in pending_edits %}
+                {% include "vehicle_revision.html" with revision=revision %}
+            {% endfor %}
+        </ul>
+        <script>
+            function filterPendingEdits() {
+                const showAdvanced = document.getElementById('show-advanced-edits').checked;
+                const revisions = document.querySelectorAll('#pending-edits-list > li');
+                revisions.forEach(li => {
+                    const hasAdvanced = li.dataset.hasAdvanced === 'true';
+                    li.style.display = (showAdvanced && !hasAdvanced) ? 'none' : '';
+                });
+            }
+        </script>
     {% endif %}
 
-    <h1>Edit vehicle details</h1>
+    <h1>Edit vehicle details{% if request.GET.advanced %} (Advanced){% endif %}</h1>
 
     <p>
         Ticket machine code:<br>
@@ -43,7 +63,7 @@
 
     {% include "previous_operators.html" %}
 
-    <form action="{{ vehicle.get_edit_url }}" method="POST">
+    <form action="{{ vehicle.get_edit_url }}{% if request.GET.advanced %}?advanced{% endif %}" method="POST">
         <div class="edit-vehicle">
             {{ form.as_p }}
         </div>
