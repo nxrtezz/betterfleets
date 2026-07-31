@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
@@ -57,6 +58,7 @@ def log_service(request):
 
 
 @login_required
+@require_POST
 def toggle_service_ridden(request, service_id):
     """
     Toggle ridden status for a service.
@@ -81,7 +83,7 @@ def toggle_service_ridden(request, service_id):
             "ridden": log.ridden
         })
     
-    redirect_url = request.GET.get("next", request.META.get("HTTP_REFERER", "/"))
+    redirect_url = request.POST.get("next", request.META.get("HTTP_REFERER", "/"))
     return redirect(redirect_url)
 
 
