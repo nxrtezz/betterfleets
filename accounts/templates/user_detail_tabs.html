@@ -432,38 +432,34 @@
             <div class="stats-grid">
                 {% if ride_stats %}
                 <div class="stat-card">
-                    <div class="stat-card__value">{{ ride_stats.operators_count }}</div>
+                    <div class="stat-card__value">{{ ride_stats.operators }}</div>
                     <div class="stat-card__label">Operators Ridden</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-card__value">{{ ride_stats.vehicle_types_count }}</div>
+                    <div class="stat-card__value">{{ ride_stats.types }}</div>
                     <div class="stat-card__label">Vehicle Types Ridden</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-card__value">{{ ride_stats.liveries_count }}</div>
-                    <div class="stat-card__label">Liveries Ridden</div>
+                    <div class="stat-card__value">{{ ride_stats.vehicles }}</div>
+                    <div class="stat-card__label">Vehicles Ridden</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-card__value">{{ ride_stats.vehicles_count }}</div>
-                    <div class="stat-card__label">Vehicles Ridden</div>
+                    <div class="stat-card__value">{{ route_stats.ridden }}/{{ route_stats.overall_total }}</div>
+                    <div class="stat-card__label">Routes Ridden</div>
                 </div>
                 {% endif %}
                 
                 {% if photo_stats %}
                 <div class="stat-card">
-                    <div class="stat-card__value">{{ photo_stats.operators_count }}</div>
+                    <div class="stat-card__value">{{ photo_stats.operators }}</div>
                     <div class="stat-card__label">Operators Photographed</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-card__value">{{ photo_stats.vehicle_types_count }}</div>
+                    <div class="stat-card__value">{{ photo_stats.types }}</div>
                     <div class="stat-card__label">Vehicle Types Photographed</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-card__value">{{ photo_stats.liveries_count }}</div>
-                    <div class="stat-card__label">Liveries Photographed</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card__value">{{ photo_stats.vehicles_count }}</div>
+                    <div class="stat-card__value">{{ photo_stats.vehicles }}</div>
                     <div class="stat-card__label">Vehicles Photographed</div>
                 </div>
                 {% endif %}

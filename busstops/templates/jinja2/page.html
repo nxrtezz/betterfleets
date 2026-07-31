@@ -7,50 +7,6 @@
 <meta name="theme-color" content="#ffff9e" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)">
 <meta name="format-detection" content="telephone=no">
-<style>
-    .site-name {
-        line-height: 1.5em !important;
-        font-size: 24px;
-    }
-    .site-header {
-        background: var(--brand-color);
-        position: relative;
-        overflow: hidden;
-    }
-    .site-header a {
-        color: var(--header-text-color);
-        padding: 16px;
-        line-height: 1;
-        display: inline-block;
-    }
-    .site-header a:hover {
-        background-color: var(--brand-color-darker);
-        text-decoration: none;
-    }
-    .site-header div { margin: 0 auto; }
-    .narrow .site-header div { width: 47.5em; }
-    .wide .site-header div { width: 62.5em; }
-    .site-header div .site-name { position: absolute; }
-    .site-header ul { float: right; margin: 0; }
-    .site-header ul li { display: inline; }
-    .site-header ul a { padding: 1em 1em 1em .5em; line-height: 1.5em; }
-    .site-header .header-icon svg { vertical-align: middle; }
-    .site-header .search { float: right; }
-    .site-header .search label { padding: 16px; line-height: 1.5; display: block; }
-    .site-header .search label input { z-index: 1; border-radius: 0; margin: 0; position: absolute; top: -48px; }
-    .site-header .search label input:focus { border-width: 12px 16px; width: 100%; top: 0; left: 0; }
-    .site-header .search label + input { display: none; }
-    .site-header ul + .search label { padding-right: 8px; }
-    @media (width >= 30em) {
-        .site-header .search { padding-right: 1em; position: relative; top: .7em; }
-        .site-header .search label { float: left; width: 8em; padding: 0; position: relative; }
-        .site-header .search input[type="search"] { border: 1px solid var(--brand-color-darker); border-top-left-radius: .5em; border-bottom-left-radius: .5em; width: 100%; top: 0; left: 0; }
-        .site-header .search label input:focus { border-width: 1px; }
-        .site-header .search input[type="submit"] { background: var(--brand-color-darker); border: 1px solid var(--brand-color-darker); float: right; border-top-left-radius: 0; border-bottom-left-radius: 0; margin: 0; display: block; top: 0; }
-        .site-header ul + .search { padding-right: .5em; }
-    }
-</style>
-
 <script>
 (function () {
     var storageKey = "site-theme";
@@ -306,9 +262,9 @@ window.STADIA_MAPS_API_KEY = "";
 <a href="#content" class="skip">Skip to main content</a>
 {% block header %}
 <header class="site-header">
-    <div>
+    <div class="site-header__inner">
         <a href="/" class="site-name">BetterFleets</a>
-        <ul>
+        <ul class="site-nav__list">
             <li><a href="/map" class="header-icon" title="Map">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
@@ -333,12 +289,12 @@ window.STADIA_MAPS_API_KEY = "";
                 </a></li>
             {% endif %}
         </ul>
-        <form method="GET" action="/search" class="search">
-            <label>
-                Search
+        <form method="GET" action="/search" class="search site-search">
+            <label>Search</label>
+            <div class="site-search__controls">
                 <input name="q" placeholder="Search" type="search" value="{{ query }}" required>
-            </label>
-            <input type="submit" value="Search">
+                <input type="submit" value="Search">
+            </div>
         </form>
     </div>
 </header>

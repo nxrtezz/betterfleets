@@ -21,8 +21,10 @@ config   | Kamal and Supervisor configuration
 departures | listing the "next departures" at a bus stop – from a timetable and/or predicted by an API
 disruptions | information about like roadworks, diversions and stuff
 fares    | fares
+fleet    | fleet-completion, ride, photo, and driving logs
 fixtures | some YAML files containing overrides/corrections to the operator (NOC) and bus stop (NaPTAN) datasets. Also recorded HTTP responses used in tests
 frontend | TypeScript and Sass bits
+service_logging | per-user route completion logs
 transxchange | code for parsing TransXChange XML files. Could be published as a separate package
 vehicles | tracking buses' locations and showing them on a map, and pointless details about vehicles' colours and features
 vosa     | the Great Britain Traffic Commissioners' bus service registration data. VOSA is the name of a defunct UK government agency.
@@ -117,6 +119,8 @@ In addition to the core features from bustimes.org, BetterFleets includes:
 - **Driver Status Requests**: Users can request driver status with admin approval workflow
 - **Enhanced Notifications**: Color-coded Discord embeds with approve/deny buttons for revisions
 - **User Account Linking**: Connect Discord accounts to BetterFleets user accounts via 6-digit codes
+- **Route Completion**: Users can log routes they have ridden from a service page. Route lists show a tick for ridden routes, a cross for unlogged public routes, and a dash for non-public routes. Non-public routes can still be logged and are included in a user's ridden total.
+- **Public Profile Stats**: Profiles whose owners have enabled public fleet logging show vehicle, photo, and route-completion totals. The livery tab groups the user's logged vehicles by operator and livery.
 
 ## Deploying
 

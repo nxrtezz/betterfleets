@@ -2426,6 +2426,7 @@ class OperatorDetailView(DetailView):
                         "code",
                         "start_date",
                         "end_date",
+                        "public_use",
                     ),
                 )
             )
@@ -2448,6 +2449,14 @@ class OperatorDetailView(DetailView):
         event_services = []
         for service in services:
             routes = list(service.route_set.all())
+            route_public_uses = [
+                route.public_use for route in routes if route.public_use is not None
+            ]
+            service.route_is_public = (
+                service.public_use
+                if service.public_use is not None
+                else any(route_public_uses) if route_public_uses else True
+            )
             has_visible_event_route = any(
                 self._route_is_event_visible(route, today) for route in routes
             )
@@ -2491,9 +2500,27 @@ class OperatorDetailView(DetailView):
                 current=True,
                 is_rail_replacement=True
             )
+            .prefetch_related(
+                Prefetch(
+                    "route_set",
+                    queryset=Route.objects.only("id", "service_id", "public_use"),
+                )
+            )
             .defer("geometry", "search_vector")
         )
-        return list(rail_replacement_services)
+        rail_replacement_services = list(rail_replacement_services)
+        for service in rail_replacement_services:
+            route_public_uses = [
+                route.public_use
+                for route in service.route_set.all()
+                if route.public_use is not None
+            ]
+            service.route_is_public = (
+                service.public_use
+                if service.public_use is not None
+                else any(route_public_uses) if route_public_uses else True
+            )
+        return rail_replacement_services
 
     def get_liveries(self, vehicle_queryset):
         livery_rows = list(
@@ -2650,6 +2677,12 @@ class OperatorDetailView(DetailView):
         context["event_services_count"] = len(event_services)
         context["rail_replacement_services"] = self.get_rail_replacement_services()
         context["rail_replacement_services_count"] = len(context["rail_replacement_services"])
+        context["public_routes_count"] = sum(
+            service.route_is_public for service in context["services"]
+        )
+        context["ridden_routes_count"] = sum(
+            getattr(service, "route_ridden", False) for service in context["services"]
+        )
 
         if context["services"] or context["non_current_services"] or context["event_services"]:
             # for 'from {date}' for future services:
@@ -3617,6 +3650,7 @@ class ServiceDetailView(DetailView):
                 user=self.request.user, service=self.object, ridden=True
             ).exists()
         )
+        context["route_is_public"] = self.object.actual_public_use is not False
 
         context["related"] = self.object.get_similar_services()
         if context["related"]:

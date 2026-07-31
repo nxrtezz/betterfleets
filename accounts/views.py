@@ -10,6 +10,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from sql_util.utils import SubqueryCount
 
 from fleet.completion import get_user_ride_stats, get_user_driving_stats, get_user_photo_stats
+from service_logging.completion import get_user_route_stats
 from accounts.scoring import get_score_breakdown, get_leaderboard
 from vehicles.models import Vehicle, VehicleReview
 
@@ -305,19 +306,20 @@ def user_detail(request, pk):
         .select_related("operator", "vehicle_type")
         .order_by("operator__name", "fleet_number", "fleet_code", "reg", "code"),
     }
-    can_view_ride_stats = request.user.is_authenticated and (
+    can_view_ride_stats = (
         request.user == user or request.user.is_superuser or user.fleet_logging_public
     )
     if can_view_ride_stats:
         context["ride_stats"] = get_user_ride_stats(user)
+        context["route_stats"] = get_user_route_stats(user)
     
-    can_view_driving_stats = request.user.is_authenticated and (
+    can_view_driving_stats = (
         request.user == user or request.user.is_superuser or user.driving_logging_public
     )
     if can_view_driving_stats and user.is_driver:
         context["driving_stats"] = get_user_driving_stats(user)
     
-    can_view_photo_stats = request.user.is_authenticated and (
+    can_view_photo_stats = (
         request.user == user or request.user.is_superuser or user.fleet_logging_public
     )
     if can_view_photo_stats:
@@ -389,18 +391,18 @@ def user_liveries(request, pk):
     user = get_object_or_404(UserModel, pk=pk)
     
     # Get vehicles user has ridden
-    ridden_vehicles = FleetRideLog.objects.filter(
+    ridden_vehicle_ids = set(FleetRideLog.objects.filter(
         user=user
-    ).values_list('vehicle_id', flat=True).distinct()
+    ).values_list('vehicle_id', flat=True).distinct())
     
     # Get vehicles user has photographed
-    photographed_vehicles = FleetPhotoLog.objects.filter(
+    photographed_vehicle_ids = set(FleetPhotoLog.objects.filter(
         user=user
-    ).values_list('vehicle_id', flat=True).distinct()
+    ).values_list('vehicle_id', flat=True).distinct())
     
     # Get all vehicles with liveries
     vehicles = Vehicle.objects.filter(
-        id__in=set(list(ridden_vehicles) + list(photographed_vehicles))
+        id__in=ridden_vehicle_ids | photographed_vehicle_ids
     ).select_related('operator', 'livery', 'vehicle_type').exclude(
         livery__isnull=True
     ).order_by('operator__name', 'livery__name')
@@ -418,23 +420,26 @@ def user_liveries(request, pk):
         if livery_key not in liveries_by_operator[vehicle.operator_id]['liveries']:
             liveries_by_operator[vehicle.operator_id]['liveries'][livery_key] = {
                 'livery': vehicle.livery,
-                'photographed': vehicle.id in photographed_vehicles,
-                'ridden': vehicle.id in ridden_vehicles,
+                'photographed': vehicle.id in photographed_vehicle_ids,
+                'ridden': vehicle.id in ridden_vehicle_ids,
                 'count': 1
             }
         else:
             liveries_by_operator[vehicle.operator_id]['liveries'][livery_key]['count'] += 1
-            if vehicle.id in photographed_vehicles:
+            if vehicle.id in photographed_vehicle_ids:
                 liveries_by_operator[vehicle.operator_id]['liveries'][livery_key]['photographed'] = True
-            if vehicle.id in ridden_vehicles:
+            if vehicle.id in ridden_vehicle_ids:
                 liveries_by_operator[vehicle.operator_id]['liveries'][livery_key]['ridden'] = True
     
     # Generate HTML
     html = ''
-    for operator_data in sorted(liveries_by_operator.values(), key=lambda x: x['operator'].name):
+    for operator_data in sorted(
+        liveries_by_operator.values(),
+        key=lambda x: x['operator'].name if x['operator'] else '',
+    ):
         operator = operator_data['operator']
         html += f'<div class="livery-section">'
-        html += f'<h3 class="livery-section__title">{operator.name}</h3>'
+        html += f'<h3 class="livery-section__title">{operator.name if operator else "Unknown operator"}</h3>'
         html += '<div class="livery-grid">'
         
         for livery_data in operator_data['liveries'].values():

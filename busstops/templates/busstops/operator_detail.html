@@ -243,7 +243,7 @@
     <div class="fleet-stat-pills">
         <span class="fleet-stat-pill">
             <span class="fleet-stat-pill__icon">🚌</span>
-            <span class="fleet-stat-pill__num">{{ services|length }}</span> route{{ services|length|pluralize }}
+            <span class="fleet-stat-pill__num">{{ ridden_routes_count }}/{{ public_routes_count }}</span> route{{ public_routes_count|pluralize }}
         </span>
         {% if non_current_services %}
         <span class="fleet-stat-pill">

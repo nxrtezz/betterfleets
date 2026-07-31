@@ -37,7 +37,7 @@
         <strong class="name{% if object.colour_id %} colour colour-{{ object.colour_id }}{% endif %}">{{ object.line_brand }}</strong>
     {% endif %}
     </span>
-    <span class="description">{{ object.description }} {% if request.user.is_authenticated %}{% if route_ridden %}<span title="Route ridden" aria-label="Route ridden">&#10003;</span>{% else %}<span title="Route not yet ridden" aria-label="Route not yet ridden">&#10007;</span>{% endif %}{% endif %}</span>
+    <span class="description">{{ object.description }} {% if request.user.is_authenticated %}{% if not route_is_public %}<span title="Non-public route" aria-label="Non-public route">-</span>{% elif route_ridden %}<span title="Route ridden" aria-label="Route ridden">&#10003;</span>{% else %}<span title="Route not yet ridden" aria-label="Route not yet ridden">&#10007;</span>{% endif %}{% endif %}</span>
 </h1>
 
 <p>
