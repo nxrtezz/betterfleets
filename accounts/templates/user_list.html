@@ -1,0 +1,337 @@
+{% extends 'page.html' %}
+
+{% block title %}Users{% endblock %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block bodyclass %}wide{% endblock %}
+
+{% block head %}
+    <style>
+        .user-directory {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        @media (min-width: 62em) {
+            .user-directory {
+                grid-template-columns: minmax(0, 1fr) 20rem;
+                align-items: start;
+            }
+        }
+
+        .user-directory__main,
+        .user-directory__sidebar {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .user-search-card,
+        .user-sidebar-card,
+        .user-list {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .user-search-card,
+        .user-sidebar-card,
+        .user-list-empty {
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+        }
+
+        .user-search-card h2,
+        .user-sidebar-card h2,
+        .user-sidebar-card h3 {
+            margin-top: 0;
+        }
+
+        .user-search-form {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+
+        .user-search-form label {
+            flex: 1 1 16rem;
+        }
+
+        .user-search-form input[type='search'] {
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 0.35rem;
+        }
+
+        .user-list-card {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 1rem;
+            align-items: start;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+        }
+
+        .user-list-avatar,
+        .user-list-avatar-fallback {
+            width: 4rem;
+            height: 4rem;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1d4ed8, #0f766e);
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .user-list-avatar {
+            object-fit: cover;
+        }
+
+        .user-list-card h2 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .user-list-meta,
+        .user-list-tags,
+        .user-list-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin: 0.5rem 0 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .user-list-meta li,
+        .user-list-stats li,
+        .user-list-tag {
+            background: rgba(148, 163, 184, 0.08);
+            border-radius: 999px;
+            padding: 0.3rem 0.7rem;
+        }
+
+        .leaderboard {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 0.65rem;
+        }
+
+        .leaderboard li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 0.9rem;
+            border-radius: 0.9rem;
+            background: rgba(148, 163, 184, 0.08);
+        }
+
+        .leaderboard__rank {
+            min-width: 2rem;
+            font-weight: 700;
+        }
+
+        .leaderboard__entry {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .leaderboard__entry a {
+            font-weight: 700;
+        }
+
+        .leaderboard__value {
+            white-space: nowrap;
+            color: var(--secondary-text-color);
+        }
+
+        .leaderboard li:nth-child(1) {
+            background: linear-gradient(135deg, #fef3c7, #facc15);
+            color: #3b2f02;
+        }
+
+        .leaderboard li:nth-child(2) {
+            background: linear-gradient(135deg, #f1f5f9, #cbd5e1);
+            color: #1f2937;
+        }
+
+        .leaderboard li:nth-child(3) {
+            background: linear-gradient(135deg, #fed7aa, #d97706);
+            color: #3b1d04;
+        }
+
+        .leaderboard li:nth-child(1) a,
+        .leaderboard li:nth-child(2) a,
+        .leaderboard li:nth-child(3) a,
+        .leaderboard li:nth-child(1) .leaderboard__value,
+        .leaderboard li:nth-child(2) .leaderboard__value,
+        .leaderboard li:nth-child(3) .leaderboard__value {
+            color: inherit;
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.user-list-tag[data-bg]').forEach(tag => {
+                tag.style.background = tag.dataset.bg;
+                tag.style.color = tag.dataset.color;
+            });
+        });
+    </script>
+{% endblock head %}
+
+{% block content %}
+    <h1>Users</h1>
+
+    <div class="user-directory">
+        <div class="user-directory__main">
+            {% if current_user %}
+                <section class="user-search-card">
+                    <h2>Your profile</h2>
+                    <article class="user-list-card">
+                        <div>
+                            {% if current_user.get_profile_picture_url %}
+                                <img class="user-list-avatar" src="{{ current_user.get_profile_picture_url }}" alt="{{ current_user.get_display_name }}">
+                            {% else %}
+                                <div class="user-list-avatar-fallback">{{ current_user.get_display_name|first|upper }}</div>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <h2><a href="{{ current_user.get_absolute_url }}">{{ current_user.get_display_name }}</a></h2>
+                            <ul class="user-list-meta">
+                                <li>@{{ current_user.get_username_display }}</li>
+                                {% if current_user.get_full_name_display and current_user.get_full_name_display != current_user.get_display_name %}
+                                    <li>{{ current_user.get_full_name_display }}</li>
+                                {% endif %}
+                            </ul>
+
+                            {% with tags=current_user.get_profile_tags %}
+                                {% if tags %}
+                                    <div class="user-list-tags">
+                                        {% for tag in tags %}
+                                            <span class="user-list-tag" data-bg="{{ tag.badge_background }}" data-color="{{ tag.badge_text_colour }}">{{ tag.name }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            {% endwith %}
+
+                            <ul class="user-list-stats">
+                                <li>{{ current_user.total_count }} edit{{ current_user.total_count|pluralize }}</li>
+                                <li>{{ current_user.review_count }} review{{ current_user.review_count|pluralize }}</li>
+                                {% if current_user.linked_operator_count %}
+                                    <li>{{ current_user.linked_operator_count }} linked operator{{ current_user.linked_operator_count|pluralize }}</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </article>
+                </section>
+            {% endif %}
+
+            <section class="user-search-card">
+                <h2>Find a user</h2>
+                <form method="get" class="user-search-form">
+                    <label>
+                        Search by username, display name, real name or user ID
+                        <input type="search" name="q" value="{{ query }}" placeholder="Try a username or display name">
+                    </label>
+                    <input type="submit" value="Search">
+                </form>
+            </section>
+
+            {% if users %}
+                <div class="user-list">
+                    {% for object in users %}
+                        <article class="user-list-card">
+                            <div>
+                                {% if object.get_profile_picture_url %}
+                                    <img class="user-list-avatar" src="{{ object.get_profile_picture_url }}" alt="{{ object.get_display_name }}">
+                                {% else %}
+                                    <div class="user-list-avatar-fallback">{{ object.get_display_name|first|upper }}</div>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <h2><a href="{{ object.get_absolute_url }}">{{ object.get_display_name }}</a></h2>
+                                <ul class="user-list-meta">
+                                    <li>@{{ object.get_username_display }}</li>
+                                    {% if object.get_full_name_display and object.get_full_name_display != object.get_display_name %}
+                                        <li>{{ object.get_full_name_display }}</li>
+                                    {% endif %}
+                                </ul>
+
+                                {% with tags=object.get_profile_tags %}
+                                    {% if tags %}
+                                        <div class="user-list-tags">
+                                            {% for tag in tags %}
+                                                <span class="user-list-tag" data-bg="{{ tag.badge_background }}" data-color="{{ tag.badge_text_colour }}">{{ tag.name }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                {% endwith %}
+
+                                <ul class="user-list-stats">
+                                    <li>{{ object.total_count }} edit{{ object.total_count|pluralize }}</li>
+                                    <li>{{ object.review_count }} review{{ object.review_count|pluralize }}</li>
+                                    {% if object.linked_operator_count %}
+                                        <li>{{ object.linked_operator_count }} linked operator{{ object.linked_operator_count|pluralize }}</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+
+                {% include 'pagination.html' with page=users %}
+            {% else %}
+                <p class="user-list-empty">No users found.</p>
+            {% endif %}
+        </div>
+
+        <aside class="user-directory__sidebar">
+            <section class="user-sidebar-card">
+                <h2>Top Reviewers</h2>
+                {% if top_reviewers %}
+                    <ol class="leaderboard">
+                        {% for object in top_reviewers %}
+                            <li>
+                                <span class="leaderboard__rank">
+                                    {% if forloop.counter == 1 %}Gold{% elif forloop.counter == 2 %}Silver{% elif forloop.counter == 3 %}Bronze{% else %}{{ forloop.counter }}{% endif %}
+                                </span>
+                                <span class="leaderboard__entry"><a href="{{ object.get_absolute_url }}">{{ object.get_display_name }}</a></span>
+                                <span class="leaderboard__value">{{ object.review_count }} review{{ object.review_count|pluralize }}</span>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                {% else %}
+                    <p>No reviews yet.</p>
+                {% endif %}
+            </section>
+
+            <section class="user-sidebar-card">
+                <h2>Top Editors</h2>
+                {% if top_editors %}
+                    <ol class="leaderboard">
+                        {% for object in top_editors %}
+                            <li>
+                                <span class="leaderboard__rank">
+                                    {% if forloop.counter == 1 %}Gold{% elif forloop.counter == 2 %}Silver{% elif forloop.counter == 3 %}Bronze{% else %}{{ forloop.counter }}{% endif %}
+                                </span>
+                                <span class="leaderboard__entry"><a href="{{ object.get_absolute_url }}">{{ object.get_display_name }}</a></span>
+                                <span class="leaderboard__value">{{ object.total_count }} edit{{ object.total_count|pluralize }}</span>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                {% else %}
+                    <p>No edits yet.</p>
+                {% endif %}
+            </section>
+        </aside>
+    </div>
+{% endblock content %}

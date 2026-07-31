@@ -1,0 +1,34 @@
+{% extends 'page.html' %}
+
+{% block title %}Live bus map - Better Fleets{% endblock %}
+
+{% load static %}
+
+{% block head %}
+    <meta property="og:title" content="Live bus map - Better Fleets">
+    <link rel="stylesheet" href="{% static 'dist/js/app.css' %}">
+    <link rel="stylesheet" media="print" href="/liveries.{{ liveries_css_version }}.css" onload="this.onload=null;this.removeAttribute('media')">
+{% endblock head %}
+
+{% block bodyclass %}no-scroll{% endblock %}
+
+{% block header %}{% endblock header %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+    <div id="hugemap">
+        <noscript class="sorry">Sorry, the map requires JavaScript. You can still use most of the rest of the website.</noscript>
+    </div>
+{% endblock content %}
+
+{% block footer %}
+    <script>
+        INITIAL_VIEW_STATE = {
+            latitude: 54,
+            longitude: -2.9,
+            zoom: 5,
+        };
+    </script>
+    <script src="{% static 'dist/js/app.js' %}"></script>
+{% endblock footer %}

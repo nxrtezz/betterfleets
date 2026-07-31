@@ -1,0 +1,189 @@
+{% extends 'page.html' %}
+
+{% block title %}Live Fleet Mass Import - Better Fleets{% endblock %}
+
+{% block head %}
+<style>
+.management-shell { display:grid; gap:1.5rem; }
+.management-card { background:rgba(255,255,255,.92); border:1px solid rgba(26,42,68,.12); border-radius:1rem; padding:1.25rem; box-shadow:0 1rem 2.5rem rgba(26,42,68,.06); }
+.management-actions { display:flex; flex-wrap:wrap; gap:.75rem; margin:.75rem 0 0; }
+.management-actions .button, .management-actions button { margin:0; }
+.management-grid { display:grid; gap:1rem; }
+.management-grid label { display:grid; gap:.35rem; font-weight:600; }
+.management-grid input, .management-grid select, .management-grid textarea { width:100%; max-width:100%; }
+.operator-picker { display:grid; gap:.75rem; }
+.operator-picker__row { display:grid; gap:.75rem; }
+.import-results { display:grid; gap:1rem; }
+.issue-list, .error-list { display:grid; gap:.75rem; padding:0; margin:0; list-style:none; }
+.issue-card { border:1px solid rgba(170,60,60,.18); border-radius:.85rem; padding:1rem; background:#fff8f8; }
+.issue-card details { margin-top:.65rem; }
+.issue-card summary { cursor:pointer; font-weight:600; }
+.issue-card a { word-break:break-word; }
+.status-chip { display:inline-flex; align-items:center; border-radius:999px; padding:.2rem .65rem; background:#eef6ff; color:#134074; font-size:.9rem; }
+@media (min-width: 48em) {
+  .operator-picker__row { grid-template-columns:1fr 1fr; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="management-shell">
+    <section class="management-card">
+        <span class="status-chip">Superuser only</span>
+        <h1>Live fleet mass import</h1>
+        <p>This page imports directly into the live fleet list without using Django admin. Use the template download to get the right columns, or export an operator's current fleet before editing it offline.</p>
+        {% if messages %}
+            <ul class="error-list">
+                {% for message in messages %}
+                    <li class="issue-card">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        <div class="management-actions">
+            <a class="button" href="{{ template_download_url }}">Download XLSX template</a>
+            <a class="button" href="{{ request_hub_url }}">Open request pages</a>
+            <a class="button" href="{{ review_url }}">Review pending requests</a>
+        </div>
+    </section>
+
+    <section class="management-card">
+        <h2>Import workbook or pasted rows</h2>
+        <p>The workbook's <strong>Vehicles</strong> sheet is imported. You can upload <strong>.xlsx</strong> or UTF-8 <strong>.csv</strong>, or paste tab/comma-separated rows.</p>
+        <form method="post" enctype="multipart/form-data" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="issue-card">{{ form.non_field_errors }}</div>{% endif %}
+            <div class="management-grid operator-picker">
+                <div class="operator-picker__row">
+                    <label for="operator-search">Search operators
+                        <input id="operator-search" type="search" placeholder="Type to filter the dropdown">
+                    </label>
+                    <label for="{{ form.operator.id_for_label }}">Operator
+                        {{ form.operator }}
+                        {% if form.operator.errors %}<span>{{ form.operator.errors }}</span>{% endif %}
+                        <small>{{ form.operator.help_text }}</small>
+                    </label>
+                </div>
+                <div class="management-actions">
+                    <a id="operator-export-link" class="button" href="#" aria-disabled="true">Download operator fleet</a>
+                </div>
+                <label for="{{ form.workbook.id_for_label }}">{{ form.workbook.label }}
+                    {{ form.workbook }}
+                    {% if form.workbook.errors %}<span>{{ form.workbook.errors }}</span>{% endif %}
+                    <small>{{ form.workbook.help_text }}</small>
+                </label>
+                <label for="{{ form.bulk_text.id_for_label }}">{{ form.bulk_text.label }}
+                    {{ form.bulk_text }}
+                    {% if form.bulk_text.errors %}<span>{{ form.bulk_text.errors }}</span>{% endif %}
+                    <small>{{ form.bulk_text.help_text }}</small>
+                </label>
+            </div>
+            <div class="management-actions">
+                <button type="submit" class="button">Import rows</button>
+            </div>
+        </form>
+    </section>
+
+    {% if imported_count is not None or row_errors or issues %}
+    <section class="management-card import-results">
+        <h2>Import results</h2>
+        {% if imported_count is not None %}
+            <p><strong>{{ imported_count }}</strong> row{{ imported_count|pluralize }} imported.</p>
+        {% endif %}
+        {% if row_errors %}
+            <div>
+                <h3>Row errors</h3>
+                <ul class="error-list">
+                    {% for error in row_errors %}
+                        <li class="issue-card">{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+        {% if issues %}
+            <div>
+                <h3>Missing linked records</h3>
+                <ul class="issue-list">
+                    {% for issue in issues %}
+                        <li class="issue-card">
+                            <strong>{{ issue.message }}</strong>
+                            <details>
+                                <summary>Create missing {{ issue.missing_kind|cut:'_' }}</summary>
+                                <p>Open the Django add page in a new tab, create <strong>{{ issue.value }}</strong>, then rerun the import for the skipped rows.</p>
+                                <p><a href="{{ issue.create_url }}" target="_blank" rel="noopener">Open {{ issue.missing_kind|cut:'_' }} add page</a></p>
+                            </details>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+    </section>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block foot %}
+<script>
+(function () {
+    var searchInput = document.getElementById('operator-search');
+    var select = document.getElementById('{{ form.operator.id_for_label }}');
+    var exportLink = document.getElementById('operator-export-link');
+    if (!select || !exportLink) {
+        return;
+    }
+
+    var originalOptions = Array.prototype.slice.call(select.options).map(function (option) {
+        return {
+            value: option.value,
+            label: option.text,
+            selected: option.selected
+        };
+    });
+
+    function updateExportLink() {
+        if (!select.value) {
+            exportLink.setAttribute('aria-disabled', 'true');
+            exportLink.href = '#';
+            return;
+        }
+        exportLink.setAttribute('aria-disabled', 'false');
+        exportLink.href = '{% url "live_fleet_operator_xlsx" %}?operator=' + encodeURIComponent(select.value);
+    }
+
+    function renderOptions(filterValue) {
+        var currentValue = select.value;
+        var filtered = originalOptions.filter(function (option) {
+            return !filterValue || option.label.toLowerCase().indexOf(filterValue) !== -1 || option.value.toLowerCase().indexOf(filterValue) !== -1;
+        });
+        select.innerHTML = '';
+        filtered.forEach(function (option) {
+            var element = document.createElement('option');
+            element.value = option.value;
+            element.textContent = option.label;
+            if (option.value === currentValue) {
+                element.selected = true;
+            }
+            select.appendChild(element);
+        });
+        if (currentValue && !filtered.some(function (option) { return option.value === currentValue; })) {
+            var selected = originalOptions.find(function (option) { return option.value === currentValue; });
+            if (selected) {
+                var hiddenOption = document.createElement('option');
+                hiddenOption.value = selected.value;
+                hiddenOption.textContent = selected.label;
+                hiddenOption.selected = true;
+                select.appendChild(hiddenOption);
+            }
+        }
+        updateExportLink();
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function (event) {
+            renderOptions(event.target.value.trim().toLowerCase());
+        });
+    }
+    select.addEventListener('change', updateExportLink);
+    updateExportLink();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,257 @@
+{% extends 'page.html' %}
+{% load static %}
+
+{% block head %}
+    {% include 'includes/theme_styles.html' with page_theme=page_theme profile=object profile_class='organisation-profile' %}
+
+{% if active_tab == 'vehicles' %}
+    <style>
+        .livery {
+            width: 3rem;
+            height: 1.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid var(--border-color);
+            display: inline-block;
+        }
+    </style>
+{% endif %}
+
+{% endblock head %}
+
+{% block content %}
+
+<section class="organisation-profile">
+    <div class="organisation-profile__banner"{% if object.banner %} style="background-image:url('{{ object.banner.url }}')"{% endif %}></div>
+    <div class="organisation-profile__body">
+        {% if object.logo %}
+            <img src="{{ object.logo.url }}" alt="" class="organisation-profile__logo" style="max-width:min(42vw,14rem);max-height:clamp(6rem,15vw,10rem);width:auto;height:auto;object-fit:contain;">
+        {% endif %}
+        <div class="organisation-profile__meta">
+            {% if object.legal_name %}<p class="organisation-profile__eyebrow">{{ object.legal_name }}</p>{% endif %}
+            <h1>{{ object.short_name|default:object.name }}</h1>
+            {% if object.slogan %}<p class="organisation-profile__slogan"><i>{{ object.slogan }}</i></p>{% endif %}
+            {% if object.description %}<p class="organisation-profile__description">{{ object.description|linebreaksbr }}</p>{% endif %}
+            <ul class="organisation-profile__stats">
+                <li><strong>{{ groups|length }}</strong> divisions</li>
+                <li><strong>{{ operators_count }}</strong> operators</li>
+                <li><strong>{{ vehicles_count }}</strong> vehicles</li>
+                <li><strong>{{ depots_count }}</strong> depots</li>
+            </ul>
+            {% include 'includes/social_icons.html' with social_links=social_links %}
+            {% if object.website or object.email or object.phone %}
+                <ul class="organisation-profile__contact">
+                    {% if object.website %}<li><a href="{{ object.website }}" rel="nofollow">{{ object.website }}</a></li>{% endif %}
+                    {% if object.email %}<li><a href="mailto:{{ object.email }}">{{ object.email }}</a></li>{% endif %}
+                    {% if object.phone %}<li>{{ object.phone }}</li>{% endif %}
+                </ul>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<ul class="tabs">
+    <li>{% if active_tab == 'about' %}About{% else %}<a href="?tab=about">About</a>{% endif %}</li>
+    <li>{% if active_tab == 'vehicles' %}Fleet ({{ vehicles_count }}){% else %}<a href="?tab=vehicles">Fleet ({{ vehicles_count }})</a>{% endif %}</li>
+    <li>{% if active_tab == 'operators' %}Operators ({{ operators_count }}){% else %}<a href="?tab=operators">Operators ({{ operators_count }})</a>{% endif %}</li>
+    <li>{% if active_tab == 'garages' %}Garages ({{ depots_count }}){% else %}<a href="?tab=garages">Garages ({{ depots_count }})</a>{% endif %}</li>
+    <li>{% if active_tab == 'liveries' %}Liveries ({{ liveries_count }}){% else %}<a href="?tab=liveries">Liveries ({{ liveries_count }})</a>{% endif %}</li>
+    <li><a href="{% url 'organisation_map' object.slug %}">Map</a></li>
+</ul>
+
+{% if active_tab == 'vehicles' %}
+    {% if vehicles %}
+        <div class="table-wrapper">
+            <table class="fleet compact">
+                <thead>
+                    <tr>
+                        <th scope="col" colspan="2"></th>
+                        <th scope="col">Livery</th>
+                        <th scope="col">Branding</th>
+                        <th scope="col">Type</th>
+                        <th scope="col" class="trivia">Name</th>
+                        <th scope="col" class="trivia">Garage</th>
+                        <th scope="col" class="trivia">Previous reg</th>
+                        <th>Operator</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vehicle in vehicles %}
+                        <tr id="{{ vehicle.slug }}">
+                            <td class="tabular">
+                                <a href="{{ vehicle.get_absolute_url }}">
+                                    {% if vehicle.fleet_code or vehicle.fleet_number %}{% firstof vehicle.fleet_code vehicle.fleet_number %}{% if not vehicle.code_matches_fleet_primary %} (<i>{{ vehicle.get_code_display }}</i>){% endif %}{% else %}{{ vehicle.code }}{% endif %}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="{{ vehicle.get_absolute_url }}" class="reg">
+                                    {% if vehicle.reg %}{{ vehicle.get_reg }}{% endif %}
+                                </a>
+                            </td>
+                            <td class="livery-cell" colspan="2">
+                                {% if vehicle.colours or vehicle.livery_id %}<div class="livery{% if vehicle.livery_id %} livery-{{ vehicle.livery_id }}{% else %}" style="background:{{ vehicle.get_livery }}{% endif %}"></div>{% endif %}
+                                {% if vehicle.livery_name %}{{ vehicle.livery_name }}{% endif %}
+                            </td>
+                            <td>{{ vehicle.vehicle_type_name }}</td>
+                            <td class="trivia">{{ vehicle.name }}</td>
+                            <td class="trivia">{{ vehicle.garage_name }}</td>
+                            <td class="trivia">{{ vehicle.prev_registration }}</td>
+                            <td><a href="{{ vehicle.operator.get_absolute_url }}">{{ vehicle.operator_name }}</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+    {% else %}
+        <p>No vehicles are currently listed for this organisation.</p>
+    {% endif %}
+{% elif active_tab == 'garages' %}
+    {% include 'includes/depot_section.html' with depots=depots depot_map_points=depot_map_points depot_section_class='organisation-card depot-section' show_operator=True show_group=True %}
+    {% if not depots %}
+        <p>No garages are currently listed for this organisation.</p>
+    {% endif %}
+{% elif active_tab == 'operators' %}
+    <div class="organisation-divisions">
+        {% for group in groups %}
+            <article class="organisation-division">
+                <h3><a href="{{ group.get_absolute_url }}">{{ group.name }}</a></h3>
+                {% if group.description %}<p>{{ group.description|linebreaksbr }}</p>{% endif %}
+                <ul>
+                    {% for op in group.ordered_operators %}
+                        <li><a href="{{ op.get_absolute_url }}">{% firstof op.aka op.name %}{% if op.preserved %} <i>(preserved)</i>{% endif %}</a></li>
+                    {% empty %}
+                        <li>No active operators in this division.</li>
+                    {% endfor %}
+                </ul>
+                {% if group.ceased_operators %}
+                    <h4>Ceased Operations</h4>
+                    <ul>
+                        {% for op in group.ceased_operators %}
+                            <li><a href="{{ op.get_absolute_url }}">{% firstof op.aka op.name %}</a> <small>Ceased {{ op.ceased_operations_on|date:"j F Y" }}</small></li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </article>
+        {% empty %}
+            {% if not direct_operators and not ceased_direct_operators %}
+                <p>No divisions or operators are linked to this major operator yet.</p>
+            {% endif %}
+        {% endfor %}
+        {% if direct_operators %}
+            <article class="organisation-division">
+                <h3>Direct operators</h3>
+                <p>Operators linked to this major operator but not assigned to a division.</p>
+                <ul>
+                    {% for op in direct_operators %}
+                        <li><a href="{{ op.get_absolute_url }}">{% firstof op.aka op.name %}{% if op.preserved %} <i>(preserved)</i>{% endif %}</a></li>
+                    {% endfor %}
+                </ul>
+                {% if ceased_direct_operators %}
+                    <h4>Ceased Operations</h4>
+                    <ul>
+                        {% for op in ceased_direct_operators %}
+                            <li><a href="{{ op.get_absolute_url }}">{% firstof op.aka op.name %}</a> <small>Ceased {{ op.ceased_operations_on|date:"j F Y" }}</small></li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </article>
+        {% endif %}
+        {% if not direct_operators and ceased_direct_operators %}
+            <article class="organisation-division">
+                <h3>Direct operators</h3>
+                <h4>Ceased Operations</h4>
+                <ul>
+                    {% for op in ceased_direct_operators %}
+                        <li><a href="{{ op.get_absolute_url }}">{% firstof op.aka op.name %}</a> <small>Ceased {{ op.ceased_operations_on|date:"j F Y" }}</small></li>
+                    {% endfor %}
+                </ul>
+            </article>
+        {% endif %}
+    </div>
+{% elif active_tab == 'liveries' %}
+    <style>
+        .operator-liveries {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+        }
+        .operator-livery-card {
+            display: grid;
+            gap: 0.85rem;
+            padding: 0.9rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            background: var(--background-color);
+            transition: border-color 0.15s;
+        }
+        .operator-livery-card:hover {
+            border-color: var(--border-color-darker);
+        }
+        .operator-livery-card__swatch {
+            min-height: 5.5rem;
+            aspect-ratio: 9 / 4;
+            border-radius: 0.85rem;
+            border: 1px solid var(--border-color);
+        }
+        .operator-livery-card h3,
+        .operator-livery-card p {
+            margin: 0;
+        }
+        .operator-livery-card__meta {
+            color: var(--secondary-text-color);
+        }
+    </style>
+    <div class="fleet-section-header">
+        <h2 class="fleet-section-title">Liveries</h2>
+        <span class="fleet-section-count">{{ liveries|length }} livery{{ liveries|length|pluralize }}</span>
+    </div>
+    {% if liveries %}
+        <div class="operator-liveries">
+            {% for livery in liveries %}
+                <article class="operator-livery-card">
+                    {% if livery.preview_css %}
+                        {% if livery.published %}
+                            <a href="{{ livery.get_absolute_url }}">
+                                <div class="operator-livery-card__swatch" style="background:{{ livery.preview_css }}"></div>
+                            </a>
+                        {% else %}
+                            <div class="operator-livery-card__swatch" style="background:{{ livery.preview_css }}"></div>
+                        {% endif %}
+                    {% endif %}
+                    <div>
+                        <h3>
+                            {% if livery.published %}
+                                <a href="{{ livery.get_absolute_url }}">{{ livery.name }}</a>
+                            {% else %}
+                                {{ livery.name }}
+                            {% endif %}
+                        </h3>
+                        <p class="operator-livery-card__meta">{{ livery.vehicle_count }} vehicle{{ livery.vehicle_count|pluralize }} in this organisation's fleet</p>
+                    </div>
+                    {% if livery.creator %}
+                        <p class="operator-livery-card__meta">Created by {{ livery.creator }}</p>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No liveries are currently listed for this organisation.</p>
+    {% endif %}
+{% elif active_tab == 'about' %}
+    {% if object.about %}
+        <div class="about-content">
+            {{ object.about|linebreaksbr }}
+        </div>
+    {% else %}
+        <p>No about information has been added for this organisation yet.</p>
+    {% endif %}
+{% endif %}
+
+{% endblock content %}
+
+{% block foot %}
+{{ block.super }}
+{% if active_tab == 'liveries' or active_tab == 'vehicles' %}
+{{ livery_styles|safe }}
+{% endif %}
+{% endblock foot %}

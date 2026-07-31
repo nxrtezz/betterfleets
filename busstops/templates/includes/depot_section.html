@@ -1,0 +1,33 @@
+{% if depots %}
+    <section class="{{ depot_section_class|default:'division-card depot-section' }}">
+        <h2>Garages</h2>
+        {% if depot_map_html %}
+            <div class="depot-map-root">{{ depot_map_html|safe }}</div>
+            <p class="depot-list__intro">Garage locations shown on the map below.</p>
+        {% endif %}
+        <ul class="division-depots garage-list">
+            {% for depot in depots %}
+                <li>
+                    <strong>
+                        {% if depot.filter_url %}
+                            <a href="{{ depot.filter_url }}">{{ depot.name }}</a>
+                        {% else %}
+                            {{ depot.name }}
+                        {% endif %}
+                    </strong>
+                    {% if show_operator and depot.operator_name %}
+                        <span class="depot-list__meta"><a href="{{ depot.operator_url }}">{{ depot.operator_name }}</a></span>
+                    {% endif %}
+                    {% if show_group and depot.group_name %}
+                        <span class="depot-list__meta"><a href="{{ depot.group_url }}">{{ depot.group_name }}</a></span>
+                    {% endif %}
+                    {% if depot.vehicle_count %}
+                        <span class="depot-list__meta">{{ depot.vehicle_count }} vehicle{{ depot.vehicle_count|pluralize }}</span>
+                    {% endif %}
+                    {% if depot.address %}<span>{{ depot.address }}</span>{% endif %}
+                    {% if depot.notes %}<small>{{ depot.notes }}</small>{% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+{% endif %}

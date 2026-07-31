@@ -1,0 +1,99 @@
+# =========================
+# Operating System
+# =========================
+.DS_Store
+Thumbs.db
+.metadata_never_index
+
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+.venv_old/
+venv/
+env/
+ENV/
+
+# Coverage & testing
+.coverage
+.coverage.*
+.pytest_cache/
+htmlcov/
+.tox/
+.nox/
+
+# Type checking / linting
+.mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
+
+# =========================
+# Django
+# =========================
+media/
+staticfiles/
+*.log
+
+# Local data
+data/
+
+# =========================
+# JavaScript / Node
+# =========================
+node_modules/
+.parcel-cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Built frontend assets
+busstops/static/dist/
+
+# =========================
+# IDEs
+# =========================
+.idea/
+.vscode/
+.cursor/
+.devin/
+
+# =========================
+# AI tooling
+# =========================
+.aider*
+
+# =========================
+# Local scripts
+# =========================
+manage.sh
+credentials.sh
+
+# =========================
+# Secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+.env.sentry-build-plugin
+.kamal/secrets
+
+# Keys & certificates
+*.pem
+*.key
+*.crt
+*.p12
+
+# =========================
+# Misc
+# =========================
+slim-bustimes.sql

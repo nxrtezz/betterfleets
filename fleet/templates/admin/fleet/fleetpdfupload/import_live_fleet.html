@@ -1,0 +1,77 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <p>
+        <a href="{% url 'admin:fleet_fleetpdfupload_change' upload.pk %}">Back to PDF upload</a>
+    </p>
+
+    <p>
+        This works like a mass-add preview: review the intended operator and depot matches before committing into the live fleet.
+    </p>
+
+    {% if can_commit %}
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="submit-row">
+                <button type="submit" name="action" value="commit" class="default">Commit to live fleet</button>
+            </div>
+        </form>
+    {% endif %}
+
+    {% if rows %}
+        <h2>Preview</h2>
+        <table class="adminlist">
+            <thead>
+                <tr>
+                    <th>PDF row</th>
+                    <th>Action</th>
+                    <th>Live vehicle</th>
+                    <th>Operator</th>
+                    <th>Depot</th>
+                    <th>Vehicle</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ row.fleet_vehicle.source_page }} / {{ row.fleet_vehicle.fleet_number|default:row.fleet_vehicle.code }}</td>
+                        <td>{{ row.action }}</td>
+                        <td>
+                            {% if row.live_vehicle %}
+                                <a href="{% url 'admin:vehicles_vehicle_change' row.live_vehicle.pk %}">{{ row.live_vehicle }}</a>
+                            {% else %}
+                                New vehicle
+                            {% endif %}
+                        </td>
+                        <td>{{ row.operator_preview.label }}</td>
+                        <td>{{ row.garage_preview.label }}</td>
+                        <td>
+                            {{ row.fleet_vehicle.registration }}
+                            {% if row.unresolved_livery %}
+                                <div>Unmatched livery text: {{ row.unresolved_livery }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.errors %}
+                                {% for error in row.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            {% else %}
+                                OK
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    {% if summary %}
+        <p>Created: {{ summary.created }} | Updated: {{ summary.updated }} | Errors: {{ summary.errors }}</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends 'page.html' %}
+{% load static %}
+{% load i18n %}
+{% load account %}
+
+{% block title %}{% trans "Confirm Email Address" %} - BetterFleet{% endblock %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <style>
+        .auth-container {
+            max-width: 28rem;
+            margin: 0 auto;
+        }
+
+        .auth-card {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+
+        .auth-header {
+            padding: 2rem 1.5rem 1rem;
+            text-align: center;
+        }
+
+        .auth-header h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.75rem;
+            color: var(--text-color);
+        }
+
+        .auth-header p {
+            margin: 0;
+            color: var(--secondary-text-color);
+        }
+
+        .auth-form {
+            padding: 1.5rem;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .auth-form button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+            background: var(--brand-color-darker);
+            color: var(--button-foreground);
+        }
+
+        .auth-form button:hover {
+            background: var(--brand-color-darker-darker);
+        }
+
+        .auth-content {
+            padding: 0 1.5rem 1.5rem;
+        }
+
+        .auth-content a {
+            color: var(--link-color);
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>{% trans "Confirm Email Address" %}</h1>
+        </div>
+
+        {% if confirmation %}
+            {% user_display confirmation.email_address.user as user_display %}
+            <p class="auth-content">{% blocktrans with confirmation.email_address.email as email %}Please confirm that <a href="mailto:{{ email }}">{{ email }}</a> is an email address for user {{ user_display }}.{% endblocktrans %}</p>
+
+            <form method="post" action="{% url 'account_confirm_email' confirmation.key %}" class="auth-form">
+                {% csrf_token %}
+                <button type="submit">{% trans "Confirm" %}</button>
+            </form>
+        {% else %}
+            {% url 'account_email' as email_url %}
+            <p class="auth-content">{% blocktrans %}This email confirmation link expired or is invalid. Please <a href="{{ email_url }}">issue a new email confirmation request</a>.{% endblocktrans %}</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

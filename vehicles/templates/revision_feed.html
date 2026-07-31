@@ -1,0 +1,13 @@
+{% load static %}
+
+<script src="{% static 'js/htmx.min.js' %}"></script>
+
+<ul class="revisions-list" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    {% for entry in entries %}
+        {% if entry.entry_type == "vehicle_revision" %}
+            {% include "vehicle_revision.html" with revision=entry.object %}
+        {% else %}
+            {% include "request_log.html" with request_entry=entry.object %}
+        {% endif %}
+    {% endfor %}
+</ul>

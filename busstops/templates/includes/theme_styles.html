@@ -1,0 +1,43 @@
+{% if page_theme or profile %}
+    <style>
+        {% if page_theme %}
+            :root {
+                --brand-color: {{ page_theme.button_background|default:page_theme.accent_colour|default:'#ffff9e' }};
+                --brand-color-darker: {{ page_theme.header_background|default:page_theme.accent_colour|default:'#de8' }};
+                --brand-color-darker-darker: {{ page_theme.accent_colour|default:page_theme.header_background|default:'#cd7' }};
+                --border-color: {{ page_theme.header_background|default:page_theme.accent_colour|default:'#de8' }};
+                --border-color-darker: {{ page_theme.accent_colour|default:page_theme.header_background|default:'#cd7' }};
+                --header-text-color: {{ page_theme.header_foreground|default:'#111827' }};
+                --theme-card-background: {{ page_theme.card_background|default:'#ffffff' }};
+                --theme-button-background: {{ page_theme.button_background|default:page_theme.accent_colour|default:'#ffff9e' }};
+                --theme-button-foreground: {{ page_theme.button_foreground|default:page_theme.header_foreground|default:'#111827' }};
+                --button-background: var(--theme-button-background);
+                --button-foreground: var(--theme-button-foreground);
+            }
+        {% endif %}
+        {% if profile and profile_class == 'division-profile' %}
+            .division-profile {
+                --division-bg: {{ profile.header_background|default:'#f6f8fb' }};
+                --division-fg: {{ profile.header_foreground|default:'#111827' }};
+                --division-accent: {{ profile.accent_colour|default:'#0f766e' }};
+                --division-card: {{ profile.card_background|default:'#ffffff' }};
+                --division-button-bg: {{ profile.button_background|default:'#ecfeff' }};
+                --division-button-fg: {{ profile.button_foreground|default:'#0f172a' }};
+            }
+        {% endif %}
+        {% if profile and profile_class == 'organisation-profile' %}
+            .organisation-profile {
+                --org-bg: {{ profile.header_background|default:'#f5f7fb' }};
+                --org-fg: {{ profile.header_foreground|default:'#111827' }};
+                --org-accent: {{ profile.accent_colour|default:'#0f766e' }};
+                --org-card: {{ profile.card_background|default:'#ffffff' }};
+                --org-button-bg: {{ profile.button_background|default:'#ecfeff' }};
+                --org-button-fg: {{ profile.button_foreground|default:'#0f172a' }};
+            }
+        {% endif %}
+        {% if page_theme and page_theme.custom_css %}
+            {{ page_theme.custom_css|safe }}
+        {% endif %}
+    </style>
+{% endif %}
+

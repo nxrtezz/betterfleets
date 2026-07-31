@@ -1,0 +1,33 @@
+{% extends 'page.html' %}
+
+{% block title %}Government Authorities - betterfleets{% endblock %}
+
+{% block meta_description %}
+    <meta name="description" content="Browse government authorities and transport bodies listed on Better Fleets.">
+{% endblock meta_description %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+    <h1>Government Authorities</h1>
+    <p>Government authorities and transport bodies listed on Better Fleets.</p>
+
+    {% if authorities %}
+        <div class="panes">
+            {% for authority in authorities %}
+                <article class="pane">
+                    {% if authority.logo %}
+                        <p><img src="{{ authority.logo.url }}" alt="" style="max-width:min(12rem, 80%);max-height:7rem;object-fit:contain;"></p>
+                    {% endif %}
+                    <h2><a href="{{ authority.get_absolute_url }}">{{ authority.name }}</a></h2>
+                    {% if authority.description %}<p>{{ authority.description|truncatewords:32 }}</p>{% endif %}
+                    {% if authority.short_name and authority.short_name != authority.name %}<p><small>{{ authority.short_name }}</small></p>{% endif %}
+                </article>
+            {% endfor %}
+        </div>
+
+        {% include 'pagination.html' with page=authorities %}
+    {% else %}
+        <p>No government authorities are listed yet.</p>
+    {% endif %}
+{% endblock content %}

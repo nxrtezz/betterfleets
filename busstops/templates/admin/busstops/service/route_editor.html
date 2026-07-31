@@ -1,0 +1,366 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.6.1/ol.css">
+    <script src="https://cdn.jsdelivr.net/npm/ol@v10.6.1/dist/ol.js"></script>
+    <script src="{% static 'admin/js/stopgroup-selector.js' %}?v=20260430a"></script>
+    <style>
+        .route-editor-search {
+            margin: 1rem 0 1.5rem;
+        }
+        .route-editor-search input[type="search"] {
+            min-width: 22rem;
+        }
+        .route-editor-results {
+            margin: 0 0 1.5rem;
+            padding-left: 1.25rem;
+        }
+        .route-editor-results li {
+            margin-bottom: 0.35rem;
+        }
+        .route-editor-summary {
+            margin-bottom: 1rem;
+        }
+        .route-editor-segments {
+            display: grid;
+            gap: 1rem;
+        }
+        .route-editor-segment {
+            border: 1px solid var(--hairline-color, #d4d4d4);
+            border-radius: 8px;
+            padding: 1rem;
+            background: var(--body-bg, #fff);
+        }
+        .route-editor-segment h3 {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+        }
+        .route-editor-segment textarea {
+            width: 100%;
+            min-height: 10rem;
+            font-family: Consolas, Monaco, monospace;
+            box-sizing: border-box;
+        }
+        .route-editor-help {
+            color: var(--body-quiet-color, #666);
+            margin-top: 0.4rem;
+        }
+        .route-editor-actions {
+            margin-top: 1rem;
+        }
+        .stop-group-selector {
+            max-width: 1100px;
+        }
+        .stop-group-selector-map {
+            height: 460px;
+            width: 100%;
+            margin: 1rem 0;
+            border: 1px solid var(--hairline-color, #d4d4d4);
+            background: #f3f4f6;
+        }
+        .stop-group-selector-status {
+            margin-top: 0.5rem;
+            color: var(--body-quiet-color, #666);
+        }
+        .stop-group-selector-list {
+            margin: 0;
+            padding-left: 1.5rem;
+        }
+        .stop-group-selector-list li {
+            margin-bottom: 0.35rem;
+        }
+        .stop-group-selector-list li.empty {
+            color: var(--body-quiet-color, #666);
+        }
+        .stop-group-selector-remove {
+            margin-right: 0.5rem;
+        }
+        .route-editor-preview-map {
+            height: 460px;
+            width: 100%;
+            margin-top: 1rem;
+            border: 1px solid var(--hairline-color, #d4d4d4);
+            background: #f3f4f6;
+        }
+    </style>
+{% endblock extrahead %}
+
+{% block content %}
+    <h1>Route editor</h1>
+    <p>Search for a service, then edit stop-to-stop route geometry here in admin.</p>
+
+    <form method="get" class="route-editor-search">
+        <input
+            type="search"
+            name="q"
+            value="{{ search_query }}"
+            placeholder="Search line name, description or service code"
+        >
+        {% if service %}
+            <input type="hidden" name="service" value="{{ service.id }}">
+        {% endif %}
+        <button type="submit" class="button">Search</button>
+    </form>
+
+    {% if results %}
+        <ul class="route-editor-results">
+            {% for result in results %}
+                <li>
+                    <a href="?service={{ result.id }}&q={{ search_query|urlencode }}">
+                        {{ result.get_line_name|default:result.line_name }}{% if result.description %} - {{ result.description }}{% endif %}
+                    </a>
+                    {% if result.service_code %}<span class="quiet">({{ result.service_code }})</span>{% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if service %}
+        <div class="route-editor-summary">
+            <h2>
+                {{ service.get_line_name }}
+                {% if service.description %} - {{ service.description }}{% endif %}
+            </h2>
+            <p>
+                <a href="{% url 'admin:busstops_service_change' service.id %}">Back to service</a>
+                ·
+                <a href="{{ service.get_absolute_url }}" target="_blank" rel="noopener">Open public page</a>
+            </p>
+        </div>
+
+        <form method="get" class="route-editor-search">
+            <input type="hidden" name="service" value="{{ service.id }}">
+            {% if search_query %}
+                <input type="hidden" name="q" value="{{ search_query }}">
+            {% endif %}
+            <label>
+                Direction:
+                <select name="inbound">
+                    <option value="0"{% if not inbound %} selected{% endif %}>Outbound</option>
+                    <option value="1"{% if inbound %} selected{% endif %}>Inbound</option>
+                </select>
+            </label>
+            <button type="submit" class="button">Switch</button>
+        </form>
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="save_stops">
+            <input type="hidden" name="service" value="{{ service.id }}">
+            <input type="hidden" name="inbound" value="{% if inbound %}1{% else %}0{% endif %}">
+            {% if search_query %}
+                <input type="hidden" name="q" value="{{ search_query }}">
+            {% endif %}
+            <section class="route-editor-segment">
+                <h3>Ordered stops ({% if inbound %}inbound{% else %}outbound{% endif %})</h3>
+                <p>Click stops on the map to add them to the {% if inbound %}inbound{% else %}outbound{% endif %} stop chain in order. Click a selected stop again, or use Remove, to take it out.</p>
+                <input type="hidden" name="stops_selection" value="{{ selected_stop_ids_csv }}">
+                <div class="stop-group-selector"
+                     data-stops-url="/stops.json"
+                     data-include-unlinked-stops="1"
+                     data-default-style="alidade_smooth"
+                     data-selected-stop-ids="{{ selected_stop_ids_csv }}">
+                    <div class="stop-group-selector-status">Zoom in to load stops.</div>
+                    <div class="stop-group-selector-map" id="stop-group-selector-map"></div>
+                    <h3>Selected stops</h3>
+                    <ol class="stop-group-selector-list">
+                        {% for row in selected_stop_rows %}
+                            <li data-stop-id="{{ row.stop_id }}" data-stop-name="{{ row.stop_name }}">
+                                <button type="button" class="stop-group-selector-remove" data-stop-id="{{ row.stop_id }}">Remove</button>
+                                {{ row.stop_name }} <span class="quiet">{{ row.stop_id }}</span>
+                            </li>
+                        {% empty %}
+                            <li class="empty">No stops selected yet.</li>
+                        {% endfor %}
+                    </ol>
+                </div>
+                <p class="route-editor-help">
+                    This updates the {% if inbound %}inbound{% else %}outbound{% endif %} stop order used to generate the editable stop-to-stop segments below.
+                </p>
+                <div class="route-editor-actions">
+                    <button type="submit" class="default">Save stops</button>
+                </div>
+            </section>
+        </form>
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="generate_geometry">
+            <input type="hidden" name="service" value="{{ service.id }}">
+            <input type="hidden" name="inbound" value="{% if inbound %}1{% else %}0{% endif %}">
+            {% if search_query %}
+                <input type="hidden" name="q" value="{{ search_query }}">
+            {% endif %}
+            <section class="route-editor-segment">
+                <h3>Generate snapped geometry</h3>
+                <p>Build route links automatically from the ordered {% if inbound %}inbound{% else %}outbound{% endif %} stops using the configured routing backend, then fine-tune any segment below if needed.</p>
+                <p class="route-editor-help">By default this uses a local OSRM-style endpoint from <code>ROUTE_EDITOR_OSRM_URL</code>. You can switch backends in settings if needed.</p>
+                <div style="margin: 1rem 0;">
+                    <label for="waypoints" style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
+                        Waypoints (for OSRM guidance only, hidden from final route):
+                    </label>
+                    <textarea 
+                        id="waypoints" 
+                        name="waypoints" 
+                        placeholder="Optional: Add waypoint coordinates (one per line, format: lng,lat)&#10;These will guide the routing but won't appear in the saved route."
+                        style="width: 100%; min-height: 6rem; font-family: Consolas, Monaco, monospace; box-sizing: border-box; padding: 0.5rem;"
+                    >{{ waypoints_text }}</textarea>
+                    <p class="route-editor-help">
+                        Add waypoint coordinates to guide OSRM routing (e.g., to avoid certain areas or force a specific path). These waypoints are only used during route generation and will NOT be saved in the final route geometry.
+                    </p>
+                </div>
+                <div class="route-editor-actions">
+                    <button type="submit" class="button">Generate snapped route geometry</button>
+                </div>
+            </section>
+        </form>
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="save_geometry">
+            <input type="hidden" name="service" value="{{ service.id }}">
+            <input type="hidden" name="inbound" value="{% if inbound %}1{% else %}0{% endif %}">
+            {% if search_query %}
+                <input type="hidden" name="q" value="{{ search_query }}">
+            {% endif %}
+            {% if segments or preview_stops %}
+                <section class="route-editor-segment">
+                    <h3>Route preview</h3>
+                    <p>Preview the current stop chain and the saved/generated route geometry on the map below.</p>
+                    <div id="route-editor-preview-map" class="route-editor-preview-map"></div>
+                </section>
+            {% endif %}
+            <div class="route-editor-segments">
+                {% for segment in segments %}
+                    <section class="route-editor-segment">
+                        <h3>{{ segment.from_stop_name }} → {{ segment.to_stop_name }}</h3>
+                        <p>
+                            {{ segment.line_name|default:service.get_line_name }}
+                            ·
+                            {% if segment.inbound %}inbound{% else %}outbound{% endif %}
+                        </p>
+                        <textarea name="{{ segment.field_name }}">{{ segment.coordinates_text }}</textarea>
+                        <p class="route-editor-help">
+                            One <code>lng, lat</code> pair per line. Clear the box to remove the saved geometry for this segment.
+                        </p>
+                    </section>
+                {% empty %}
+                    <p>No stop-to-stop segments were found for this service yet. Add stops above first.</p>
+                {% endfor %}
+            </div>
+            {% if segments %}
+                <div class="route-editor-actions">
+                    <button type="submit" class="default">Save route geometry</button>
+                </div>
+            {% endif %}
+        </form>
+        {{ segments|json_script:"route-editor-segments-data" }}
+        {{ preview_stops|json_script:"route-editor-stops-data" }}
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                const mapElement = document.getElementById("route-editor-preview-map");
+                if (!mapElement || !window.ol) {
+                    return;
+                }
+
+                const segments = JSON.parse(
+                    document.getElementById("route-editor-segments-data").textContent
+                );
+                const stops = JSON.parse(
+                    document.getElementById("route-editor-stops-data").textContent
+                );
+
+                const lineSource = new ol.source.Vector();
+                const stopSource = new ol.source.Vector();
+
+                segments.forEach(function (segment) {
+                    const coordinates = (segment.coordinates || []).map(function (point) {
+                        return ol.proj.fromLonLat(point);
+                    });
+                    if (coordinates.length < 2) {
+                        return;
+                    }
+                    lineSource.addFeature(
+                        new ol.Feature({
+                            geometry: new ol.geom.LineString(coordinates),
+                        })
+                    );
+                });
+
+                stops.forEach(function (stop, index) {
+                    if (!stop.coordinates || stop.coordinates.length < 2) {
+                        return;
+                    }
+                    const feature = new ol.Feature({
+                        geometry: new ol.geom.Point(ol.proj.fromLonLat(stop.coordinates)),
+                    });
+                    feature.setProperties({
+                        label: String(index + 1),
+                        name: stop.stop_name,
+                    });
+                    stopSource.addFeature(feature);
+                });
+
+                const map = new ol.Map({
+                    target: mapElement,
+                    layers: [
+                        new ol.layer.Tile({
+                            source: new ol.source.OSM(),
+                        }),
+                        new ol.layer.Vector({
+                            source: lineSource,
+                            style: new ol.style.Style({
+                                stroke: new ol.style.Stroke({
+                                    color: "#dc2626",
+                                    width: 4,
+                                }),
+                            }),
+                        }),
+                        new ol.layer.Vector({
+                            source: stopSource,
+                            style: function (feature) {
+                                return new ol.style.Style({
+                                    image: new ol.style.Circle({
+                                        radius: 8,
+                                        fill: new ol.style.Fill({ color: "#111827" }),
+                                        stroke: new ol.style.Stroke({
+                                            color: "#ffffff",
+                                            width: 2,
+                                        }),
+                                    }),
+                                    text: new ol.style.Text({
+                                        text: feature.get("label"),
+                                        fill: new ol.style.Fill({ color: "#ffffff" }),
+                                        offsetY: 1,
+                                    }),
+                                });
+                            },
+                        }),
+                    ],
+                    view: new ol.View({
+                        center: ol.proj.fromLonLat([-2.5, 54.5]),
+                        zoom: 6,
+                    }),
+                });
+
+                const extent = ol.extent.createEmpty();
+                let hasFeatures = false;
+                [lineSource, stopSource].forEach(function (source) {
+                    source.getFeatures().forEach(function (feature) {
+                        ol.extent.extend(extent, feature.getGeometry().getExtent());
+                        hasFeatures = true;
+                    });
+                });
+
+                if (hasFeatures) {
+                    map.getView().fit(extent, {
+                        padding: [40, 40, 40, 40],
+                        maxZoom: 16,
+                    });
+                }
+            });
+        </script>
+    {% endif %}
+{% endblock content %}

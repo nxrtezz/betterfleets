@@ -1,0 +1,308 @@
+{% extends 'page.html' %}
+
+{% block title %}Dashboard - Better Fleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <style>
+        .dashboard-hero,
+        .dashboard-section {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .dashboard-hero h1,
+        .dashboard-section h2 {
+            margin-top: 0;
+        }
+
+        .dashboard-stats,
+        .dashboard-shortcuts,
+        .dashboard-featured,
+        .dashboard-groups {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .dashboard-stats {
+            grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+            margin-top: 1rem;
+        }
+
+        .dashboard-shortcuts,
+        .dashboard-featured {
+            grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+        }
+
+        .dashboard-groups {
+            grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+        }
+
+        .dashboard-card,
+        .dashboard-group {
+            border: 1px solid var(--border-color);
+            border-radius: 0.9rem;
+            padding: 1rem;
+            background: rgba(148, 163, 184, 0.08);
+        }
+
+        .dashboard-card h3,
+        .dashboard-group h3,
+        .dashboard-group h4 {
+            margin-top: 0;
+            margin-bottom: 0.4rem;
+        }
+
+        .dashboard-stat__value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .dashboard-stat__label,
+        .dashboard-card p,
+        .dashboard-group p {
+            margin: 0.35rem 0 0;
+        }
+
+        .dashboard-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.85rem;
+        }
+
+        .dashboard-links a {
+            text-decoration: none;
+        }
+
+        .dashboard-group + .dashboard-group {
+            margin-top: 0;
+        }
+
+        .dashboard-model-list {
+            display: grid;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <section class="dashboard-hero">
+        <h1>Hello, {{ user.username|default:user.email }}</h1>
+        <p>This is a themed superuser dashboard for quick additions and site-level admin work.</p>
+
+        <div class="dashboard-stats">
+            {% for stat in stats %}
+                <article class="dashboard-card dashboard-stat">
+                    <div class="dashboard-stat__value">{{ stat.value }}</div>
+                    <p class="dashboard-stat__label">{{ stat.label }}</p>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="dashboard-section">
+        <h2>System Health</h2>
+        <div class="dashboard-stats">
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value" style="color: {% if system_health.health_status == 'healthy' %}#28a745{% elif system_health.health_status == 'unhealthy' %}#dc3545{% else %}#ffc107{% endif %}">{{ system_health.health_status|title }}</div>
+                <p class="dashboard-stat__label">Health Status</p>
+            </article>
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value" style="color: {% if system_health.redis_status == 'connected' %}#28a745{% else %}#dc3545{% endif %}">{{ system_health.redis_status|title }}</div>
+                <p class="dashboard-stat__label">Redis</p>
+            </article>
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value" style="color: {% if system_health.db_status == 'connected' %}#28a745{% else %}#dc3545{% endif %}">{{ system_health.db_status|title }}</div>
+                <p class="dashboard-stat__label">Database</p>
+            </article>
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value" style="color: {% if system_health.huey_status == 'connected' %}#28a745{% elif system_health.huey_status == 'not configured' %}#6c757d{% else %}#dc3545{% endif %}">{{ system_health.huey_status|title }}</div>
+                <p class="dashboard-stat__label">Huey Queue</p>
+            </article>
+            {% if system_health.huey_queue_size > 0 %}
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ system_health.huey_queue_size }}</div>
+                <p class="dashboard-stat__label">Queue Size</p>
+            </article>
+            {% endif %}
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ system_health.active_users }}</div>
+                <p class="dashboard-stat__label">Active Users</p>
+            </article>
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ system_health.active_anonymous }}</div>
+                <p class="dashboard-stat__label">Active Anonymous</p>
+            </article>
+        </div>
+    </section>
+
+    <section class="dashboard-section">
+        <h2>Vehicle Tracking Statistics</h2>
+        <div class="dashboard-stats">
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ statistics.vehicle_journeys }}</div>
+                <p class="dashboard-stat__label">Vehicle Journeys (30min)</p>
+            </article>
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ statistics.service_vehicle_journeys }}</div>
+                <p class="dashboard-stat__label">With Service</p>
+            </article>
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ statistics.trip_vehicle_journeys }}</div>
+                <p class="dashboard-stat__label">With Trip</p>
+            </article>
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ statistics.pending_vehicle_edits }}</div>
+                <p class="dashboard-stat__label">Pending Vehicle Edits</p>
+            </article>
+        </div>
+        {% if statistics.datetime %}
+        <p style="margin-top: 1rem; color: #6c757d; font-size: 0.9rem;">Last updated: {{ statistics.datetime }}</p>
+        {% endif %}
+    </section>
+
+    <section class="dashboard-section">
+        <h2>Import Status</h2>
+        {% if import_status.sources %}
+        <div class="dashboard-stats">
+            {% for source_name, count in import_status.sources.items %}
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ count }}</div>
+                <p class="dashboard-stat__label">{{ source_name|title }}</p>
+            </article>
+            {% endfor %}
+        </div>
+        {% if import_status.datetime %}
+        <p style="margin-top: 1rem; color: #6c757d; font-size: 0.9rem;">Last updated: {{ import_status.datetime }}</p>
+        {% endif %}
+        {% else %}
+        <p>No import status data available. Timetable source stats task may not have run yet.</p>
+        {% endif %}
+    </section>
+
+    <section class="dashboard-section">
+        <h2>Service Statistics</h2>
+        <div class="dashboard-stats">
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ service_stats.total_services }}</div>
+                <p class="dashboard-stat__label">Total Services</p>
+            </article>
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ service_stats.current_services }}</div>
+                <p class="dashboard-stat__label">Current Services</p>
+            </article>
+        </div>
+        {% if service_stats.datetime %}
+        <p style="margin-top: 1rem; color: #6c757d; font-size: 0.9rem;">Last updated: {{ service_stats.datetime }}</p>
+        {% endif %}
+    </section>
+
+    <section class="dashboard-section">
+        <h2>Stop Statistics</h2>
+        <div class="dashboard-stats">
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ stop_stats.total_stops }}</div>
+                <p class="dashboard-stat__label">Total Stops</p>
+            </article>
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ stop_stats.active_stops }}</div>
+                <p class="dashboard-stat__label">Active Stops</p>
+            </article>
+        </div>
+        {% if stop_stats.datetime %}
+        <p style="margin-top: 1rem; color: #6c757d; font-size: 0.9rem;">Last updated: {{ stop_stats.datetime }}</p>
+        {% endif %}
+    </section>
+
+    <section class="dashboard-section">
+        <h2>Operator Statistics</h2>
+        <div class="dashboard-stats">
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ operator_stats.total_operators }}</div>
+                <p class="dashboard-stat__label">Total Operators</p>
+            </article>
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ operator_stats.operators_with_vehicles }}</div>
+                <p class="dashboard-stat__label">With Vehicles</p>
+            </article>
+        </div>
+        {% if operator_stats.datetime %}
+        <p style="margin-top: 1rem; color: #6c757d; font-size: 0.9rem;">Last updated: {{ operator_stats.datetime }}</p>
+        {% endif %}
+    </section>
+
+    <section class="dashboard-section">
+        <h2>Last Sync</h2>
+        {% if last_sync.datetime %}
+        <div class="dashboard-stats">
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ last_sync.source }}</div>
+                <p class="dashboard-stat__label">Source</p>
+            </article>
+            <article class="dashboard-card dashboard-stat">
+                <div class="dashboard-stat__value">{{ last_sync.datetime }}</div>
+                <p class="dashboard-stat__label">Last Synced</p>
+            </article>
+        </div>
+        {% else %}
+        <p>No sync information available.</p>
+        {% endif %}
+    </section>
+
+    <section class="dashboard-section">
+        <h2>Quick shortcuts</h2>
+        <div class="dashboard-shortcuts">
+            {% for shortcut in shortcuts %}
+                <article class="dashboard-card">
+                    <h3><a href="{{ shortcut.url }}">{{ shortcut.label }}</a></h3>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="dashboard-section">
+        <h2>Quick add</h2>
+        <div class="dashboard-featured">
+            {% for item in featured_models %}
+                <article class="dashboard-card">
+                    <h3>{{ item.plural_title }}</h3>
+                    <p>{{ item.description }}</p>
+                    <div class="dashboard-links">
+                        {% if item.can_add %}<a class="button" href="{{ item.add_url }}">Add</a>{% endif %}
+                        {% if item.manage_url %}<a class="button" href="{{ item.manage_url }}">Manage</a>{% endif %}
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="dashboard-section">
+        <h2>All models</h2>
+        <div class="dashboard-groups">
+            {% for section in model_sections %}
+                <article class="dashboard-group">
+                    <h3>{{ section.title }}</h3>
+                    <div class="dashboard-model-list">
+                        {% for item in section.items %}
+                            <div class="dashboard-card">
+                                <h4>{{ item.plural_title }}</h4>
+                                <p>{{ item.description }}</p>
+                                <div class="dashboard-links">
+                                    {% if item.can_add %}<a class="button" href="{{ item.add_url }}">Add</a>{% endif %}
+                                    {% if item.manage_url %}<a class="button" href="{{ item.manage_url }}">Manage</a>{% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+{% endblock content %}

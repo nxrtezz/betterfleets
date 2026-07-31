@@ -1,0 +1,95 @@
+name: Run tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test-frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - run: npm install-ci-test
+    - run: npm run lint
+    - run: npm run build
+
+    - uses: actions/upload-artifact@v7
+      with:
+        name: dist
+        path: busstops/static
+        if-no-files-found: error
+
+  test-backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    needs: test-frontend
+    container:
+      image: ghcr.io/jclgoodwin/bustimes.org/bustimes-base:3.14
+
+    permissions:
+      # Gives the action the necessary permissions for publishing new
+      # comments in pull requests.
+      pull-requests: write
+      # Gives the action the necessary permissions for pushing data to the
+      # python-coverage-comment-action branch, and for editing existing
+      # comments (to avoid publishing multiple comments in the same PR)
+      contents: write
+
+    services:
+      postgres:
+        image: postgis/postgis:18-3.6
+
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_INITDB_ARGS: "--no-sync"
+        options: >-
+          --mount type=tmpfs,destination=/var/lib/postgresql
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: astral-sh/setup-uv@v7
+
+    - run: uv sync --group test --frozen
+
+    - run: rm -r busstops/static
+
+    - uses: actions/download-artifact@v8
+      with:
+        name: dist
+        path: busstops/static
+
+    - name: run tests
+      env:
+        DATABASE_URL: postgis://postgres:postgres@postgres/postgres
+        SECRET_KEY: secret
+      run: |
+        uv run ./manage.py collectstatic --noinput && \
+        uv run coverage run --parallel-mode --concurrency=multiprocessing ./manage.py test --parallel=2 --keepdb --durations 10
+
+    - name: generate coverage report
+      run: |
+        uv run coverage combine && \
+        uv run coverage html
+
+    - name: Coverage comment
+      uses: py-cov-action/python-coverage-comment-action@v3
+      with:
+        GITHUB_TOKEN: ${{ github.token }}

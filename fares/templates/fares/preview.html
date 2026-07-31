@@ -1,0 +1,175 @@
+{% extends 'page.html' %}
+
+{% block title %}Preview NeTEx fare data{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+
+<h1>Preview NeTEx fare data</h1>
+
+<p>Upload a NeTEx XML fare file to inspect its product details, prices, channels, and covered lines without importing it.</p>
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" name="action" value="preview">Preview file</button>
+    {% if request.user.is_staff %}
+        <button type="submit" name="action" value="import">Import file</button>
+    {% endif %}
+</form>
+
+{% if not request.user.is_staff %}
+    <p>You can preview any file here. Importing is limited to staff accounts.</p>
+{% endif %}
+
+{% if preview %}
+    <h2>{{ preview.frame_name|default:preview.filename }}</h2>
+
+    {% if preview.frame_description %}
+        <p>{{ preview.frame_description }}</p>
+    {% elif preview.description %}
+        <p>{{ preview.description }}</p>
+    {% endif %}
+
+    <p><strong>Published:</strong> {{ preview.publication_timestamp|default:"-" }}</p>
+    <p><strong>Participant:</strong> {{ preview.participant_ref|default:"-" }}</p>
+
+    {% if preview.operators %}
+        <h2>Operators</h2>
+        {% for operator in preview.operators %}
+            <p>
+                <strong>{{ operator.name|default:operator.code }}</strong>
+                {% if operator.trading_name %}<br>{{ operator.trading_name }}{% endif %}
+            </p>
+        {% endfor %}
+    {% endif %}
+
+    {% if preview.fare_products %}
+        <h2>Products</h2>
+        {% for product in preview.fare_products %}
+            <p>
+                <strong>{{ product.name|default:product.id }}</strong>
+                {% if product.description %}<br>{{ product.description }}{% endif %}
+                {% if product.charging_moment %}<br>Charging moment: {{ product.charging_moment }}{% endif %}
+            </p>
+        {% endfor %}
+    {% endif %}
+
+    {% if preview.sales_packages %}
+        <h2>Sales channels</h2>
+        {% for package in preview.sales_packages %}
+            <p>
+                <strong>{{ package.name|default:package.id }}</strong>
+                {% if package.channels %}<br>Channel: {{ package.channels|join:", " }}{% endif %}
+                {% if package.payment_methods %}<br>Payment methods: {{ package.payment_methods|join:", " }}{% endif %}
+            </p>
+        {% endfor %}
+    {% endif %}
+
+    {% if preview.tariffs %}
+        <h2>Tariffs</h2>
+        {% for tariff in preview.tariffs %}
+            <p>
+                <strong>{{ tariff.name|default:tariff.id }}</strong>
+                {% if tariff.type %}<br>Type: {{ tariff.type }}{% endif %}
+                {% if tariff.basis %}<br>Basis: {{ tariff.basis }}{% endif %}
+                {% if tariff.valid_from or tariff.valid_to %}<br>Valid: {{ tariff.valid_from|default:"-" }}{% if tariff.valid_to %} to {{ tariff.valid_to }}{% endif %}{% endif %}
+                {% if tariff.line %}<br>Line: {{ tariff.line.public_code|default:tariff.line.id }}{% if tariff.line.name %} - {{ tariff.line.name }}{% endif %}{% endif %}
+            </p>
+            {% if tariff.time_intervals %}
+                {% for interval in tariff.time_intervals %}
+                    <p>
+                        Duration: {{ interval.name|default:interval.duration }}
+                        {% if interval.duration %} ({{ interval.duration }}){% endif %}
+                    </p>
+                {% endfor %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    {% if preview.preview_tables %}
+        <h2>Fare tables</h2>
+        {% for table in preview.preview_tables %}
+            <h3>{{ table.name|default:table.id }}</h3>
+            <p>
+                {% if table.product %}{{ table.product.name }}{% endif %}
+                {% if table.user_profile %}{% if table.product %} · {% endif %}{{ table.user_profile.name }}{% endif %}
+                {% if table.line %}{% if table.product or table.user_profile %} · {% endif %}{{ table.line.public_code|default:table.line.id }}{% endif %}
+            </p>
+
+            {% if table.sales_packages %}
+                <p>
+                    Available via
+                    {% for package in table.sales_packages %}
+                        {% if not forloop.first %}, {% endif %}{{ package.name|default:package.id }}
+                    {% endfor %}
+                </p>
+            {% endif %}
+
+            {% if table.flat_prices %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for price in table.flat_prices %}
+                            <tr>
+                                <td>{{ price.display_amount }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
+            {% if table.matrix_rows %}
+                <div class="table-wrapper">
+                    <table class="compact nowrap">
+                        <thead>
+                            <tr>
+                                <th scope="col">From \ To</th>
+                                {% for column in table.matrix_columns %}
+                                    <th scope="col">{{ column }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in table.matrix_rows %}
+                                <tr>
+                                    <th scope="row">{{ row.name }}</th>
+                                    {% for cell in row.cells %}
+                                        <td>{{ cell }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    {% if preview.included_lines %}
+        <h2>Included lines</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Code</th>
+                    <th scope="col">Name</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for line in preview.included_lines %}
+                    <tr>
+                        <td>{{ line.public_code|default:"-" }}</td>
+                        <td>{{ line.name|default:line.id }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endif %}
+
+{% endblock content %}

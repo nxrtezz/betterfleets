@@ -1,0 +1,23 @@
+{% extends 'page.html' %}
+
+{% block title %}Requests - bustimes.org{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+
+<h1>Requests</h1>
+
+<ul class="horizontal">
+    <li><a href="{% url 'request_vehicle' %}">Vehicle</a></li>
+    <li><a href="{% url 'request_service' %}">Service</a></li>
+    <li><a href="{% url 'request_operator' %}">Operator</a></li>
+    <li><a href="{% url 'request_vehicle_model' %}">Vehicle Model</a></li>
+</ul>
+
+{% if entries %}
+    <h2>Recent requests</h2>
+    {% include 'revision_feed.html' with entries=entries %}
+{% endif %}
+
+{% endblock content %}

@@ -1,0 +1,116 @@
+{% extends 'page.html' %}
+
+{% block title %}SORN vehicles - bustimes.org{% endblock %}
+
+{% block head %}
+    <style>
+        .filters-card {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1rem 1.1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .filters-grid {
+            display: grid;
+            gap: 0.85rem 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+            align-items: end;
+        }
+
+        .filters-grid p {
+            margin: 0;
+        }
+
+        .filters-grid label {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+        }
+
+        .filters-grid input,
+        .filters-grid select {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        .filters-grid input[type="checkbox"] {
+            width: auto;
+        }
+
+        .filters-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+            margin-top: 1rem;
+        }
+    </style>
+{% endblock head %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+
+<h1>SORN vehicles</h1>
+<p>Vehicles marked as SORN, with filters for operator, vehicle type, and fleet status flags.</p>
+
+<div class="filters-card">
+    <form method="get">
+        <div class="filters-grid">
+            {% for field in filter_form %}
+                <p>
+                    {{ field.label_tag }}
+                    {{ field }}
+                    {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                    {% for error in field.errors %}<small>{{ error }}</small>{% endfor %}
+                </p>
+            {% endfor %}
+        </div>
+
+        <div class="filters-actions">
+            <input type="submit" value="Apply filters">
+            <a href="/vehicles/sorn">Reset</a>
+        </div>
+    </form>
+</div>
+
+<div class="table-wrapper">
+    <table class="fleet compact">
+        <thead>
+            <tr>
+                <th scope="col">Operator</th>
+                <th scope="col">Fleet</th>
+                <th scope="col">Registration</th>
+                <th scope="col">Tax status</th>
+                <th scope="col">MOT status</th>
+                <th scope="col">Euro status</th>
+                <th scope="col">Type</th>
+                <th scope="col">Flags</th>
+                <th scope="col"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for vehicle in vehicles %}
+                <tr{% if vehicle.row_class %} class="{{ vehicle.row_class }}"{% endif %}>
+                    <td>{% if vehicle.operator %}<a href="{{ vehicle.operator.get_absolute_url }}">{{ vehicle.operator }}</a>{% endif %}</td>
+                    <td><a href="{{ vehicle.get_absolute_url }}">{% firstof vehicle.fleet_code vehicle.fleet_number vehicle.code %}</a></td>
+                    <td>{% if vehicle.reg %}<a href="{{ vehicle.get_absolute_url }}" class="reg">{{ vehicle.get_reg }}</a>{% endif %}</td>
+                    <td>{{ vehicle.dvla_tax_status }}</td>
+                    <td>{{ vehicle.dvla_mot_status }}</td>
+                    <td>{{ vehicle.dvla_euro_status }}</td>
+                    <td>{{ vehicle.vehicle_type_name|default:"" }}</td>
+                    <td>{{ vehicle.get_statuses|join:", " }}</td>
+                    <td><a href="/vehicles/edits?show=all&q=&operator=&vehicle={{ vehicle.id }}&user=&status=approved">History</a></td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="9">No vehicles matched these filters.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock content %}

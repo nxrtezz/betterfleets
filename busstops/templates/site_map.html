@@ -1,0 +1,70 @@
+{% extends 'page.html' %}
+
+{% block title %}Site map - Better Fleets{% endblock %}
+
+{% block head %}
+<style>
+    .site-map-legend,
+    .site-map-list {
+        margin: 1rem 0;
+    }
+
+    .site-map-list {
+        columns: 2 20rem;
+        column-gap: 2rem;
+        padding-left: 1.25rem;
+    }
+
+    .site-map-list li {
+        break-inside: avoid;
+        margin-bottom: 0.35rem;
+    }
+
+    .site-map-path {
+        font-family: monospace;
+    }
+
+    .site-map-path.is-staff {
+        color: #c1121f;
+        font-weight: 700;
+    }
+
+    .site-map-path.is-superuser {
+        color: #6a0dad;
+        font-weight: 700;
+    }
+
+    .site-map-tag {
+        font-size: 0.85rem;
+        margin-left: 0.45rem;
+    }
+</style>
+{% endblock head %}
+
+{% block content %}
+    <h1>Site map</h1>
+    <p>This page is generated from the current URL config. Parameterised routes are shown as placeholders like <code>&lt;slug&gt;</code> rather than expanded into every real page.</p>
+
+    <p class="site-map-legend">
+        <span class="site-map-path is-staff">Red</span> means staff-only.
+        <span class="site-map-path is-superuser">Purple</span> means superuser-only.
+    </p>
+
+    {% for section in sections %}
+        <section>
+            <h2>{{ section.title }}</h2>
+            <ul class="site-map-list">
+                {% for entry in section.entries %}
+                    <li>
+                        <span class="site-map-path{% if entry.permission == 'staff' %} is-staff{% elif entry.permission == 'superuser' %} is-superuser{% endif %}">{{ entry.path }}</span>
+                        {% if entry.permission == 'staff' %}
+                            <span class="site-map-tag">(staff)</span>
+                        {% elif entry.permission == 'superuser' %}
+                            <span class="site-map-tag">(superuser)</span>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endfor %}
+{% endblock content %}

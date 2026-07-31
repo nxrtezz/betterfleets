@@ -1,0 +1,42 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>Delete logs for user (keep selected operators)</h1>
+
+<p>Select a user and the operators whose logs you want to <strong>keep</strong>. All other logs for that user will be deleted.</p>
+
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="post" value="yes">
+    <input type="hidden" name="{{ action_checkbox_name }}" value="">
+
+    <div class="form-row">
+        <div>
+            <label for="user_id">User:</label>
+            <select name="user_id" id="user_id" required>
+                <option value="">-- Select a user --</option>
+                {% for user in users %}
+                    <option value="{{ user.id }}">{{ user.username }} ({{ user.email }})</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div>
+            <label for="operator_ids">Operators to <strong>keep</strong> (optional - leave blank to delete all logs for the user):</label>
+            <select name="operator_ids" id="operator_ids" multiple size="10">
+                {% for operator in operators %}
+                    <option value="{{ operator.id }}">{{ operator.name }}</option>
+                {% endfor %}
+            </select>
+            <p class="help">Hold Ctrl/Cmd to select multiple operators. Logs from these operators will be <strong>kept</strong>. All other logs for the user will be deleted.</p>
+        </div>
+    </div>
+
+    <div class="submit-row">
+        <input type="submit" value="Delete logs" class="default">
+        <a href="../" class="button cancel-link">Cancel</a>
+    </div>
+</form>
+{% endblock %}

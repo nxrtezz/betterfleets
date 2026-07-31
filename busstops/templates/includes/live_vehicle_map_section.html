@@ -1,0 +1,7 @@
+<section class="{{ map_section_class|default:'division-card live-vehicle-map-section' }}">
+    <h2>Live map</h2>
+    <p class="depot-list__intro">Live vehicle positions are loaded for the visible map area.</p>
+    <script>window.LIVERIES_CSS_URL = "/liveries.{{ liveries_css_version }}.css";</script>
+    <div id="live-vehicle-map-root"></div>
+    {{ tracking_map_config|json_script:"live-vehicle-map-data" }}
+</section>

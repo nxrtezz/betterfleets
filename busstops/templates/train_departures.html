@@ -1,0 +1,161 @@
+{% if departures %}
+<div class="aside train-departures" id="departures">
+    <h2>Train departures</h2>
+    {% if is_train_station %}
+        <p class="station-info">
+            <span class="crs-code">{{ object.crs_code }}</span>
+            <span class="station-name">{{ object.common_name }}</span>
+        </p>
+    {% endif %}
+    
+    <table>
+        <thead>
+            <tr>
+                <th scope="col">Destination</th>
+                <th scope="col">Origin</th>
+                <th scope="col">Service</th>
+                <th scope="col">Operator</th>
+                <th scope="col">Time</th>
+                <th scope="col">Platform</th>
+                <th scope="col">Type</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in departures %}
+            <tr>
+                <td class="destination">
+                    {{ item.destination }}
+                </td>
+                <td class="origin">
+                    {{ item.origin }}
+                </td>
+                <td class="service">
+                    {{ item.service }}
+                </td>
+                <td class="operator">
+                    {{ item.operator }}
+                </td>
+                <td class="scheduled">
+                    {% if item.time %}
+                        {{ item.time|time:"H:i" }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td class="platform {% if item.platform %}has-platform{% endif %}">
+                    {% if item.platform %}
+                        {{ item.platform }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td class="status">
+                    {% if item.status %}
+                        {{ item.status }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    {% if not departures %}
+        <p class="no-departures">No departures available</p>
+    {% endif %}
+</div>
+
+<style>
+.train-departures {
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 20px;
+}
+
+.train-departures h2 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: #333;
+    font-size: 1.25rem;
+}
+
+.station-info {
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: #e8f4f8;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.crs-code {
+    font-weight: bold;
+    color: #0066cc;
+    margin-right: 8px;
+}
+
+.station-name {
+    font-weight: 500;
+}
+
+.train-departures table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.train-departures th {
+    background: #333;
+    color: white;
+    padding: 8px 6px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.train-departures td {
+    padding: 8px 6px;
+    border-bottom: 1px solid #ddd;
+}
+
+.train-departures tr:last-child td {
+    border-bottom: none;
+}
+
+.train-departures tr:hover {
+    background: #f0f0f0;
+}
+
+.platform.has-platform {
+    font-weight: bold;
+    color: #0066cc;
+    background: #e8f4f8;
+    border-radius: 3px;
+    padding: 2px 6px;
+}
+
+.no-departures {
+    text-align: center;
+    color: #666;
+    padding: 20px;
+    font-style: italic;
+}
+
+@media (max-width: 768px) {
+    .train-departures table {
+        font-size: 0.75rem;
+    }
+    
+    .train-departures th,
+    .train-departures td {
+        padding: 6px 4px;
+    }
+    
+    .train-departures .origin,
+    .train-departures .operator {
+        display: none;
+    }
+}
+</style>
+{% endif %}

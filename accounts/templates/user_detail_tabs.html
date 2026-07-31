@@ -1,0 +1,650 @@
+{% extends 'page.html' %}
+
+{% block title %}{{ object.get_display_name }} - profile{% endblock %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <style>
+        .user-profile {
+            display: grid;
+            gap: 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .user-profile__card,
+        .user-profile__section {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+
+        .user-profile__banner {
+            min-height: 12rem;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.24), transparent 35%),
+                linear-gradient(135deg, #0f172a, #1d4ed8 50%, #38bdf8);
+        }
+
+        .user-profile__banner img {
+            width: 100%;
+            max-width: 100%;
+            min-height: 12rem;
+            max-height: 20rem;
+            object-fit: cover;
+            display: block;
+        }
+
+        .user-profile__header {
+            padding: 0 1.25rem 1.25rem;
+        }
+
+        .user-profile__avatar-wrap {
+            margin-top: -3.25rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .user-profile__avatar,
+        .user-profile__avatar-fallback {
+            width: 6.5rem;
+            height: 6.5rem;
+            border-radius: 999px;
+            border: 4px solid var(--background-color);
+            background: linear-gradient(135deg, #1d4ed8, #0f766e);
+            display: grid;
+            place-items: center;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .user-profile__avatar {
+            object-fit: cover;
+        }
+
+        .user-profile__title {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: baseline;
+        }
+
+        .user-profile__title h1 {
+            margin: 0;
+        }
+
+        .user-profile__subtitle {
+            color: var(--secondary-text-color);
+            margin: 0.35rem 0 0;
+        }
+
+        .user-profile__badges,
+        .user-profile__links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.65rem;
+            margin: 0.85rem 0 0;
+        }
+
+        .user-profile__badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .user-profile__bio {
+            margin: 1rem 0;
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .user-profile__tabs {
+            display: flex;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 1.25rem;
+            overflow-x: auto;
+        }
+
+        .user-profile__tab {
+            padding: 1rem 1.25rem;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--secondary-text-color);
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .user-profile__tab:hover {
+            color: var(--text-color);
+        }
+
+        .user-profile__tab--active {
+            color: var(--text-color);
+            border-bottom-color: #1d4ed8;
+        }
+
+        .user-profile__tab-content {
+            display: none;
+            padding: 1.25rem;
+        }
+
+        .user-profile__tab-content--active {
+            display: block;
+        }
+
+        .timeline-item {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .timeline-item:last-child {
+            border-bottom: none;
+        }
+
+        .timeline-item__header {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .timeline-item__icon {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 999px;
+            background: var(--accent-color);
+            display: grid;
+            place-items: center;
+            font-size: 1rem;
+        }
+
+        .timeline-item__content {
+            flex: 1;
+        }
+
+        .timeline-item__time {
+            color: var(--secondary-text-color);
+            font-size: 0.875rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+        }
+
+        .stat-card__value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+
+        .stat-card__label {
+            color: var(--secondary-text-color);
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+
+        .livery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .livery-item {
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        .livery-item__preview {
+            height: 4rem;
+            background: var(--background-color);
+        }
+
+        .livery-item__info {
+            padding: 0.75rem;
+        }
+
+        .livery-item__name {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .livery-item__operator {
+            color: var(--secondary-text-color);
+            font-size: 0.75rem;
+        }
+
+        .livery-item__badges {
+            display: flex;
+            gap: 0.25rem;
+            margin-top: 0.5rem;
+        }
+
+        .livery-item__badge {
+            padding: 0.125rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.625rem;
+            font-weight: 600;
+        }
+
+        .livery-item__badge--photographed {
+            background: #10b981;
+            color: #fff;
+        }
+
+        .livery-item__badge--ridden {
+            background: #3b82f6;
+            color: #fff;
+        }
+
+        .livery-section {
+            margin-bottom: 2rem;
+        }
+
+        .livery-section__title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .activity-graph {
+            margin-top: 2rem;
+        }
+
+        .activity-graph__controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .activity-graph__button {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            background: var(--background-color);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .activity-graph__button:hover {
+            border-color: var(--border-color-darker);
+        }
+
+        .activity-graph__button--active {
+            background: #1d4ed8;
+            color: #fff;
+            border-color: #1d4ed8;
+        }
+
+        .activity-graph__chart {
+            height: 300px;
+            position: relative;
+        }
+
+        .activity-graph__bar {
+            position: absolute;
+            bottom: 0;
+            background: #1d4ed8;
+            border-radius: 0.25rem 0.25rem 0 0;
+            transition: height 0.3s;
+        }
+
+        .activity-graph__bar:hover {
+            background: #3b82f6;
+        }
+
+        .activity-graph__label {
+            position: absolute;
+            bottom: -1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            color: var(--secondary-text-color);
+            white-space: nowrap;
+        }
+
+        .activity-graph__tooltip {
+            position: absolute;
+            background: var(--text-color);
+            color: var(--background-color);
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10;
+        }
+
+        .activity-graph__bar:hover .activity-graph__tooltip {
+            opacity: 1;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="user-profile">
+    <div class="user-profile__card">
+        {% if object.get_profile_banner_url %}
+        <div class="user-profile__banner">
+            <img src="{{ object.get_profile_banner_url }}" alt="">
+        </div>
+        {% else %}
+        <div class="user-profile__banner"></div>
+        {% endif %}
+        
+        <div class="user-profile__header">
+            <div class="user-profile__avatar-wrap">
+                {% if object.get_profile_picture_url %}
+                <img src="{{ object.get_profile_picture_url }}" alt="" class="user-profile__avatar">
+                {% else %}
+                <div class="user-profile__avatar-fallback">
+                    {{ object.get_display_name|first|upper }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="user-profile__title">
+                <h1>{{ object.get_display_name }}</h1>
+                {% if object.username != object.email %}
+                <span class="user-profile__subtitle">@{{ object.username }}</span>
+                {% endif %}
+            </div>
+            
+            <div class="user-profile__badges">
+                {% for tag in object.get_profile_tags %}
+                <span class="user-profile__badge" style="background: {{ tag.badge_background }}; color: {{ tag.badge_text_colour }}">
+                    {{ tag.name }}
+                </span>
+                {% endfor %}
+            </div>
+            
+            {% if object.score %}
+            <div class="user-profile__subtitle">
+                Score: {{ object.score }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="user-profile__card">
+        <div class="user-profile__tabs">
+            <button class="user-profile__tab user-profile__tab--active" data-tab="actions">Actions</button>
+            <button class="user-profile__tab" data-tab="stats">Stats</button>
+            <button class="user-profile__tab" data-tab="liveries">Liveries</button>
+        </div>
+        
+        <div class="user-profile__tab-content user-profile__tab-content--active" id="tab-actions">
+            <div class="timeline">
+                {% for item in timeline_items %}
+                <div class="timeline-item">
+                    <div class="timeline-item__header">
+                        <div class="timeline-item__icon">
+                            {% if item.type == 'revision' %}✏️{% elif item.type == 'review' %}⭐{% elif item.type == 'photo' %}📷{% elif item.type == 'ride_log' %}🚌{% elif item.type == 'photo_log' %}📸{% else %}📌{% endif %}
+                        </div>
+                        <div class="timeline-item__content">
+                            {% if item.type == 'revision' %}
+                            <a href="{{ item.item.vehicle.get_absolute_url }}">Edited {{ item.item.vehicle }}</a>
+                            {% elif item.type == 'review' %}
+                            <a href="{{ item.item.vehicle.get_absolute_url }}">Reviewed {{ item.item.vehicle }}</a>
+                            {% elif item.type == 'photo' %}
+                            <a href="{{ item.item.get_absolute_url }}">Uploaded photo</a>
+                            {% elif item.type == 'ride_log' %}
+                            <a href="{{ item.item.vehicle.get_absolute_url }}">Rode {{ item.item.vehicle }}</a>
+                            {% elif item.type == 'photo_log' %}
+                            <a href="{{ item.item.vehicle.get_absolute_url }}">Photographed {{ item.item.vehicle }}</a>
+                            {% endif %}
+                        </div>
+                        <div class="timeline-item__time">
+                            {{ item.created_at|date:"M d, Y H:i" }}
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <p>No activity yet.</p>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="user-profile__tab-content" id="tab-stats">
+            <div class="stats-grid">
+                {% if ride_stats %}
+                <div class="stat-card">
+                    <div class="stat-card__value">{{ ride_stats.operators_count }}</div>
+                    <div class="stat-card__label">Operators Ridden</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value">{{ ride_stats.vehicle_types_count }}</div>
+                    <div class="stat-card__label">Vehicle Types Ridden</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value">{{ ride_stats.liveries_count }}</div>
+                    <div class="stat-card__label">Liveries Ridden</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value">{{ ride_stats.vehicles_count }}</div>
+                    <div class="stat-card__label">Vehicles Ridden</div>
+                </div>
+                {% endif %}
+                
+                {% if photo_stats %}
+                <div class="stat-card">
+                    <div class="stat-card__value">{{ photo_stats.operators_count }}</div>
+                    <div class="stat-card__label">Operators Photographed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value">{{ photo_stats.vehicle_types_count }}</div>
+                    <div class="stat-card__label">Vehicle Types Photographed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value">{{ photo_stats.liveries_count }}</div>
+                    <div class="stat-card__label">Liveries Photographed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value">{{ photo_stats.vehicles_count }}</div>
+                    <div class="stat-card__label">Vehicles Photographed</div>
+                </div>
+                {% endif %}
+                
+                <div class="stat-card">
+                    <div class="stat-card__value">{{ object.total_count }}</div>
+                    <div class="stat-card__label">Total Edits</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value">{{ object.review_count }}</div>
+                    <div class="stat-card__label">Reviews</div>
+                </div>
+            </div>
+            
+            <div class="activity-graph">
+                <div class="activity-graph__controls">
+                    <button class="activity-graph__button activity-graph__button--active" data-period="daily">Daily</button>
+                    <button class="activity-graph__button" data-period="weekly">Weekly</button>
+                    <button class="activity-graph__button" data-period="monthly">Monthly</button>
+                </div>
+                <div class="activity-graph__chart" id="activity-chart">
+                    <!-- Chart will be rendered here -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="user-profile__tab-content" id="tab-liveries">
+            <div id="liveries-container">
+                <p>Livery collection will be displayed here.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tabs = document.querySelectorAll('.user-profile__tab');
+    const contents = document.querySelectorAll('.user-profile__tab-content');
+    
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const targetTab = this.dataset.tab;
+            
+            // Update tab styles
+            tabs.forEach(t => t.classList.remove('user-profile__tab--active'));
+            this.classList.add('user-profile__tab--active');
+            
+            // Update content visibility
+            contents.forEach(content => {
+                content.classList.remove('user-profile__tab-content--active');
+                if (content.id === `tab-${targetTab}`) {
+                    content.classList.add('user-profile__tab-content--active');
+                }
+            });
+            
+            // Load liveries if switching to liveries tab
+            if (targetTab === 'liveries') {
+                loadLiveries();
+            }
+            
+            // Load activity graph if switching to stats tab
+            if (targetTab === 'stats') {
+                loadActivityGraph('daily');
+            }
+        });
+    });
+    
+    function loadLiveries() {
+        const container = document.getElementById('liveries-container');
+        if (container.dataset.loaded) return;
+        
+        fetch(`/accounts/{{ object.id }}/liveries/`)
+            .then(response => response.json())
+            .then(data => {
+                container.innerHTML = data.html;
+                container.dataset.loaded = 'true';
+            })
+            .catch(error => {
+                container.innerHTML = '<p>Error loading liveries.</p>';
+            });
+    }
+    
+    // Activity graph functionality
+    const activityButtons = document.querySelectorAll('.activity-graph__button');
+    activityButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const period = this.dataset.period;
+            
+            // Update button styles
+            activityButtons.forEach(b => b.classList.remove('activity-graph__button--active'));
+            this.classList.add('activity-graph__button--active');
+            
+            loadActivityGraph(period);
+        });
+    });
+    
+    function loadActivityGraph(period) {
+        const chart = document.getElementById('activity-chart');
+        if (!chart) return;
+        
+        // Mock data for demonstration - in production, fetch from API
+        const mockData = generateMockActivityData(period);
+        renderActivityChart(chart, mockData);
+    }
+    
+    function generateMockActivityData(period) {
+        const data = [];
+        const now = new Date();
+        let count, labelFormat;
+        
+        if (period === 'daily') {
+            count = 30;
+            labelFormat = (date) => date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        } else if (period === 'weekly') {
+            count = 12;
+            labelFormat = (date) => `W${getWeekNumber(date)}`;
+        } else {
+            count = 12;
+            labelFormat = (date) => date.toLocaleDateString('en-GB', { month: 'short' });
+        }
+        
+        for (let i = count - 1; i >= 0; i--) {
+            const date = new Date(now);
+            if (period === 'daily') {
+                date.setDate(date.getDate() - i);
+            } else if (period === 'weekly') {
+                date.setDate(date.getDate() - (i * 7));
+            } else {
+                date.setMonth(date.getMonth() - i);
+            }
+            
+            data.push({
+                date: date,
+                label: labelFormat(date),
+                value: Math.floor(Math.random() * 20) // Random activity count
+            });
+        }
+        
+        return data;
+    }
+    
+    function renderActivityChart(chart, data) {
+        chart.innerHTML = '';
+        
+        if (data.length === 0) {
+            chart.innerHTML = '<p>No activity data available.</p>';
+            return;
+        }
+        
+        const maxValue = Math.max(...data.map(d => d.value));
+        const chartWidth = chart.offsetWidth;
+        const barWidth = (chartWidth / data.length) - 10;
+        
+        data.forEach((item, index) => {
+            const bar = document.createElement('div');
+            bar.className = 'activity-graph__bar';
+            
+            const height = maxValue > 0 ? (item.value / maxValue) * 100 : 0;
+            bar.style.height = `${height}%`;
+            bar.style.width = `${barWidth}px`;
+            bar.style.left = `${index * (chartWidth / data.length) + 5}px`;
+            
+            bar.innerHTML = `
+                <div class="activity-graph__label">${item.label}</div>
+                <div class="activity-graph__tooltip">${item.value} activities</div>
+            `;
+            
+            chart.appendChild(bar);
+        });
+    }
+    
+    function getWeekNumber(date) {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    }
+    
+    // Load initial activity graph
+    loadActivityGraph('daily');
+});
+</script>
+{% endblock %}

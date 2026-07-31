@@ -1,0 +1,79 @@
+{% extends 'page.html' %}
+
+{% block title %}Manage blog posts - betterfleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <style>
+        .blog-manage-hero,
+        .blog-manage-card {
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+        }
+
+        .blog-manage-table {
+            width: 100%;
+        }
+
+        .blog-manage-table th,
+        .blog-manage-table td {
+            vertical-align: top;
+        }
+
+        .blog-manage-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <section class="blog-manage-hero">
+        <h1>Manage blog posts</h1>
+        <p>Write, draft, and publish blog posts without leaving the main site.</p>
+        <p><strong>{{ published_count }}</strong> live post{{ published_count|pluralize }} and <strong>{{ draft_count }}</strong> draft{{ draft_count|pluralize }}.</p>
+        <div class="blog-manage-actions">
+            {% if can_create_blog_post %}<a class="button" href="{% url 'blog_post_create' %}">Write a new post</a>{% endif %}
+            <a href="{% url 'blog_index' %}">View public blog</a>
+        </div>
+    </section>
+
+    <section class="blog-manage-card">
+        <table class="blog-manage-table compact">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Status</th>
+                    <th>Updated</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for post in posts %}
+                    <tr>
+                        <td>
+                            <strong>{{ post.title }}</strong>
+                            {% if post.excerpt %}<div>{{ post.excerpt|truncatewords:18 }}</div>{% endif %}
+                        </td>
+                        <td>{% if post.published %}Live{% else %}Draft{% endif %}</td>
+                        <td>{{ post.updated_at|date:"j M Y H:i" }}</td>
+                        <td>
+                            <a href="{% url 'blog_post_edit' post.slug %}">Edit</a>
+                            {% if post.published %} · <a href="{{ post.get_absolute_url }}">Open</a>{% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4">No blog posts yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock content %}

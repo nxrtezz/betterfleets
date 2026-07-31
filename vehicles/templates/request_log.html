@@ -1,0 +1,74 @@
+{% load humanize %}
+<li id="request-{{ request_entry.id }}">
+    <p>
+        <strong>{{ request_entry.request_type_label }} request</strong>
+        {% if request_entry.object_url %}
+            &centerdot; <a href="{{ request_entry.object_url }}">{{ request_entry.title }}</a>
+        {% else %}
+            &centerdot; {{ request_entry.title }}
+        {% endif %}
+        {% if request_entry.approved and request_entry.created_title and request_entry.created_title != request_entry.title %}
+            &centerdot; created as
+            {% if request_entry.object_url %}
+                <a href="{{ request_entry.object_url }}">{{ request_entry.created_title }}</a>
+            {% else %}
+                {{ request_entry.created_title }}
+            {% endif %}
+        {% endif %}
+        &centerdot; {{ request_entry.created_at|naturaltime }}
+        {% if request_entry.requested_by_id %}
+            &centerdot; <a href="{% url 'user_detail' request_entry.requested_by_id %}">{{ request_entry.requested_by_label }}</a>
+        {% endif %}
+    </p>
+
+    {% if request_entry.summary %}
+        <p>{{ request_entry.summary }}</p>
+    {% endif %}
+
+    {% if request_entry.changes %}
+        <dl class="contact-details">
+            {% for change in request_entry.changes %}
+                {% if change.value %}
+                    <div>
+                        <dt>{{ change.label }}</dt>
+                        <dd>
+                            {% if change.preview_css %}
+                                <div class="livery" style="background:{{ change.preview_css }}; display:inline-block; vertical-align:middle; margin-right:0.5rem;"></div>
+                            {% endif %}
+                            {% if change.is_link %}
+                                <a href="{{ change.value }}">{{ change.value }}</a>
+                            {% elif change.is_code %}
+                                <code>{{ change.value }}</code>
+                            {% else %}
+                                {{ change.value|linebreaksbr }}
+                            {% endif %}
+                        </dd>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </dl>
+    {% endif %}
+
+    {% if request_entry.disapproved %}
+        <p><strong>Declined</strong>{% if request_entry.disapproved_reason %} &centerdot; <i>{{ request_entry.disapproved_reason }}</i>{% endif %}</p>
+    {% elif request_entry.approved %}
+        <p><strong>Approved</strong></p>
+    {% endif %}
+
+    <p class="actions" hx-target="#request-{{ request_entry.id }}">
+        {% if request_entry.pending %}
+            {% if request_entry.can_apply %}
+                <button type="button" class="button" hx-post="{% url 'request_log_action' request_entry.id 'apply' %}" hx-prompt="Reason for approving">Approve</button>
+                {% if request_entry.can_cancel %}
+                    <button type="button" class="button" hx-post="{% url 'request_log_action' request_entry.id 'reject' %}" hx-prompt="Reason for denying or cancelling">Deny</button>
+                {% else %}
+                    <button type="button" class="button" hx-post="{% url 'request_log_action' request_entry.id 'reject' %}" hx-prompt="Reason for denying">Deny</button>
+                {% endif %}
+            {% elif request_entry.can_cancel %}
+                <button type="button" class="button" hx-post="{% url 'request_log_action' request_entry.id 'reject' %}">Deny</button>
+            {% else %}
+                Pending
+            {% endif %}
+        {% endif %}
+    </p>
+</li>

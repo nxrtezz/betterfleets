@@ -1,0 +1,104 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <p>
+        <a href="{% url 'admin:busstops_service_change' service.pk %}">Back to service</a>
+        |
+        <a href="{{ service.get_absolute_url }}" target="_blank" rel="noopener">Open public timetable</a>
+    </p>
+
+    <p>
+        <a class="button" href="{{ simple_template_download_url }}">Download simple XLSX template</a>
+        <a class="button" href="{{ template_download_url }}">Download XLSX template</a>
+        <a class="button" href="{{ export_download_url }}">Download current timetable XLSX</a>
+        <a class="button" href="{{ delete_timetable_url }}" style="background-color: #dc2626; color: white;">Delete all timetable data</a>
+    </p>
+
+    <p>
+        Each workbook row represents one stop time. New trips need an <code>import_key</code> shared by every row in that trip.
+        Existing trips can be edited by keeping their <code>trip_id</code>.
+    </p>
+
+    <p>
+        The simple template keeps stop names in the first visible column and uses bold time cells to mark timing points.
+    </p>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="form-row">
+            {{ form.workbook.errors }}
+            {{ form.workbook.label_tag }}
+            {{ form.workbook }}
+            {% if form.workbook.help_text %}<p class="help">{{ form.workbook.help_text }}</p>{% endif %}
+        </div>
+        <div class="form-row">
+            {{ form.rows_text.errors }}
+            {{ form.rows_text.label_tag }}
+            {{ form.rows_text }}
+            {% if form.rows_text.help_text %}<p class="help">{{ form.rows_text.help_text }}</p>{% endif %}
+        </div>
+        <div class="submit-row">
+            <button type="submit" name="action" value="preview" class="default">Preview</button>
+            {% if can_commit %}
+                <button type="submit" name="action" value="commit">{{ commit_label }}</button>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if rows %}
+        <h2>Preview</h2>
+        <table class="adminlist">
+            <thead>
+                <tr>
+                    <th>Rows</th>
+                    <th>Action</th>
+                    <th>Trip</th>
+                    <th>Route</th>
+                    <th>Stops</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ row.row_numbers|join:", " }}</td>
+                        <td>{{ row.action }}</td>
+                        <td>
+                            {% if row.trip %}
+                                <a href="{% url 'admin:bustimes_trip_change' row.trip.pk %}">{{ row.trip.pk }}</a>
+                            {% else %}
+                                {{ row.identifier }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.route %}
+                                <a href="{% url 'admin:bustimes_route_change' row.route.pk %}">{{ row.route }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ row.stop_rows|length }}</td>
+                        <td>
+                            {% if row.errors %}
+                                {% for error in row.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            {% else %}
+                                OK
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    {% if created or updated or errors %}
+        <p>Created: {{ created }} | Updated: {{ updated }} | Errors: {{ errors }}</p>
+    {% endif %}
+</div>
+{% endblock %}

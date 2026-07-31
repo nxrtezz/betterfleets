@@ -1,0 +1,85 @@
+{% extends 'page.html' %}
+
+{% block title %}{% if is_create %}Write blog post{% else %}Edit blog post{% endif %} - betterfleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    {{ form.media }}
+    <style>
+        .blog-editor-shell,
+        .blog-editor-section {
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+        }
+
+        .blog-editor-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .blog-editor-field label {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 0.35rem;
+        }
+
+        .blog-editor-field input,
+        .blog-editor-field textarea {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        .blog-editor-help {
+            display: block;
+            margin-top: 0.35rem;
+            opacity: 0.82;
+        }
+
+        .blog-editor-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .errorlist {
+            margin: 0 0 0.5rem;
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <section class="blog-editor-shell">
+        <h1>{% if is_create %}Write blog post{% else %}Edit blog post{% endif %}</h1>
+        <p>Use headings like <code>## Section heading</code>, smaller headings like <code>### Detail</code>, and list items with <code>- bullet</code>.</p>
+        <p><a href="{% url 'blog_manage' %}">Back to blog manager</a>{% if object and object.published %} · <a href="{{ object.get_absolute_url }}">Open public post</a>{% endif %}</p>
+    </section>
+
+    <form method="post">
+        {% csrf_token %}
+        {% if form.non_field_errors %}{{ form.non_field_errors }}{% endif %}
+
+        <section class="blog-editor-section">
+            <div class="blog-editor-grid">
+                {% for field in form %}
+                    <div class="blog-editor-field">
+                        {{ field.errors }}
+                        {{ field.label_tag }}
+                        {{ field }}
+                        {% if field.help_text %}<small class="blog-editor-help">{{ field.help_text }}</small>{% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <div class="blog-editor-actions">
+            <button class="button" type="submit" name="publish" value="1">Publish</button>
+            <button type="submit" name="save_draft" value="1">Save draft</button>
+            <a href="{% url 'blog_manage' %}">Cancel</a>
+        </div>
+    </form>
+{% endblock content %}

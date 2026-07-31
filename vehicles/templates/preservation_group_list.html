@@ -1,0 +1,58 @@
+{% extends 'page.html' %}
+
+{% block title %}Preservation Groups - Better Fleets{% endblock %}
+
+{% block content %}
+<h1>Preservation Groups</h1>
+
+<p>Browse preservation groups and their preserved vehicle collections.</p>
+
+{% if preservation_groups %}
+    <div class="table-wrapper">
+        <table class="fleet compact">
+            <thead>
+                <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Founded</th>
+                    <th scope="col">Vehicles</th>
+                    <th scope="col">Website</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in preservation_groups %}
+                    <tr>
+                        <td>
+                            {% if group.logo %}
+                                <img src="{{ group.logo.url }}" alt="{{ group.name }}" style="height: 32px; margin-right: 8px; vertical-align: middle;">
+                            {% endif %}
+                            <a href="{{ group.get_absolute_url }}">{{ group.name }}</a>
+                            {% if group.description %}
+                                <br><small>{{ group.description|truncatewords:10 }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if group.founded_date %}
+                                {{ group.founded_date|date:"Y" }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ group.vehicle_count }}</td>
+                        <td>
+                            {% if group.website %}
+                                <a href="{{ group.website }}" target="_blank" rel="noopener">Website</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% include 'pagination.html' with page=preservation_groups %}
+{% else %}
+    <p>No preservation groups have been added yet.</p>
+{% endif %}
+{% endblock %}

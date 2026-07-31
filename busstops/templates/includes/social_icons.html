@@ -1,0 +1,59 @@
+{% if social_links %}
+    <ul class="social-icons" aria-label="Social links">
+        {% for label, url in social_links %}
+            {% if url %}
+                <li>
+                    <a class="social-icons__link" href="{{ url }}" rel="nofollow" aria-label="{{ label }}">
+                        {% if label == "Website" %}
+                            <svg class="social-icons__icon" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" style="width:1.05rem;height:1.05rem;flex:0 0 auto;">
+                                <path fill="currentColor" d="M12 2a10 10 0 1 0 0 20a10 10 0 0 0 0-20Zm7.93 9h-3.17a15.9 15.9 0 0 0-1.1-5.02A8.02 8.02 0 0 1 19.93 11ZM12 4c.9 0 2.26 1.68 3.05 7H8.95C9.74 5.68 11.1 4 12 4Zm-3.66.98A15.9 15.9 0 0 0 7.24 11H4.07a8.02 8.02 0 0 1 4.27-6.02ZM4.07 13h3.17c.2 1.78.63 3.56 1.1 5.02A8.02 8.02 0 0 1 4.07 13Zm3.88 0h8.1c-.79 5.32-2.15 7-3.05 7s-2.26-1.68-3.05-7Zm7.71 5.02c.47-1.46.9-3.24 1.1-5.02h3.17a8.02 8.02 0 0 1-4.27 6.02Z"/>
+                            </svg>
+                        {% elif label == "X" %}
+                            <svg class="social-icons__icon" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" style="width:1.05rem;height:1.05rem;flex:0 0 auto;">
+                                <path fill="currentColor" d="M18.9 2H22l-6.78 7.75L23.2 22h-6.7l-5.25-6.9L5.3 22H2.2l7.25-8.28L.8 2h6.86l4.74 6.26L18.9 2Zm-1.17 18h1.71L6.76 3.94H4.92L17.73 20Z"/>
+                            </svg>
+                        {% elif label == "Facebook" %}
+                            <svg class="social-icons__icon" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" style="width:1.05rem;height:1.05rem;flex:0 0 auto;">
+                                <path fill="currentColor" d="M13.5 22v-8h2.7l.4-3h-3.1V9.1c0-.9.3-1.6 1.7-1.6h1.5V4.8c-.3 0-1.2-.1-2.3-.1c-2.3 0-3.9 1.4-3.9 4V11H8v3h2.5v8h3Z"/>
+                            </svg>
+                        {% elif label == "Instagram" %}
+                            <svg class="social-icons__icon" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" style="width:1.05rem;height:1.05rem;flex:0 0 auto;">
+                                <path fill="currentColor" d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm10 2H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3Zm-5 4a5 5 0 1 1 0 10a5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6a3 3 0 0 0 0-6Zm5.6-.9a1.2 1.2 0 1 1-2.4 0a1.2 1.2 0 0 1 2.4 0Z"/>
+                            </svg>
+                        {% elif label == "LinkedIn" %}
+                            <svg class="social-icons__icon" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" style="width:1.05rem;height:1.05rem;flex:0 0 auto;">
+                                <path fill="currentColor" d="M4.98 3.5A2.5 2.5 0 1 1 5 8.5a2.5 2.5 0 0 1-.02-5ZM3 21V9h4v12H3Zm7 0V9h3.8v1.7h.05c.53-1 1.8-2 3.7-2c4 0 4.7 2.6 4.7 6V21h-4v-5.3c0-1.3 0-3-1.8-3s-2.1 1.4-2.1 2.9V21h-4Z"/>
+                            </svg>
+                        {% elif label == "YouTube" %}
+                            <svg class="social-icons__icon" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" style="width:1.05rem;height:1.05rem;flex:0 0 auto;">
+                                <path fill="currentColor" d="M21.6 7.3c.2.8.4 2 .4 4.7s-.2 3.9-.4 4.7c-.2.9-1 1.6-1.9 1.8c-1.6.4-7.7.4-7.7.4s-6.1 0-7.7-.4c-.9-.2-1.7-.9-1.9-1.8C2.2 15.9 2 14.7 2 12s.2-3.9.4-4.7c.2-.9 1-1.6 1.9-1.8C5.9 5.1 12 5.1 12 5.1s6.1 0 7.7.4c.9.2 1.7.9 1.9 1.8ZM10 15.5V8.5L16 12l-6 3.5Z"/>
+                            </svg>
+                        {% elif label == "TikTok" %}
+                            <svg class="social-icons__icon" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" style="width:1.05rem;height:1.05rem;flex:0 0 auto;">
+                                <path fill="currentColor" d="M16 2c.4 3 2.3 4.8 5 5v3c-1.9.1-3.6-.5-5-1.6V16a6 6 0 1 1-6.2-6v3.2a3 3 0 1 0 3.2 3V2h3Z"/>
+                            </svg>
+                        {% elif label == "Threads" %}
+                            <svg class="social-icons__icon" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" style="width:1.05rem;height:1.05rem;flex:0 0 auto;">
+                                <path fill="currentColor" d="M12 2c5.5 0 10 4.4 10 9.9c0 5.8-4.1 10.1-10 10.1c-6 0-10-4.6-10-10.1C2 6.4 6.5 2 12 2Zm.1 6c-2.6 0-4.3 1.4-4.3 3.5c0 1.6 1.1 2.6 2.7 2.9c1.4.3 3.2.2 4.2.6c.8.3 1.1.8 1.1 1.5c0 1.2-1.1 1.9-2.8 1.9c-1.5 0-2.7-.6-3.2-1.8l-2.1.8c.8 2.1 2.8 3.3 5.3 3.3c3 0 5-1.5 5-4c0-1.4-.7-2.5-2-3.2c.5-.8.8-1.8.6-2.9c-.4-2.2-2.5-3.6-4.5-3.6Zm0 2c1.1 0 2 .7 2.1 1.7c.1.6 0 1.1-.3 1.5c-1-.2-2.1-.2-3.2-.4c-.7-.1-1.1-.5-1.1-1.2c0-1 .9-1.6 2.5-1.6Z"/>
+                            </svg>
+                        {% elif label == "Bluesky" %}
+                            <svg class="social-icons__icon" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" style="width:1.05rem;height:1.05rem;flex:0 0 auto;">
+                                <path fill="currentColor" d="M12 2c2.6 2.1 5.2 4.9 6.6 7.1c1.2 1.9.9 3.8-1.2 4.7c-1.4.6-3 .4-4.3-.6c-.5-.4-.9-.9-1.1-1.2c-.2.3-.6.8-1.1 1.2c-1.3 1-2.9 1.2-4.3.6C4.5 12.9 4.2 11 5.4 9.1C6.8 6.9 9.4 4.1 12 2Zm-2.4 14.3c.9-.1 1.7-.5 2.4-1.1c.7.6 1.5 1 2.4 1.1c1 .1 1.9-.2 2.6-.8c.1.7-.1 1.6-.7 2.4c-1 1.3-3.2 2.7-4.3 3.4c-1.1-.7-3.3-2.1-4.3-3.4c-.6-.8-.8-1.7-.7-2.4c.7.6 1.6.9 2.6.8Z"/>
+                            </svg>
+                        {% elif label == "Mastodon" %}
+                            <svg class="social-icons__icon" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" style="width:1.05rem;height:1.05rem;flex:0 0 auto;">
+                                <path fill="currentColor" d="M12 2c4.8 0 8.8 1.2 9.2 6.5c.1 1.8.1 3.6-.2 5.4c-.4 2.2-2.7 3.9-5.3 4.2c-1.4.2-2.5.1-3.7-.3c.2.7.6 1.4 1.2 1.8c1.3 1 3.1.9 4.5.6l.2 1.8c-1.6.6-3.3.8-5 .6c-2.7-.4-4.9-2.2-5.5-4.8c-.6-2.6-.5-5.5-.4-8.1C7.1 3.2 11.1 2 12 2Zm-2.5 7.3c-1.1 0-1.9.8-1.9 2v4.1h1.8v-4c0-.5.2-.8.7-.8s.7.3.7.8v2.2h1.8v-2.2c0-.5.2-.8.7-.8s.7.3.7.8v4h1.8v-4.1c0-1.2-.8-2-1.9-2c-.9 0-1.5.4-2 .9c-.5-.5-1.1-.9-2-.9Z"/>
+                            </svg>
+                        {% else %}
+                            <svg class="social-icons__icon" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" style="width:1.05rem;height:1.05rem;flex:0 0 auto;">
+                                <path fill="currentColor" d="M10.6 13.4a4 4 0 0 0 5.7 0l2-2a4 4 0 1 0-5.7-5.7l-1.1 1.1a6 6 0 0 1 1.4.7l.9-.9a2 2 0 1 1 2.8 2.8l-2 2a2 2 0 0 1-2.8 0a2 2 0 0 1 0-2.8l.3-.3a6 6 0 0 1-.4-1.9l-1.3 1.3a4 4 0 0 0 0 5.7Zm2.8-2.8a6 6 0 0 1 .4 1.9l-1.4 1.4a2 2 0 1 1-2.8-2.8l2-2a2 2 0 0 1 2.8 0a2 2 0 0 1 0 2.8l-1 1Z"/>
+                            </svg>
+                        {% endif %}
+                        <span class="social-icons__label">{{ label }}</span>
+                    </a>
+                </li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+{% endif %}
+

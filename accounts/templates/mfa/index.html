@@ -1,0 +1,73 @@
+{% extends 'mfa/base.html' %}
+{% load i18n %}
+
+{% block title %}Two-Factor Authentication - BetterFleet{% endblock %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block body %}
+    <div class="mfa-page__card mfa-page__section">
+        <h1>{% trans "Two-Factor Authentication" %}</h1>
+        
+        {% if not is_mfa_enabled %}
+            <div class="mfa-page__status mfa-page__status--inactive">
+                {% trans "Two-factor authentication is not enabled for your account." %}
+            </div>
+        {% else %}
+            <div class="mfa-page__status mfa-page__status--active">
+                {% trans "Two-factor authentication is enabled for your account." %}
+            </div>
+        {% endif %}
+    </div>
+
+    {% if "totp" in MFA_SUPPORTED_TYPES %}
+        <div class="mfa-page__card mfa-page__section">
+            <h2>{% trans "Authenticator App" %}</h2>
+            {% if authenticators.totp %}
+                <p>{% trans "An authenticator app is active." %}</p>
+                <div class="mfa-page__actions">
+                    <a href="{% url 'mfa_deactivate_totp' %}" class="btn-secondary">{% trans "Deactivate" %}</a>
+                </div>
+            {% else %}
+                <p>{% trans "An authenticator app is not active." %}</p>
+                <div class="mfa-page__actions">
+                    <a href="{% url 'mfa_activate_totp' %}" class="btn-primary">{% trans "Activate" %}</a>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if "recovery_codes" in MFA_SUPPORTED_TYPES %}
+        <div class="mfa-page__card mfa-page__section">
+            <h2>{% trans "Recovery Codes" %}</h2>
+            {% if authenticators.recovery_codes %}
+                <p>{% trans "Recovery codes are set up." %}</p>
+                <div class="mfa-page__actions">
+                    <a href="{% url 'mfa_view_recovery_codes' %}" class="btn-secondary">{% trans "View Codes" %}</a>
+                </div>
+            {% else %}
+                <p>{% trans "No recovery codes set up." %}</p>
+                <div class="mfa-page__actions">
+                    <a href="{% url 'mfa_generate_recovery_codes' %}" class="btn-primary">{% trans "Generate Codes" %}</a>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if "webauthn" in MFA_SUPPORTED_TYPES %}
+        <div class="mfa-page__card mfa-page__section">
+            <h2>{% trans "Security Keys" %}</h2>
+            {% if authenticators.webauthn %}
+                <p>{% trans "Security keys are set up." %}</p>
+                <div class="mfa-page__actions">
+                    <a href="{% url 'mfa_list_webauthn' %}" class="btn-secondary">{% trans "Manage Keys" %}</a>
+                </div>
+            {% else %}
+                <p>{% trans "No security keys set up." %}</p>
+                <div class="mfa-page__actions">
+                    <a href="{% url 'mfa_add_webauthn' %}" class="btn-primary">{% trans "Add Security Key" %}</a>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock body %}

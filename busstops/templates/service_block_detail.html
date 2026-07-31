@@ -1,0 +1,59 @@
+{% extends 'page.html' %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+
+<h1>{{ object }}</h1>
+
+<p>
+    Block for <a href="{{ service.get_absolute_url }}?tab=blocks">{{ service }}</a>
+    {% if operators %}
+        operated by
+        {% for operator in operators %}{% if not forloop.first %}{% if forloop.last %} and {% else %}, {% endif %}{% endif %}<a href="{{ operator.get_absolute_url }}">{{ operator.get_public_name }}</a>{% endfor %}
+    {% endif %}
+</p>
+
+<h2>{{ date|date:"j M Y" }}</h2>
+
+{% if trips %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Service</th>
+                    <th scope="col">Trip</th>
+                    <th scope="col">Code</th>
+                    <th scope="col">To</th>
+                    <th scope="col">Vehicle</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for trip in trips %}
+                    <tr>
+                        <td>{{ trip.route.line_name }}</td>
+                        <td class="link"><a href="{{ trip.get_absolute_url }}">{{ trip }}</a></td>
+                        <td>{{ trip.ticket_machine_code }}</td>
+                        <td>{{ trip.destination_name }}</td>
+                        <td class="link">
+                            {% for journey in trip.vehicle_journeys %}
+                                {% if not forloop.first %}, {% endif %}
+                                <a href="{{ journey.get_absolute_url }}">{{ journey.vehicle }}</a>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <p>No trips are listed for this block today.</p>
+{% endif %}
+
+{% if trip.route.source.credit %}
+    <p class="credit">Timetable data from {{ trip.route.source.credit }}</p>
+{% endif %}
+
+{% endblock content %}

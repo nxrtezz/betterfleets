@@ -1,0 +1,99 @@
+{% extends "page.html" %}
+
+{% load urlise %}
+
+{% block title %}{{ situation }} - disruption - Better Fleets{% endblock %}
+
+{% block content %}
+<h1>{{ situation }}</h1>
+
+{% if situation.list_validity_periods %}
+    <p>
+        {% for validity_period in situation.list_validity_periods %}
+            {{ validity_period }}{% if not forloop.last %}<br>{% endif %}
+        {% endfor %}
+    </p>
+{% endif %}
+
+<dl class="contact-details">
+    {% if situation.nice_reason %}
+        <div>
+            <dt>Reason</dt>
+            <dd>{{ situation.nice_reason }}</dd>
+        </div>
+    {% endif %}
+    {% if situation.predicted_cause %}
+        <div>
+            <dt>Predicted cause</dt>
+            <dd>{{ situation.predicted_cause }}</dd>
+        </div>
+    {% endif %}
+    {% if situation.predicted_end %}
+        <div>
+            <dt>Predicted end</dt>
+            <dd>{{ situation.predicted_end|date:"j F Y H:i" }}</dd>
+        </div>
+    {% endif %}
+    {% with operators=situation.get_affected_operators %}
+        {% if operators %}
+            <div>
+                <dt>Affected operators</dt>
+                <dd>
+                    {% for operator in operators %}
+                        <a href="{{ operator.get_absolute_url }}">{{ operator }}</a>{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </dd>
+            </div>
+        {% endif %}
+    {% endwith %}
+    {% with services=situation.get_affected_services %}
+        {% if services %}
+            <div>
+                <dt>Affected routes</dt>
+                <dd>
+                    {% for service in services %}
+                        <a href="{{ service.get_absolute_url }}">{{ service }}</a>{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </dd>
+            </div>
+        {% endif %}
+    {% endwith %}
+    {% with areas=situation.get_affected_admin_areas %}
+        {% if areas %}
+            <div>
+                <dt>Affected areas</dt>
+                <dd>
+                    {% for area in areas %}
+                        <a href="{{ area.get_absolute_url }}">{{ area }}</a>{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </dd>
+            </div>
+        {% endif %}
+    {% endwith %}
+</dl>
+
+{% if situation.text %}
+    {{ situation.text|linebreaks|urlise }}
+{% endif %}
+{% for consequence in situation.consequences %}
+    {% if consequence.text and consequence.text != situation.text %}
+        {{ consequence.text|linebreaks|urlise }}
+    {% endif %}
+{% endfor %}
+{% for link in situation.link_set.all %}
+    <p>{{ link.url|urlise }}</p>
+{% endfor %}
+
+{% if situation.affectedjourney_set.all %}
+    <h2>Affected journeys</h2>
+    {% for aj in situation.affectedjourney_set.all %}
+        <p><a href="{{ aj.trip.get_absolute_url }}">{{ aj.trip }}</a> {{ aj.condition }}</p>
+    {% endfor %}
+{% endif %}
+
+{% if xml %}
+    <style>{{ css }}</style>
+    <h2>Source data</h2>
+    <p><code>{{ xml }}</code></p>
+{% endif %}
+{% endblock content %}

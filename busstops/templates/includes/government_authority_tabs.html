@@ -1,0 +1,6 @@
+<ul class="tabs">
+    <li>{% if active_tab == 'about' %}About{% else %}<a href="{{ object.get_absolute_url }}">About</a>{% endif %}</li>
+    <li>{% if active_tab == 'vehicles' %}Vehicles{% else %}<a href="{{ object.get_absolute_url }}vehicles/">Vehicles</a>{% endif %}</li>
+    <li>{% if active_tab == 'routes' %}Routes{% else %}<a href="{{ object.get_absolute_url }}routes/">Routes</a>{% endif %}</li>
+    <li>{% if active_tab == 'operators' %}Operators{% else %}<a href="{{ object.get_absolute_url }}operators/">Operators</a>{% endif %}</li>
+</ul>

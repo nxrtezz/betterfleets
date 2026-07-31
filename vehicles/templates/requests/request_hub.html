@@ -1,0 +1,81 @@
+{% extends 'page.html' %}
+
+{% block title %}Requests - Better Fleets{% endblock %}
+
+{% block head %}
+<style>
+.request-shell { display:grid; gap:1.25rem; }
+.request-card { background:var(--background-color); border:1px solid var(--border-color); border-radius:1rem; padding:1.25rem; }
+.request-grid { display:grid; gap:1rem; }
+.request-links { display:grid; gap:.75rem; }
+.request-links a { display:block; padding:1rem; border-radius:.85rem; border:1px solid var(--border-color); background:var(--brand-color-darker); text-decoration:none; color:var(--text-color); }
+.request-links a:hover { background:var(--brand-color); }
+.request-list { list-style:none; padding:0; margin:0; display:grid; gap:.75rem; }
+.request-list li { border:1px solid var(--border-color); border-radius:.85rem; padding:1rem; background:var(--background-color); }
+.status-chip { display:inline-flex; padding:.2rem .6rem; border-radius:999px; background:var(--brand-color-darker); color:var(--button-foreground); }
+@media (min-width: 48em) {
+  .request-grid { grid-template-columns:1.1fr .9fr; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="request-shell">
+    <section class="request-card">
+        <h1>Requests</h1>
+        <p>Use these pages to ask for new liveries, vehicle types, operators, or garages. Requests are queued for review, and only a superuser can approve them into the live database.</p>
+        {% if messages %}
+            <ul class="request-list">
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </section>
+
+    <div class="request-grid">
+        <section class="request-card">
+            <h2>Submit a request</h2>
+            <div class="request-links">
+                <a href="/requests/liveries"><strong>Liveries</strong><br><small>Request a livery for import and fleet editing.</small></a>
+                <a href="/requests/vehicles"><strong>Vehicles</strong><br><small>Request a vehicle type for fleet records.</small></a>
+                <a href="/requests/operators"><strong>Operators</strong><br><small>Request a new operator entry.</small></a>
+                <a href="/requests/garages"><strong>Garage</strong><br><small>Request a garage under an operator.</small></a>
+            </div>
+        </section>
+
+        <section class="request-card">
+            <h2>Your recent requests</h2>
+            {% if recent_requests %}
+                <ul class="request-list">
+                    {% for addition_request in recent_requests %}
+                        <li>
+                            <span class="status-chip">{{ addition_request.get_status_display|default:"Unknown" }}</span>
+                            <strong>{{ addition_request.get_summary|default:"Unknown request" }}</strong><br>
+                            <small>{{ addition_request.get_request_type_display|default:"Request" }} · {{ addition_request.created_at|date:'j M Y H:i'|default:"Unknown date" }}</small>
+                            {% if addition_request.review_notes %}<p>{{ addition_request.review_notes|default:"" }}</p>{% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>You have not submitted any requests yet.</p>
+            {% endif %}
+        </section>
+    </div>
+
+    {% if user.is_superuser and pending_requests %}
+    <section class="request-card">
+        <h2>Pending review</h2>
+        <p><a href="{% url 'addition_request_review' %}">Open the superuser review queue</a></p>
+        <ul class="request-list">
+            {% for addition_request in pending_requests %}
+                <li>
+                    <strong>{{ addition_request.get_summary|default:"Unknown request" }}</strong><br>
+                    <small>{{ addition_request.get_request_type_display|default:"Request" }} requested by {{ addition_request.requested_by|default:"Unknown user" }} on {{ addition_request.created_at|date:'j M Y H:i'|default:"Unknown date" }}</small>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends 'page.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Sign Out" %} - BetterFleet{% endblock %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <style>
+        .auth-container {
+            max-width: 28rem;
+            margin: 0 auto;
+        }
+
+        .auth-card {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+
+        .auth-header {
+            padding: 2rem 1.5rem 1rem;
+            text-align: center;
+        }
+
+        .auth-header h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.75rem;
+            color: var(--text-color);
+        }
+
+        .auth-header p {
+            margin: 0;
+            color: var(--secondary-text-color);
+        }
+
+        .auth-form {
+            padding: 1.5rem;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .auth-form button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .auth-form .btn-danger {
+            background: #dc2626;
+            color: white;
+        }
+
+        .auth-form .btn-danger:hover {
+            background: #b91c1c;
+        }
+
+        .auth-form .btn-secondary {
+            background: var(--border-color);
+            color: var(--text-color);
+        }
+
+        .auth-form .btn-secondary:hover {
+            background: var(--border-color-darker);
+        }
+
+        .auth-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .auth-actions button {
+            flex: 1;
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>{% trans "Sign Out" %}</h1>
+            <p>Are you sure you want to sign out?</p>
+        </div>
+
+        <form method="post" action="{% url 'account_logout' %}" class="auth-form">
+            {% csrf_token %}
+            {% if redirect_field_value %}
+                <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+            {% endif %}
+            <div class="auth-actions">
+                <button type="submit" class="btn-danger">{% trans "Sign Out" %}</button>
+                <a href="{% url 'account_dashboard' %}" class="btn-secondary" style="text-decoration: none; display: inline-block; padding: 0.75rem 1.5rem; border-radius: 0.5rem; text-align: center;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

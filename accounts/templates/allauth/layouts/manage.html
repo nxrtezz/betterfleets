@@ -1,0 +1,182 @@
+{% extends 'allauth/layouts/base.html' %}
+{% load i18n %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <style>
+        .mfa-page {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .mfa-page__card {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+
+        .mfa-page__section {
+            padding: 1.5rem;
+        }
+
+        .mfa-page__section h2 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-color);
+            opacity: 0.75;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .mfa-page__nav {
+            display: grid;
+            gap: 0.5rem;
+            padding: 1rem;
+        }
+
+        .mfa-page__nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            color: var(--text-color);
+            transition: background 0.15s, border-color 0.15s;
+            border: 1px solid transparent;
+        }
+
+        .mfa-page__nav-link:hover {
+            background: rgba(148, 163, 184, 0.1);
+            border-color: var(--border-color);
+        }
+
+        .mfa-page__nav-link.active {
+            background: var(--brand-color);
+            color: var(--button-foreground);
+        }
+
+        .mfa-page__nav-link__icon {
+            font-size: 1.25rem;
+        }
+
+        .mfa-page__status {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .mfa-page__status--active {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .mfa-page__status--inactive {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .mfa-page__actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .mfa-page__actions a,
+        .mfa-page__actions button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+            text-decoration: none;
+        }
+
+        .mfa-page__actions .btn-primary {
+            background: var(--brand-color-darker);
+            color: var(--button-foreground);
+        }
+
+        .mfa-page__actions .btn-primary:hover {
+            background: var(--brand-color-darker-darker);
+        }
+
+        .mfa-page__actions .btn-secondary {
+            background: var(--border-color);
+            color: var(--text-color);
+        }
+
+        .mfa-page__actions .btn-secondary:hover {
+            background: var(--border-color-darker);
+        }
+
+        @media (min-width: 800px) {
+            .mfa-page__content {
+                display: grid;
+                grid-template-columns: 250px 1fr;
+                gap: 1.5rem;
+                align-items: start;
+            }
+
+            .mfa-page__nav {
+                position: sticky;
+                top: 1rem;
+            }
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <div class="mfa-page">
+        <div class="mfa-page__content">
+            <nav class="mfa-page__nav mfa-page__card">
+                <a href="{% url 'account_dashboard' %}" class="mfa-page__nav-link">
+                    <span class="mfa-page__nav-link__icon">🏠</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{% url 'account_profile' %}" class="mfa-page__nav-link">
+                    <span class="mfa-page__nav-link__icon">👤</span>
+                    <span>Profile Settings</span>
+                </a>
+                <a href="{% url 'account_email' %}" class="mfa-page__nav-link">
+                    <span class="mfa-page__nav-link__icon">📧</span>
+                    <span>Email Addresses</span>
+                </a>
+                <a href="{% url 'account_change_password' %}" class="mfa-page__nav-link">
+                    <span class="mfa-page__nav-link__icon">🔒</span>
+                    <span>Change Password</span>
+                </a>
+                <a href="{% url 'socialaccount_connections' %}" class="mfa-page__nav-link">
+                    <span class="mfa-page__nav-link__icon">🔗</span>
+                    <span>Connected Accounts</span>
+                </a>
+                <a href="{% url 'mfa_index' %}" class="mfa-page__nav-link active">
+                    <span class="mfa-page__nav-link__icon">🔑</span>
+                    <span>Two-Factor Authentication</span>
+                </a>
+                <a href="{% url 'account_sessions' %}" class="mfa-page__nav-link">
+                    <span class="mfa-page__nav-link__icon">💻</span>
+                    <span>Sessions</span>
+                </a>
+                <a href="{% url 'user_detail' user.id %}" class="mfa-page__nav-link">
+                    <span class="mfa-page__nav-link__icon">📊</span>
+                    <span>Public Profile</span>
+                </a>
+            </nav>
+
+            <div class="mfa-page__main">
+                {% block body %}
+                    {{ block.super }}
+                {% endblock body %}
+            </div>
+        </div>
+    </div>
+{% endblock content %}

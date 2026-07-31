@@ -1,0 +1,141 @@
+{% extends 'page.html' %}
+
+{% block bodyclass %}{% endblock %}
+
+{% load date_range %}
+
+{% block content %}
+
+    <style>
+        .ticket-page {
+            display: grid;
+            gap: 1.25rem;
+        }
+
+        .ticket-card {
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1rem 1.1rem;
+        }
+
+        .ticket-card h2,
+        .ticket-card h3 {
+            margin-top: 0;
+        }
+
+        .ticket-meta {
+            color: var(--text-color);
+            opacity: 0.82;
+        }
+
+        .ticket-list {
+            margin: 0;
+            padding-left: 1.25rem;
+        }
+
+        .ticket-prices {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .ticket-price {
+            border-top: 1px solid var(--border-color);
+            padding-top: 0.75rem;
+        }
+
+        .ticket-price:first-child {
+            border-top: 0;
+            padding-top: 0;
+        }
+
+        .ticket-price__amount {
+            font-size: 1.15rem;
+            font-weight: 700;
+        }
+    </style>
+
+    <div class="ticket-page">
+        <header class="ticket-card">
+            <h1>{{ ticket_title }}</h1>
+            {% if ticket_description %}
+                <p>{{ ticket_description }}</p>
+            {% endif %}
+
+            {% if object.valid_between %}
+                <p class="ticket-meta">Valid {{ object.valid_between|date_range }}</p>
+            {% endif %}
+
+            {% if object.operators.all %}
+                <p class="ticket-meta">
+                    {% for operator in object.operators.all %}
+                        {% if not forloop.first %}{% if forloop.last %} and {% else %}, {% endif %}{% endif %}
+                        <a href="{{ operator.get_detail_url }}?tab=tickets">{{ operator }}</a>
+                    {% endfor %}
+                </p>
+            {% endif %}
+        </header>
+
+        {% if price_rows %}
+            <section class="ticket-card">
+                <h2>Prices</h2>
+                <div class="ticket-prices">
+                    {% for price in price_rows %}
+                        <div class="ticket-price">
+                            <div>{{ price.label }}</div>
+                            <div class="ticket-price__amount">{{ price.amount }}</div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endif %}
+
+        {% if linked_services %}
+            <section class="ticket-card">
+                <h2>Accepted on these routes</h2>
+                <ul class="ticket-list">
+                    {% for service in linked_services %}
+                        <li><a href="{{ service.get_absolute_url }}#tickets">{{ service }}</a></li>
+                    {% endfor %}
+                </ul>
+            </section>
+        {% endif %}
+
+        {% if product_rows %}
+            <section class="ticket-card">
+                <h2>Included ticket types</h2>
+                <ul class="ticket-list">
+                    {% for product in product_rows %}
+                        <li>{{ product }}</li>
+                    {% endfor %}
+                </ul>
+            </section>
+        {% endif %}
+
+        {% if form.fields.origin.choices %}
+            <section class="ticket-card">
+                <h2>Find a fare</h2>
+                <form autocomplete="off">
+                    {{ form.as_p }}
+                    <input type="submit" value="Find fare">
+                </form>
+
+                {% for result in results %}
+                    {% ifchanged result.start_zone %}<h3>{{ result.start_zone }} to {{ result.end_zone }}</h3>{% endifchanged %}
+                    <p>{{ result.html }}</p>
+                {% endfor %}
+            </section>
+        {% endif %}
+
+        {% for table in object.faretable_set.all %}
+            {% if table.row_set.exists and table.column_set.exists %}
+                <section class="ticket-card">
+                    {% ifchanged table.name %}<h2>{{ table }}</h2>{% endifchanged %}
+                    {% include "fares/faretable_detail.html" with object=table %}
+                </section>
+            {% endif %}
+        {% endfor %}
+
+        <p class="ticket-meta">Fares data from {{ object.source.name }}, {{ object.source.datetime|date:"j F Y" }}</p>
+    </div>
+
+{% endblock content %}

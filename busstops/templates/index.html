@@ -1,0 +1,264 @@
+{% extends 'page.html' %}
+
+{% block title %}Better Fleets - UK Bus Fleet Database{% endblock %}
+
+{% block canonical %}
+    <link rel="canonical" href="https://eeveeit.uk/">
+{% endblock canonical %}
+
+{% block meta_description %}
+    <meta name="description" content="Better Fleets is a UK bus fleet database with vehicle records, liveries, operators, live maps and fleet tracking tools.">
+{% endblock meta_description %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+<style>
+    .collapsible-section summary {
+        cursor: pointer;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .collapsible-section summary::-webkit-details-marker {
+        display: none;
+    }
+    .collapsible-section summary::after {
+        content: '▼';
+        font-size: 0.8rem;
+        transition: transform 0.2s;
+        margin-left: 0.5rem;
+    }
+    .collapsible-section[open] summary::after {
+        transform: rotate(180deg);
+    }
+    .collapsible-section h2 {
+        margin: 0;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+{% load humanize %}
+
+<p>Fleet lists, liveries and operator pages.</p>
+
+<ul class="horizontal">
+    <li>{{ stats.vehicles|intcomma }} vehicles</li>
+    <li>{{ stats.operators|intcomma }} operators</li>
+    <li>{{ stats.vehicle_types|intcomma }} vehicle types</li>
+    <li>{{ stats.liveries|intcomma }} liveries</li>
+    <li>{{ stats.users|intcomma }} <a href="{% url 'user_list' %}">users</a></li>
+</ul>
+
+<div class="panes">
+    <div class="pane">
+        <form method="get" action="/search" class="search">
+            <h2><label for="q">Search</label></h2>
+            <p><label for="q">Search operators, vehicles, services, preservation groups and withdrawn vehicles</label></p>
+            <p>
+                <input id="q" name="q" type="search" required>
+                <input type="submit" value="Search">
+            </p>
+        </form>
+    </div>
+
+    <div class="pane">
+        <h2>Fleet</h2>
+        <p><a href="/vehicles" class="button">Browse operators</a></p>
+        <p><a href="/map" class="button">Live bus map</a></p>
+    </div>
+</div>
+
+{% if organisations or manufacturers or preservation_groups or government_authorities %}
+    <div class="panes">
+        {% if organisations %}
+            <div class="pane">
+                <details class="collapsible-section" open>
+                    <summary><h2>Major Operators</h2></summary>
+                    <ul class="has-smalls">
+                        {% for organisation in organisations %}
+                            <li>
+                                <a href="{{ organisation.get_absolute_url }}">
+                                    <span>{{ organisation.short_name|default:organisation.name }}</span>
+                                    {% if organisation.legal_name and organisation.legal_name != organisation.name %}
+                                        <small>{{ organisation.legal_name }}</small>
+                                    {% elif organisation.slogan %}
+                                        <small>{{ organisation.slogan }}</small>
+                                    {% endif %}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </details>
+            </div>
+        {% endif %}
+        {% if preservation_groups %}
+            <div class="pane">
+                <details class="collapsible-section" open>
+                    <summary><h2>Preservation Groups</h2></summary>
+                    <ul class="has-smalls">
+                        {% for group in preservation_groups %}
+                            <li>
+                                <a href="{{ group.get_absolute_url }}">
+                                    <span>{{ group.name }}</span>
+                                    <small>{{ group.vehicle_count }} preserved vehicle{{ group.vehicle_count|pluralize }}</small>
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </details>
+            </div>
+        {% endif %}
+        {% if government_authorities %}
+            <div class="pane">
+                <details class="collapsible-section" open>
+                    <summary><h2>Government Authorities</h2></summary>
+                    <ul class="has-smalls">
+                        {% for authority in government_authorities %}
+                            <li>
+                                <a href="{{ authority.get_absolute_url }}">
+                                    <span>{{ authority.short_name|default:authority.name }}</span>
+                                    {% if authority.legal_name and authority.legal_name != authority.name %}
+                                        <small>{{ authority.legal_name }}</small>
+                                    {% elif authority.slogan %}
+                                        <small>{{ authority.slogan }}</small>
+                                    {% endif %}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </details>
+            </div>
+        {% endif %}
+        {% if manufacturers %}
+            <div class="pane">
+                <details class="collapsible-section" open>
+                    <summary><h2>Manufactors</h2></summary>
+                    <ul class="has-smalls">
+                        {% for manufacturer in manufacturers %}
+                            <li>
+                                <a href="{{ manufacturer.get_absolute_url }}">
+                                    <span>{{ manufacturer.short_name|default:manufacturer.name }}</span>
+                                    {% if manufacturer.legal_name and manufacturer.legal_name != manufacturer.name %}
+                                        <small>{{ manufacturer.legal_name }}</small>
+                                    {% elif manufacturer.slogan %}
+                                        <small>{{ manufacturer.slogan }}</small>
+                                    {% endif %}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </details>
+            </div>
+        {% endif %}
+    </div>
+{% endif %}
+
+{% if pinned_operators %}
+    <h2>Pinned Operators</h2>
+    <ul class="has-smalls">
+        {% for pinned in pinned_operators %}
+            <li>
+                <a href="{{ pinned.operator.get_absolute_url }}">
+                    <span>{{ pinned.operator.name }}</span>
+                    <small>{{ pinned.operator.vehicle_set.count }} vehicle{{ pinned.operator.vehicle_set.count|pluralize }}</small>
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+{% if request.user.is_authenticated %}
+    {% if favourite_operators or favourite_vehicles or favourite_services %}
+    <h2>Your Favourites</h2>
+    <div class="panes">
+        {% if favourite_operators %}
+            <div class="pane">
+                <h3>Operators</h3>
+                <ul class="has-smalls">
+                    {% for fav in favourite_operators %}
+                        <li>
+                            <a href="{{ fav.operator.get_absolute_url }}">
+                                <span>{{ fav.operator.name }}</span>
+                                <small>{{ fav.operator.vehicle_set.count }} vehicle{{ fav.operator.vehicle_set.count|pluralize }}</small>
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+        {% if favourite_vehicles %}
+            <div class="pane">
+                <h3>Vehicles</h3>
+                <ul class="has-smalls">
+                    {% for fav in favourite_vehicles %}
+                        <li>
+                            <a href="{{ fav.vehicle.get_absolute_url }}">
+                                <span>{{ fav.vehicle }}</span>
+                                {% if fav.vehicle.operator %}<small>{{ fav.vehicle.operator }}</small>{% endif %}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+        {% if favourite_services %}
+            <div class="pane">
+                <h3>Services</h3>
+                <ul class="has-smalls">
+                    {% for fav in favourite_services %}
+                        <li>
+                            <a href="{{ fav.service.get_absolute_url }}">
+                                <span>{{ fav.service }}</span>
+                                {% if fav.service.operator %}<small>{{ fav.service.operator }}</small>{% endif %}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+{% endif %}
+
+{% if homepage_notices %}
+    <h2>Noticeboard</h2>
+    <ul class="bulleted">
+        {% for notice in homepage_notices %}
+            <li>
+                {% if notice.title %}<strong>{{ notice.title }}</strong><br>{% endif %}
+                {{ notice.message|linebreaksbr }}
+                {% if notice.from_date or notice.to_date %}
+                    <br><small>
+                        {% if notice.from_date %}From {{ notice.from_date }}{% endif %}
+                        {% if notice.from_date and notice.to_date %} - {% endif %}
+                        {% if notice.to_date %}To {{ notice.to_date }}{% endif %}
+                    </small>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+<details class="collapsible-section" open>
+    <summary><h2>Recently viewed</h2></summary>
+    {% if recently_viewed %}
+        <ul class="has-smalls">
+            {% for item in recently_viewed %}
+                <li>
+                    <a href="{{ item.url }}">
+                        <span>{{ item.title }}</span>
+                        <small>{{ item.type|title }}{% if item.subtitle %} - {{ item.subtitle }}{% endif %}</small>
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No recent pages yet.</p>
+    {% endif %}
+</details>
+{% endblock content %}

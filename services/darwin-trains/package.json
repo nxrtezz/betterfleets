@@ -1,0 +1,18 @@
+{
+  "name": "darwin-trains",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.mjs"
+  },
+  "dependencies": {
+    "csv-parse": "^5.6.0",
+    "dotenv": "^17.4.2",
+    "fast-xml-parser": "^4.5.0",
+    "kafkajs": "^2.2.4",
+    "luxon": "^3.5.0"
+  }
+}

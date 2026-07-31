@@ -1,0 +1,27 @@
+{% extends 'page.html' %}
+
+{% block title %}{{ object.name }} - vehicle name - Better Fleets{% endblock %}
+
+{% block content %}
+<h1>{{ object.name }}</h1>
+
+{% if object.description %}
+    <div>{{ object.description|linebreaks }}</div>
+{% endif %}
+
+{% if vehicles %}
+    <h2>Vehicles with this name</h2>
+    <ul class="has-smalls">
+        {% for vehicle in vehicles %}
+            <li>
+                <a href="{{ vehicle.get_absolute_url }}">{{ vehicle }}</a>
+                {% if vehicle.operator %}
+                    <small>{{ vehicle.operator }}</small>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>No vehicles currently match this name.</p>
+{% endif %}
+{% endblock %}

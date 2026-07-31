@@ -1,0 +1,40 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <p>{{ queryset|length }} {{ selected_objects_label|default:"item" }}{{ queryset|length|pluralize }} selected.</p>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% for obj in queryset %}
+            <input type="hidden" name="{{ action_checkbox_name }}" value="{{ obj.pk }}">
+        {% endfor %}
+        <input type="hidden" name="action" value="{{ action_name }}">
+        <input type="hidden" name="apply" value="1">
+
+        {{ form.non_field_errors }}
+        {% for field in form %}
+            <div class="form-row">
+                {{ field.errors }}
+                {{ field.label_tag }}
+                {{ field }}
+                {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+            </div>
+        {% endfor %}
+
+        <h2>{{ selected_objects_heading|default:"Selected items" }}</h2>
+        <ul>
+            {% for obj in queryset %}
+                <li>{{ obj }}</li>
+            {% endfor %}
+        </ul>
+
+        <div class="submit-row">
+            <button type="submit" class="default">{{ submit_label }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

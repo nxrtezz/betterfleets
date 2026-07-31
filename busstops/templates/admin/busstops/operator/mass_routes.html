@@ -1,0 +1,94 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <p>
+        <a href="{% url 'admin:busstops_operator_change' operator.pk %}">Back to operator</a>
+        |
+        <a href="{% url 'admin:busstops_service_changelist' %}?operator__noc__exact={{ operator.noc }}">Open service list</a>
+    </p>
+
+    <p>
+        <a class="button" href="{{ template_download_url }}">Download XLSX template</a>
+        <a class="button" href="{{ export_download_url }}">Download current routes</a>
+    </p>
+
+    <p>
+        Use <code>service_id</code> when you want to update a specific existing route.
+        Otherwise the importer will try to match by <code>service_code</code>, then by <code>line_name</code> and <code>description</code>.
+    </p>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="form-row">
+            {{ form.workbook.errors }}
+            {{ form.workbook.label_tag }}
+            {{ form.workbook }}
+            {% if form.workbook.help_text %}<p class="help">{{ form.workbook.help_text }}</p>{% endif %}
+        </div>
+        <div class="form-row">
+            {{ form.rows_text.errors }}
+            {{ form.rows_text.label_tag }}
+            {{ form.rows_text }}
+            {% if form.rows_text.help_text %}<p class="help">{{ form.rows_text.help_text }}</p>{% endif %}
+        </div>
+        <div class="submit-row">
+            <button type="submit" name="action" value="preview" class="default">Preview</button>
+            {% if can_commit %}
+                <button type="submit" name="action" value="commit">{{ commit_label }}</button>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if rows %}
+        <h2>Preview</h2>
+        <table class="adminlist">
+            <thead>
+                <tr>
+                    <th>Row</th>
+                    <th>Action</th>
+                    <th>Route</th>
+                    <th>Operator</th>
+                    <th>Identifier</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ row.row_number }}</td>
+                        <td>{{ row.action }}</td>
+                        <td>
+                            {% if row.service %}
+                                <a href="{% url 'admin:busstops_service_change' row.service.pk %}">{{ row.service }}</a>
+                            {% else %}
+                                New route
+                            {% endif %}
+                        </td>
+                        <td>{{ row.operator_preview_label }}</td>
+                        <td>
+                            {% firstof row.raw.service_id row.raw.service_code row.raw.line_name row.raw.description %}
+                        </td>
+                        <td>
+                            {% if row.errors %}
+                                {% for error in row.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            {% else %}
+                                OK
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    {% if created or updated or errors %}
+        <p>Created: {{ created }} | Updated: {{ updated }} | Errors: {{ errors }}</p>
+    {% endif %}
+</div>
+{% endblock %}

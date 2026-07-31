@@ -1,0 +1,152 @@
+{% extends 'page.html' %}
+
+{% block title %}{% if tag %}{{ tag.name }} blog posts - betterfleets{% else %}Blog - betterfleets{% endif %}{% endblock %}
+
+{% block head %}
+    <style>
+        .blog-shell {
+            display: grid;
+            gap: 1.5rem;
+            grid-template-columns: minmax(0, 2.4fr) minmax(16rem, 1fr);
+            align-items: start;
+        }
+
+        .blog-lead,
+        .blog-card,
+        .blog-sidebar-card {
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+        }
+
+        .blog-lead {
+            padding: 1.4rem;
+            background: linear-gradient(140deg, rgba(15, 118, 110, 0.08), rgba(234, 179, 8, 0.08));
+        }
+
+        .blog-stream {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .blog-card {
+            padding: 1.15rem;
+        }
+
+        .blog-card h2,
+        .blog-card p,
+        .blog-sidebar-card h2,
+        .blog-sidebar-card p {
+            margin-top: 0;
+        }
+
+        .blog-meta,
+        .blog-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .blog-meta {
+            color: var(--secondary-text-color);
+            font-size: 0.95rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .blog-sidebar {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .blog-sidebar-card {
+            padding: 1rem;
+        }
+
+        .blog-tag {
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            padding: 0.2rem 0.65rem;
+            text-decoration: none;
+        }
+
+        .blog-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 60rem) {
+            .blog-shell {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <section class="blog-lead">
+        <h1>{% if tag %}{{ tag.name }}{% else %}Blog{% endif %}</h1>
+        <p>
+            {% if tag %}
+                Posts tagged <strong>{{ tag.name }}</strong>.
+            {% else %}
+                News, updates, fleet notes, and project write-ups from betterfleets.
+            {% endif %}
+        </p>
+        {% if can_manage_blog %}
+            <div class="blog-actions">
+                <a class="button" href="{% url 'blog_manage' %}">Manage posts</a>
+                <a href="{% url 'blog_post_create' %}">Write a post</a>
+            </div>
+        {% endif %}
+    </section>
+
+    <div class="blog-shell">
+        <div class="blog-stream">
+            {% for post in posts %}
+                <article class="blog-card">
+                    <h2><a href="{{ post.get_absolute_url }}">{{ post.title }}</a></h2>
+                    <div class="blog-meta">
+                        <span>{{ post.get_display_date|date:"j F Y" }}</span>
+                        <span>{{ post.get_reading_time_minutes }} min read</span>
+                        {% if not post.published %}<span>Draft</span>{% endif %}
+                    </div>
+                    {% if post.excerpt %}
+                        <p>{{ post.excerpt|linebreaksbr }}</p>
+                    {% else %}
+                        <p>{{ post.body|truncatewords:45 }}</p>
+                    {% endif %}
+                    {% if post.tags.all %}
+                        <div class="blog-tags">
+                            {% for blog_tag in post.tags.all %}
+                                <a href="{{ blog_tag.get_absolute_url }}" class="blog-tag">{{ blog_tag.name }}</a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </article>
+            {% empty %}
+                <p>No posts are live yet.</p>
+            {% endfor %}
+
+            {% include 'pagination.html' with page=posts %}
+        </div>
+
+        <aside class="blog-sidebar">
+            <section class="blog-sidebar-card">
+                <h2>About the blog</h2>
+                <p>Longer updates, launch notes, data changes, and themed fleet features live here.</p>
+            </section>
+            {% if tags %}
+                <section class="blog-sidebar-card">
+                    <h2>Tags</h2>
+                    <div class="blog-tags">
+                        {% for blog_tag in tags %}
+                            <a href="{{ blog_tag.get_absolute_url }}" class="blog-tag">{{ blog_tag.name }}</a>
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+        </aside>
+    </div>
+{% endblock content %}

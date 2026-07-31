@@ -1,0 +1,462 @@
+{% extends 'page.html' %}
+
+{% block title %}Live Location Tracking - Better Fleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        .live-tracking-container {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .vehicle-selector {
+            padding: 1.25rem;
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+        }
+
+        .vehicle-selector h2 {
+            margin-top: 0;
+        }
+
+        .vehicle-selector form {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .vehicle-selector input[type="search"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+        }
+
+        .vehicle-selector button {
+            padding: 0.5rem 1rem;
+            background: #1d4ed8;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+        }
+
+        .vehicle-selector button:hover {
+            background: #1e40af;
+        }
+
+        .location-display {
+            padding: 1.25rem;
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+        }
+
+        .location-display h2 {
+            margin-top: 0;
+        }
+
+        .location-display .status {
+            margin: 1rem 0;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            background: rgba(148, 163, 184, 0.1);
+        }
+
+        .location-display .coordinates {
+            font-family: monospace;
+            margin: 0.5rem 0;
+        }
+
+        .location-display button {
+            padding: 0.5rem 1rem;
+            background: #1d4ed8;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+        }
+
+        .location-display button:hover {
+            background: #1e40af;
+        }
+
+        .location-display button:disabled {
+            background: rgba(148, 163, 184, 0.3);
+            cursor: not-allowed;
+        }
+
+        .map-container {
+            padding: 1.25rem;
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+        }
+
+        .map-container h2 {
+            margin-top: 0;
+        }
+
+        .map-container #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 0.5rem;
+            background: rgba(148, 163, 184, 0.1);
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    {% csrf_token %}
+    <h1>Live Location Tracking</h1>
+
+    <div class="live-tracking-container">
+        <section class="vehicle-selector">
+            <h2>Select a Vehicle</h2>
+            <p>Search for a vehicle by registration, fleet number, or code:</p>
+            <form method="get" action="{% url 'live_location_tracking' %}">
+                <input type="search" name="q" placeholder="e.g. SN12 ABC, 1234, or YN12 ABC" value="{{ request.GET.q }}">
+                <button type="submit">Search</button>
+            </form>
+            {% if selected_vehicle %}
+                <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(148, 163, 184, 0.1); border-radius: 0.5rem;">
+                    <strong>Selected:</strong> {{ selected_vehicle }}{% if selected_vehicle.operator %} - {{ selected_vehicle.operator }}{% endif %}
+                    <input type="hidden" id="selectedVehicleId" value="{{ selected_vehicle.id }}">
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="vehicle-selector">
+            <h2>Swap Vehicle Tracking</h2>
+            <p>Swap tracking details from one vehicle to another:</p>
+            <div style="display: grid; gap: 1rem; margin-top: 1rem;">
+                <div>
+                    <label for="sourceVehicle" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Source Vehicle (reg or fleet code)</label>
+                    <input type="text" id="sourceVehicle" placeholder="e.g. SN12 ABC or 1234" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem;">
+                </div>
+                <div>
+                    <label for="targetVehicle" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Target Vehicle (reg or fleet code)</label>
+                    <input type="text" id="targetVehicle" placeholder="e.g. YN12 ABC or 5678" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem;">
+                </div>
+                <button id="swapBtn" type="button">Swap Tracking</button>
+            </div>
+            <div id="swapStatus" class="status" style="margin-top: 1rem;"></div>
+        </section>
+
+        <section class="location-display">
+            <h2>Trip Information</h2>
+            <div style="display: grid; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label for="headcode" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Headcode</label>
+                    <input type="text" id="headcode" name="headcode" placeholder="e.g. 1A23" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem;">
+                </div>
+                <div>
+                    <label for="destination" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Destination</label>
+                    <input type="text" id="destination" name="destination" placeholder="e.g. City Centre" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem;">
+                </div>
+                <div>
+                    <label for="rotation" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Rotation (heading in degrees, 0-360)</label>
+                    <input type="number" id="rotation" name="rotation" placeholder="e.g. 90" min="0" max="360" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem;">
+                </div>
+                <div>
+                    <label for="lateness" style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Lateness (minutes, negative for early)</label>
+                    <input type="number" id="lateness" name="lateness" placeholder="e.g. 5 or -3" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem;">
+                </div>
+            </div>
+            <h2>Your Location</h2>
+            <p>Click the button below to get your current location, or click on the map to select a location:</p>
+            <button id="getLocationBtn">Get My Location</button>
+            <div style="margin-top: 1rem;">
+                <label style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Selected Location (click on map)</label>
+                <div id="selectedLocation" style="padding: 0.5rem; background: rgba(148, 163, 184, 0.1); border-radius: 0.5rem; margin-bottom: 0.5rem;">No location selected</div>
+                <input type="hidden" id="selectedLat" name="selectedLat">
+                <input type="hidden" id="selectedLng" name="selectedLng">
+            </div>
+            <button id="useSelectedLocationBtn" style="margin-top: 0.5rem;">Use Selected Location</button>
+            <div id="locationStatus" class="status"></div>
+            <div id="coordinates" class="coordinates"></div>
+        </section>
+
+        <section class="map-container">
+            <h2>Map</h2>
+            <div id="map"></div>
+            <p id="mapStatus" style="margin-top: 0.5rem; color: var(--secondary-text-color);"></p>
+        </section>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const getLocationBtn = document.getElementById('getLocationBtn');
+            const useSelectedLocationBtn = document.getElementById('useSelectedLocationBtn');
+            const locationStatus = document.getElementById('locationStatus');
+            const coordinates = document.getElementById('coordinates');
+            const mapStatus = document.getElementById('mapStatus');
+            const selectedVehicleId = document.getElementById('selectedVehicleId');
+            const headcodeInput = document.getElementById('headcode');
+            const destinationInput = document.getElementById('destination');
+            const rotationInput = document.getElementById('rotation');
+            const latenessInput = document.getElementById('lateness');
+            const selectedLocationDiv = document.getElementById('selectedLocation');
+            const selectedLatInput = document.getElementById('selectedLat');
+            const selectedLngInput = document.getElementById('selectedLng');
+            const sourceVehicleInput = document.getElementById('sourceVehicle');
+            const targetVehicleInput = document.getElementById('targetVehicle');
+            const swapBtn = document.getElementById('swapBtn');
+            const swapStatus = document.getElementById('swapStatus');
+            
+            let autoUpdateInterval = null;
+            let useManualLocation = false;
+            let map = null;
+            let marker = null;
+
+            // Initialize Leaflet map
+            function initMap() {
+                map = L.map('map').setView([54, -2], 5);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+
+                // Add click handler to select location
+                map.on('click', function(e) {
+                    const lat = e.latlng.lat;
+                    const lng = e.latlng.lng;
+                    
+                    // Update selected location display
+                    selectedLocationDiv.textContent = `Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`;
+                    selectedLatInput.value = lat;
+                    selectedLngInput.value = lng;
+                    
+                    // Update or add marker
+                    if (marker) {
+                        marker.setLatLng([lat, lng]);
+                    } else {
+                        marker = L.marker([lat, lng]).addTo(map);
+                    }
+                });
+            }
+
+            function updateLocation(lat = null, lng = null) {
+                if (!selectedVehicleId || !selectedVehicleId.value) {
+                    locationStatus.textContent = 'Please select a vehicle first.';
+                    locationStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+                    return;
+                }
+
+                const headcode = headcodeInput.value.trim();
+                const destination = destinationInput.value.trim();
+
+                if (useManualLocation && lat === null && lng === null) {
+                    lat = parseFloat(selectedLatInput.value);
+                    lng = parseFloat(selectedLngInput.value);
+                    
+                    if (isNaN(lat) || isNaN(lng)) {
+                        locationStatus.textContent = 'Please select a location on the map first.';
+                        locationStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+                        return;
+                    }
+                }
+
+                if (!useManualLocation && lat === null) {
+                    if (!navigator.geolocation) {
+                        locationStatus.textContent = 'Geolocation is not supported by your browser.';
+                        return;
+                    }
+
+                    locationStatus.textContent = 'Getting your location...';
+                    locationStatus.style.background = 'rgba(59, 130, 246, 0.1)';
+
+                    navigator.geolocation.getCurrentPosition(
+                        function(position) {
+                            const autoLat = position.coords.latitude;
+                            const autoLng = position.coords.longitude;
+                            processLocation(autoLat, autoLng, headcode, destination);
+                        },
+                        function(error) {
+                            let errorMessage = 'Unable to retrieve your location.';
+                            switch(error.code) {
+                                case error.PERMISSION_DENIED:
+                                    errorMessage = 'Location access denied. Please enable location services or select a location on the map.';
+                                    break;
+                                case error.POSITION_UNAVAILABLE:
+                                    errorMessage = 'Location information is unavailable. Please select a location on the map.';
+                                    break;
+                                case error.TIMEOUT:
+                                    errorMessage = 'Location request timed out. Please select a location on the map.';
+                                    break;
+                            }
+                            locationStatus.textContent = errorMessage;
+                            locationStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 30000,
+                            maximumAge: 60000
+                        }
+                    );
+                } else {
+                    processLocation(lat, lng, headcode, destination);
+                }
+            }
+
+            function processLocation(lat, lng, headcode, destination) {
+                locationStatus.textContent = 'Location found!';
+                locationStatus.style.background = 'rgba(34, 197, 94, 0.1)';
+                coordinates.textContent = `Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`;
+
+                // Update map view and marker
+                if (map) {
+                    map.setView([lat, lng], 16);
+                    
+                    // Create custom marker icon with livery CSS and headcode
+                    const rotation = rotationInput.value ? parseInt(rotationInput.value) : null;
+                    const iconHtml = headcode 
+                        ? `<div style="
+                            width: 24px;
+                            height: 16px;
+                            background: #1d4ed8;
+                            border-radius: 2px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: white;
+                            font-size: 10px;
+                            font-weight: bold;
+                            text-align: center;
+                            white-space: nowrap;
+                            overflow: hidden;
+                            transform: rotate(${rotation || 0}deg);
+                        ">${headcode}</div>`
+                        : `<div style="
+                            width: 24px;
+                            height: 16px;
+                            background: #1d4ed8;
+                            border-radius: 2px;
+                            transform: rotate(${rotation || 0}deg);
+                        "></div>`;
+                    
+                    const customIcon = L.divIcon({
+                        className: 'custom-vehicle-marker',
+                        html: iconHtml,
+                        iconSize: [24, 16],
+                        iconAnchor: [12, 8]
+                    });
+                    
+                    if (marker) {
+                        marker.setLatLng([lat, lng]);
+                        marker.setIcon(customIcon);
+                    } else {
+                        marker = L.marker([lat, lng], {icon: customIcon}).addTo(map);
+                    }
+                }
+
+                // Send location data to server
+                const formData = new FormData();
+                formData.append('vehicle_id', selectedVehicleId.value);
+                formData.append('latitude', lat);
+                formData.append('longitude', lng);
+                formData.append('headcode', headcode);
+                formData.append('destination', destination);
+                formData.append('rotation', rotationInput.value);
+                formData.append('lateness', latenessInput.value);
+
+                fetch('{% url "live_location_tracking" %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        locationStatus.textContent = 'Location saved successfully! Auto-updating every minute...';
+                    } else {
+                        locationStatus.textContent = 'Error saving location: ' + (data.error || 'Unknown error');
+                        locationStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    locationStatus.textContent = 'Error saving location. Please try again.';
+                    locationStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+                });
+
+                mapStatus.textContent = 'Map loaded. Your location is shown as a blue marker.';
+            }
+
+            // Initialize map on load
+            initMap();
+
+            getLocationBtn.addEventListener('click', function() {
+                useManualLocation = false;
+                updateLocation();
+                // Start auto-updating every minute
+                if (autoUpdateInterval) {
+                    clearInterval(autoUpdateInterval);
+                }
+                autoUpdateInterval = setInterval(() => updateLocation(), 60000);
+            });
+
+            useSelectedLocationBtn.addEventListener('click', function() {
+                useManualLocation = true;
+                // Stop auto-updating when using manual location
+                if (autoUpdateInterval) {
+                    clearInterval(autoUpdateInterval);
+                    autoUpdateInterval = null;
+                }
+                updateLocation();
+            });
+
+            // Handle vehicle swap
+            swapBtn.addEventListener('click', function() {
+                const sourceVehicle = sourceVehicleInput.value.trim();
+                const targetVehicle = targetVehicleInput.value.trim();
+
+                if (!sourceVehicle || !targetVehicle) {
+                    swapStatus.textContent = 'Please enter both source and target vehicles.';
+                    swapStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+                    return;
+                }
+
+                swapStatus.textContent = 'Swapping tracking data...';
+                swapStatus.style.background = 'rgba(59, 130, 246, 0.1)';
+
+                const formData = new FormData();
+                formData.append('source_vehicle', sourceVehicle);
+                formData.append('target_vehicle', targetVehicle);
+
+                fetch('{% url "swap_vehicle_tracking" %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        swapStatus.textContent = 'Tracking data swapped successfully!';
+                        swapStatus.style.background = 'rgba(34, 197, 94, 0.1)';
+                        // Clear inputs
+                        sourceVehicleInput.value = '';
+                        targetVehicleInput.value = '';
+                    } else {
+                        swapStatus.textContent = 'Error swapping tracking: ' + (data.error || 'Unknown error');
+                        swapStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    swapStatus.textContent = 'Error swapping tracking. Please try again.';
+                    swapStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+                });
+            });
+        });
+    </script>
+{% endblock %}

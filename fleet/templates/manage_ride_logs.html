@@ -1,0 +1,168 @@
+{% extends 'page.html' %}
+
+{% block title %}Manage Ride Logs - Better Fleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <style>
+        .operator-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .operator-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            background: var(--background-color);
+        }
+
+        .operator-item__checkbox {
+            width: 1.25rem;
+            height: 1.25rem;
+            cursor: pointer;
+        }
+
+        .operator-item__info {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .operator-item__logo {
+            width: 2.5rem;
+            height: 2.5rem;
+            object-fit: contain;
+            border-radius: 0.5rem;
+        }
+
+        .operator-item__logo-placeholder {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 0.5rem;
+            background: linear-gradient(135deg, #1d4ed8, #0f766e);
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .operator-item__name {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .operator-item__count {
+            color: var(--text-color);
+            font-size: 0.9rem;
+        }
+
+        .form-actions {
+            margin-top: 2rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .btn--primary {
+            background: #dc2626;
+            color: #fff;
+        }
+
+        .btn--primary:hover {
+            background: #b91c1c;
+        }
+
+        .btn--secondary {
+            background: var(--border-color);
+            color: var(--text-color);
+        }
+
+        .btn--secondary:hover {
+            background: var(--text-color);
+            color: var(--background-color);
+        }
+
+        .success-message {
+            background: #dcfce7;
+            color: #166534;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+    <script>
+        function toggleAll(source) {
+            const checkboxes = document.querySelectorAll('.operator-item__checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = source.checked;
+            });
+        }
+    </script>
+{% endblock head %}
+
+{% block content %}
+    <h1>Manage Ride Logs</h1>
+
+    {% if deleted_count %}
+        <div class="success-message">
+            Successfully deleted {{ deleted_count }} ride log(s).
+        </div>
+    {% endif %}
+
+    <p>Select operators to delete all ride logs for those operators.</p>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="operator-list">
+            {% for item in operators %}
+                <div class="operator-item">
+                    <input 
+                        type="checkbox" 
+                        name="operators" 
+                        value="{{ item.operator.id }}" 
+                        class="operator-item__checkbox"
+                        id="operator-{{ item.operator.id }}"
+                    >
+                    <label for="operator-{{ item.operator.id }}" class="operator-item__info">
+                        {% if item.operator.logo %}
+                            <img class="operator-item__logo" src="{{ item.operator.logo.url }}" alt="{{ item.operator.name }}">
+                        {% else %}
+                            <div class="operator-item__logo-placeholder">{{ item.operator.name|first|upper }}</div>
+                        {% endif %}
+                        <span class="operator-item__name">{{ item.operator.name }}</span>
+                        <span class="operator-item__count">({{ item.log_count }} log{{ item.log_count|pluralize }})</span>
+                    </label>
+                </div>
+            {% empty %}
+                <p>No ride logs found.</p>
+            {% endfor %}
+        </div>
+
+        {% if operators %}
+            <div class="form-actions">
+                <label>
+                    <input type="checkbox" onclick="toggleAll(this)"> Select all
+                </label>
+                <button type="submit" class="btn btn--primary">Delete selected logs</button>
+            </div>
+        {% endif %}
+    </form>
+{% endblock %}

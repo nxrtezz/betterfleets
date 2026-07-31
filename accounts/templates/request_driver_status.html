@@ -1,0 +1,32 @@
+{% extends "page.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="card" style="max-width: 600px; margin: 50px auto; padding: 30px; background: var(--background-color); border: 1px solid var(--border-color); border-radius: 1rem;">
+        <h1 style="color: var(--text-color);">Request Driver Status</h1>
+        <p style="margin: 20px 0; color: var(--text-color);">Driver status allows you to log vehicles you have driven (separate from vehicles you have ridden as a passenger).</p>
+        
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="reason" style="display: block; margin-bottom: 8px; font-weight: bold; color: var(--text-color);">Reason for request (optional)</label>
+                <textarea 
+                    id="reason" 
+                    name="reason" 
+                    rows="4" 
+                    style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; background: var(--background-color); color: var(--text-color);"
+                    placeholder="Please explain why you need driver status (e.g., you are a bus driver, you drive these vehicles for work, etc.)"
+                ></textarea>
+            </div>
+            
+            <button type="submit" style="background: var(--button-background); color: var(--button-foreground); padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+                Submit Request
+            </button>
+        </form>
+        
+        <p style="margin-top: 20px; color: var(--secondary-text-color); font-size: 14px;">
+            Your request will be reviewed by administrators. You will be notified once a decision has been made.
+        </p>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends 'page.html' %}
+
+{% block content %}
+
+<h1>{{ object }}</h1>
+
+{% if object.location %}
+    <ul class="horizontal">
+        <li><a href="/map#16/{{ object.location.y|floatformat:4 }}/{{ object.location.x|floatformat:4 }}">Map</a></li>
+    </ul>
+{% endif %}
+
+<div class="ad-wrapper">
+    <div id="AFM_inContentTop_ad"></div>
+</div>
+
+<div class="asides">
+    {% include 'departures.html' with departures=departures %}
+
+    <div class="aside">
+        <h2>Stops</h2>
+        {% include 'stops.html' with stops=children %}
+    </div>
+</div>
+
+{% endblock content %}

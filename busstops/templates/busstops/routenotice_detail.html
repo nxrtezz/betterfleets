@@ -1,0 +1,49 @@
+{% extends 'page.html' %}
+
+{% load urlise %}
+
+{% block title %}{{ object.title }} - route notice - Better Fleets{% endblock %}
+
+{% block content %}
+<h1>{{ object.title }}</h1>
+
+<p>
+    <a href="{{ object.service.get_absolute_url }}">{{ object.service }}</a>
+    {% for service in object.other_services.all %}
+        , <a href="{{ service.get_absolute_url }}">{{ service }}</a>
+    {% endfor %}
+</p>
+
+<dl class="contact-details">
+    <div>
+        <dt>Start</dt>
+        <dd>{{ object.start|date:"d/m/Y" }}</dd>
+    </div>
+    <div>
+        <dt>End</dt>
+        <dd>{{ object.end|date:"d/m/Y" }}</dd>
+    </div>
+    <div>
+        <dt>Planned</dt>
+        <dd>{% if object.planned %}Yes{% else %}No{% endif %}</dd>
+    </div>
+    <div>
+        <dt>Diversion</dt>
+        <dd>
+            {% if object.diversion %}
+                Yes{% if object.diversion_num_display %} {{ object.diversion_num_display }}{% endif %}
+            {% else %}
+                No
+            {% endif %}
+        </dd>
+    </div>
+    <div>
+        <dt>Route map</dt>
+        <dd>{{ object.route_map_id }}</dd>
+    </div>
+</dl>
+
+{% if object.description %}
+    <div>{{ object.description|urlise|linebreaksbr }}</div>
+{% endif %}
+{% endblock %}

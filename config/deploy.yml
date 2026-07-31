@@ -1,0 +1,78 @@
+# I use Kamal (https://kamal-deploy.org) for deploying and stuff, and this is the configuration for that.
+# (Secrets live in `.kamal/secrets`, quite rightly omitted from the git repo!)
+
+# (yes, DHH is a bellend. I'm sorry)
+
+# Name of your application. Used to uniquely configure containers.
+service: bustimes
+
+# Name of the container image.
+image: jclgoodwin/bustimes-org
+
+# Deploy to these servers.
+servers:
+  web:
+    hosts:
+      - 10.131.240.102
+      - 10.131.240.103
+      - 10.131.240.104
+      - 10.131.3.251
+      - 10.131.33.248
+    env:
+      clear:
+        WEB_CONCURRENCY: 8
+        EMAIL_HOST: email-smtp.eu-west-1.amazonaws.com
+        ALLOWED_HOSTS: bustimes.org
+      secret:
+        - SECRET_KEY
+        - DATABASE_URL
+        - READ_ONLY_DB_HOST
+        - REDIS_URL
+        - SENTRY_DSN
+        - TURNSTILE_SECRET
+        - EMAIL_HOST_USER
+        - EMAIL_HOST_PASSWORD
+        - TFL_APP_ID
+        - TFL_APP_KEY
+        - NTA_API_KEY
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
+        - STADIA_MAPS_API_KEY
+        - FLICKR_API_KEY
+
+accessories:
+  tileserver:
+    image: maptiler/tileserver-gl-light
+    host: 167.99.89.1
+    port: 80:8080
+    volumes:
+      - /root/data:/data
+
+    # to upgrade,
+    # first run `docker image pull maptiler/tileserver-gl-light` on the host
+    # then `kamal accessory reboot tileserver`
+
+builder:
+  arch: amd64
+  cache:
+    type: registry
+
+registry:
+  server: localhost:5000
+
+asset_path: /staticfiles
+
+deploy_timeout: 60
+
+proxy:
+  app_port: 8000
+  buffering:
+    # we go to great effort to _stream_ certain big slow responses (big timetables)
+    # to reduce the time-to-first-byte,
+    # so we disable response buffering which would undo all that hard work
+    responses: false
+  logging:
+    request_headers:
+      - Referer
+      - CF-IPCountry
+    response_headers: []

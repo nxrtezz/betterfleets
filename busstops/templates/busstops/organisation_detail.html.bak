@@ -1,0 +1,245 @@
+{% extends 'page.html' %}
+{% load static %}
+
+{% block head %}
+    {% include 'includes/theme_styles.html' with page_theme=page_theme profile=object profile_class='organisation-profile' %}
+{% endblock head %}
+
+{% block content %}
+
+<section class="organisation-profile">
+    <div class="organisation-profile__banner"{% if object.banner %} style="background-image:url('{{ object.banner.url }}')"{% endif %}></div>
+    <div class="organisation-profile__body">
+        {% if object.logo %}
+            <img src="{{ object.logo.url }}" alt="" class="organisation-profile__logo" style="max-width:min(42vw,14rem);max-height:clamp(6rem,15vw,10rem);width:auto;height:auto;object-fit:contain;">
+        {% endif %}
+        <div class="organisation-profile__meta">
+            {% if object.legal_name %}<p class="organisation-profile__eyebrow">{{ object.legal_name }}</p>{% endif %}
+            <h1>{{ object.short_name|default:object.name }}</h1>
+            {% if object.slogan %}<p class="organisation-profile__slogan"><i>{{ object.slogan }}</i></p>{% endif %}
+            {% if object.description %}<p class="organisation-profile__description">{{ object.description|linebreaksbr }}</p>{% endif %}
+            <ul class="organisation-profile__stats">
+                <li><strong>{{ groups|length }}</strong> divisions</li>
+                <li><strong>{{ operators_count }}</strong> operators</li>
+                <li><strong>{{ vehicles_count }}</strong> vehicles</li>
+                <li><strong>{{ depots_count }}</strong> depots</li>
+            </ul>
+            {% include 'includes/social_icons.html' with social_links=social_links %}
+            {% if object.website or object.email or object.phone %}
+                <ul class="organisation-profile__contact">
+                    {% if object.website %}<li><a href="{{ object.website }}" rel="nofollow">{{ object.website }}</a></li>{% endif %}
+                    {% if object.email %}<li><a href="mailto:{{ object.email }}">{{ object.email }}</a></li>{% endif %}
+                    {% if object.phone %}<li>{{ object.phone }}</li>{% endif %}
+                </ul>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<ul class="tabs">
+    <li>{% if active_tab == 'vehicles' %}Fleet ({{ vehicles_count }}){% else %}<a href="?tab=vehicles">Fleet ({{ vehicles_count }})</a>{% endif %}</li>
+    <li>{% if active_tab == 'depots' %}Garage map ({{ depots_count }}){% else %}<a href="?tab=depots">Garage map ({{ depots_count }})</a>{% endif %}</li>
+    <li><a href="{% url 'organisation_map' object.slug %}">Map</a></li>
+    <li>{% if active_tab == 'groups' %}Divisions ({{ groups|length }}){% else %}<a href="?tab=groups">Divisions ({{ groups|length }})</a>{% endif %}</li>
+    <li>{% if active_tab == 'stats' %}Stats{% else %}<a href="?tab=stats">Stats</a>{% endif %}</li>
+</ul>
+
+{% if active_tab == 'vehicles' %}
+    {% if vehicles %}
+        <div class="table-wrapper">
+            <table class="fleet compact">
+                <thead>
+                    <tr>
+                        <th scope="col">Operator</th>
+                        <th scope="col">Fleet</th>
+                        <th scope="col">Registration</th>
+                        <th scope="col">Livery</th>
+                        <th scope="col">Type</th>
+                        <th scope="col">Garage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vehicle in vehicles %}
+                        <tr id="{{ vehicle.slug }}">
+                            <td><a href="{{ vehicle.operator.get_absolute_url }}">{{ vehicle.operator_name }}</a></td>
+                            <td><a href="{{ vehicle.get_absolute_url }}">{% if vehicle.fleet_code or vehicle.fleet_number %}{% firstof vehicle.fleet_code vehicle.fleet_number %}{% if not vehicle.code_matches_fleet_primary %} (<i>{{ vehicle.get_code_display }}</i>){% endif %}{% else %}{{ vehicle.code }}{% endif %}</a></td>
+                            <td>{% if vehicle.reg %}<a href="{{ vehicle.get_absolute_url }}" class="reg">{{ vehicle.get_reg }}</a>{% endif %}</td>
+                            <td>
+                                {% if vehicle.colours or vehicle.livery_id %}<div class="livery{% if vehicle.livery_id %} livery-{{ vehicle.livery_id }}{% else %}" style="background:{{ vehicle.get_livery }}{% endif %}"></div>{% endif %}
+                                {% if vehicle.livery_name %}{{ vehicle.livery_name }}{% endif %}
+                            </td>
+                            <td>{{ vehicle.vehicle_type_name }}</td>
+                            <td>{{ vehicle.garage_name }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include 'pagination.html' with page=vehicles %}
+    {% else %}
+        <p>No vehicles are currently listed for this organisation.</p>
+    {% endif %}
+{% elif active_tab == 'depots' %}
+    {% include 'includes/depot_section.html' with depots=depots depot_map_points=depot_map_points depot_section_class='organisation-card depot-section' show_operator=True show_group=True %}
+    {% if not depots %}
+        <p>No depots are currently listed for this organisation.</p>
+    {% endif %}
+{% elif active_tab == 'groups' %}
+    <div class="organisation-divisions">
+        {% for group in groups %}
+            <article class="organisation-division">
+                <h3><a href="{{ group.get_absolute_url }}">{{ group.name }}</a></h3>
+                {% if group.description %}<p>{{ group.description|linebreaksbr }}</p>{% endif %}
+                <ul>
+                    {% for op in group.ordered_operators %}
+                        <li><a href="{{ op.get_absolute_url }}">{% firstof op.aka op.name %}{% if op.preserved %} <i>(preserved)</i>{% endif %}</a></li>
+                    {% empty %}
+                        <li>No active operators in this division.</li>
+                    {% endfor %}
+                </ul>
+                {% if group.ceased_operators %}
+                    <h4>Ceased Operations</h4>
+                    <ul>
+                        {% for op in group.ceased_operators %}
+                            <li><a href="{{ op.get_absolute_url }}">{% firstof op.aka op.name %}</a> <small>Ceased {{ op.ceased_operations_on|date:"j F Y" }}</small></li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </article>
+        {% empty %}
+            {% if not direct_operators and not ceased_direct_operators %}
+                <p>No divisions or operators are linked to this major operator yet.</p>
+            {% endif %}
+        {% endfor %}
+        {% if direct_operators %}
+            <article class="organisation-division">
+                <h3>Direct operators</h3>
+                <p>Operators linked to this major operator but not assigned to a division.</p>
+                <ul>
+                    {% for op in direct_operators %}
+                        <li><a href="{{ op.get_absolute_url }}">{% firstof op.aka op.name %}{% if op.preserved %} <i>(preserved)</i>{% endif %}</a></li>
+                    {% endfor %}
+                </ul>
+                {% if ceased_direct_operators %}
+                    <h4>Ceased Operations</h4>
+                    <ul>
+                        {% for op in ceased_direct_operators %}
+                            <li><a href="{{ op.get_absolute_url }}">{% firstof op.aka op.name %}</a> <small>Ceased {{ op.ceased_operations_on|date:"j F Y" }}</small></li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </article>
+        {% endif %}
+        {% if not direct_operators and ceased_direct_operators %}
+            <article class="organisation-division">
+                <h3>Direct operators</h3>
+                <h4>Ceased Operations</h4>
+                <ul>
+                    {% for op in ceased_direct_operators %}
+                        <li><a href="{{ op.get_absolute_url }}">{% firstof op.aka op.name %}</a> <small>Ceased {{ op.ceased_operations_on|date:"j F Y" }}</small></li>
+                    {% endfor %}
+                </ul>
+            </article>
+        {% endif %}
+    </div>
+{% elif active_tab == 'stats' %}
+    {% if vehicles_count %}
+        <div class="organisation-stats">
+            <p class="organisation-stats__intro">Fleet breakdown for <strong>{{ vehicles_count }}</strong> active vehicle{{ vehicles_count|pluralize }} linked to this organisation.</p>
+            <div class="organisation-stats__grid">
+                {% if stats_charts.livery %}
+                    <figure class="organisation-stats__chart">
+                        <figcaption>Vehicles by livery</figcaption>
+                        <div class="organisation-stats__canvas-wrap">
+                            <canvas id="org-chart-livery" role="img" aria-label="Vehicles by livery"></canvas>
+                        </div>
+                    </figure>
+                {% endif %}
+                {% if stats_charts.vehicle_type %}
+                    <figure class="organisation-stats__chart">
+                        <figcaption>Vehicles by vehicle type</figcaption>
+                        <div class="organisation-stats__canvas-wrap">
+                            <canvas id="org-chart-vehicle-type" role="img" aria-label="Vehicles by vehicle type"></canvas>
+                        </div>
+                    </figure>
+                {% endif %}
+                {% if stats_charts.operator %}
+                    <figure class="organisation-stats__chart">
+                        <figcaption>Vehicles by operator</figcaption>
+                        <div class="organisation-stats__canvas-wrap">
+                            <canvas id="org-chart-operator" role="img" aria-label="Vehicles by operator"></canvas>
+                        </div>
+                    </figure>
+                {% endif %}
+                {% if stats_charts.group %}
+                    <figure class="organisation-stats__chart">
+                        <figcaption>Vehicles by division</figcaption>
+                        <div class="organisation-stats__canvas-wrap">
+                            <canvas id="org-chart-group" role="img" aria-label="Vehicles by division"></canvas>
+                        </div>
+                    </figure>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <p>There are no active vehicles to show statistics for yet.</p>
+    {% endif %}
+{% endif %}
+
+{% endblock content %}
+
+{% block foot %}
+{{ block.super }}
+{% if active_tab == 'stats' and vehicles_count %}
+{{ stats_charts|json_script:"organisation-stats-charts" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    var payload = document.getElementById("organisation-stats-charts");
+    if (!payload || typeof Chart === "undefined") {
+        return;
+    }
+    var chartBorderColor = getComputedStyle(document.documentElement).getPropertyValue("--background-color") || "transparent";
+    var charts = JSON.parse(payload.textContent);
+    var defs = [
+        ["livery", "org-chart-livery"],
+        ["vehicle_type", "org-chart-vehicle-type"],
+        ["operator", "org-chart-operator"],
+        ["group", "org-chart-group"]
+    ];
+    var base = {
+        type: "doughnut",
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: "bottom" }
+            }
+        }
+    };
+    for (var i = 0; i < defs.length; i++) {
+        var key = defs[i][0];
+        var id = defs[i][1];
+        var spec = charts[key];
+        var canvas = document.getElementById(id);
+        if (!spec || !canvas) {
+            continue;
+        }
+        new Chart(canvas, {
+            type: base.type,
+            data: {
+                labels: spec.labels,
+                datasets: [{
+                    data: spec.data,
+                    backgroundColor: spec.colors,
+                    borderWidth: 1,
+                    borderColor: chartBorderColor
+                }]
+            },
+            options: base.options
+        });
+    }
+})();
+</script>
+{% endif %}
+{% endblock foot %}

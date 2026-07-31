@@ -1,0 +1,147 @@
+<style>
+    .operator-page-header {
+        display: grid;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        justify-items: start;
+    }
+
+    .operator-page-header--with-logo {
+        justify-items: start;
+        text-align: left;
+    }
+
+    .operator-page-header__logo {
+        display: block;
+        max-width: min(48vw, 21rem);
+        max-height: clamp(7rem, 18vw, 12.5rem);
+        width: min(48vw, 21rem);
+        height: auto;
+        object-fit: contain;
+    }
+
+    .operator-page-header__slogan {
+        margin: 0;
+        max-width: min(48vw, 21rem);
+        text-align: center;
+    }
+
+    .operator-page-header__title {
+        margin: 0;
+    }
+
+    .operator-page-header__meta {
+        margin: 0;
+    }
+</style>
+
+<div class="operator-page-header{% if object.logo %} operator-page-header--with-logo{% endif %}">
+    {% if object.logo %}
+        {% if object.logo.name|lower|slice:"-4:" == ".svg" %}
+            <object
+                data="{{ object.logo.url }}"
+                type="image/svg+xml"
+                aria-label="{{ object.get_public_name }}"
+                class="operator-page-header__logo"
+            >
+                {{ object.get_public_name_html }}
+            </object>
+        {% else %}
+            <img src="{{ object.logo.url }}" alt="{{ object.get_public_name }}" class="operator-page-header__logo">
+        {% endif %}
+    {% else %}
+        <h1 class="operator-page-header__title">{{ object.get_public_name_html }}</h1>
+    {% endif %}
+
+    {% if object.slogan %}
+        <p class="operator-page-header__slogan"><i>{{ object.slogan }}</i></p>
+    {% endif %}
+</div>
+
+<p class="operator-page-header__meta">{{ object.get_a_mode }} operator
+    {% if object.regions.all %}
+        in
+        {% for region in object.regions.all %}{% if not forloop.first %}{% if forloop.last %} and {% else %}, {% endif %}{% endif %}
+        <a href="{{ region.get_absolute_url }}">{{ region.the }}</a>{% endfor %}
+    {% elif object.region %}in <a href="{{ object.region.get_absolute_url }}">{{ object.region.the }}</a>{% endif %}
+</p>
+
+{% if object.preserved and object.ceased_operations_on %}
+    <p><strong>Ceased operations on:</strong> {{ object.ceased_operations_on }}</p>
+{% endif %}
+
+{% include 'includes/social_icons.html' with social_links=social_links %}
+
+<ul class="tabs">
+    {% if active_operator_tab == 'fleet' %}
+        <li>Fleet{% if vehicles_count %} ({{ vehicles_count }}){% endif %}</li>
+    {% else %}
+        <li><a href="{{ object.get_vehicles_url }}">Fleet{% if vehicles_count %} ({{ vehicles_count }}){% endif %}</a></li>
+    {% endif %}
+
+    {% if active_operator_tab == 'routes' %}
+        <li>Routes{% if services_count %} ({{ services_count }}){% endif %}</li>
+    {% else %}
+        <li><a href="{{ object.get_routes_url }}">Routes{% if services_count %} ({{ services_count }}){% endif %}</a></li>
+    {% endif %}
+
+    {% if event_services_count %}
+        {% if active_operator_tab == 'events' %}
+            <li>Events ({{ event_services_count }})</li>
+        {% else %}
+            <li><a href="{{ object.get_routes_url }}?tab=events">Events ({{ event_services_count }})</a></li>
+        {% endif %}
+    {% endif %}
+
+    {% if rail_replacement_services_count %}
+        {% if active_operator_tab == 'rail-replacement' %}
+            <li>Rail replacement ({{ rail_replacement_services_count }})</li>
+        {% else %}
+            <li><a href="{{ object.get_routes_url }}?tab=rail-replacement">Rail replacement ({{ rail_replacement_services_count }})</a></li>
+        {% endif %}
+    {% endif %}
+
+    {% if liveries_count %}
+        {% if active_operator_tab == 'liveries' %}
+            <li>Liveries ({{ liveries_count }})</li>
+        {% else %}
+            <li><a href="{{ object.get_absolute_url }}?tab=liveries">Liveries ({{ liveries_count }})</a></li>
+        {% endif %}
+    {% endif %}
+
+    {% if depots_count %}
+        {% if active_operator_tab == 'depots' %}
+            <li>Garages ({{ depots_count }})</li>
+        {% else %}
+            <li><a href="{{ object.get_vehicles_url }}?tab=depots">Garages ({{ depots_count }})</a></li>
+        {% endif %}
+    {% endif %}
+
+    {% if active_operator_tab == 'map' %}
+        <li>Map</li>
+    {% else %}
+        <li><a href="{{ object.get_detail_url }}/map">Map</a></li>
+    {% endif %}
+
+    {% if active_operator_tab == 'historical' %}
+        <li>Historical fleets</li>
+    {% else %}
+        <li><a href="{{ object.get_vehicles_url }}/historical">Historical fleets</a></li>
+    {% endif %}
+
+    {% if active_operator_tab == 'blocks' %}
+        <li>Blocks</li>
+    {% else %}
+        <li><a href="{{ object.get_vehicles_url }}/blocks">Blocks</a></li>
+    {% endif %}
+
+    {% if tickets_count %}
+        {% if active_operator_tab == 'tickets' %}
+            <li>Tickets ({{ tickets_count }})</li>
+        {% else %}
+            <li><a href="{{ object.get_detail_url }}?tab=tickets">Tickets ({{ tickets_count }})</a></li>
+        {% endif %}
+    {% elif tickets_link %}
+        <li><a href="{{ tickets_link }}">Tickets</a></li>
+    {% endif %}
+</ul>

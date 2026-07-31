@@ -1,0 +1,1407 @@
+{% extends 'page.html' %}
+
+{% block title %}Theme lab - Better Fleets{% endblock %}
+
+{% block head %}
+    <style>
+        .fresh-theme-lab {
+            --lab-ink: #f3efe7;
+            --lab-panel: #17181d;
+            --lab-panel-2: #20222b;
+            --lab-line: rgba(255, 255, 255, .12);
+            --lab-soft: rgba(255, 255, 255, .68);
+            --lab-accent: #ff875c;
+            display: grid;
+            gap: 1.5rem;
+            color: var(--lab-ink);
+        }
+
+        .fresh-theme-lab a {
+            color: inherit;
+        }
+
+        .fresh-theme-lab__hero,
+        .fresh-theme-lab__controls,
+        .fresh-theme-lab__preview,
+        .fresh-theme-lab__hex,
+        .fresh-theme-lab__gallery {
+            border: 1px solid var(--lab-line);
+            border-radius: 28px;
+            background:
+                radial-gradient(circle at top right, rgba(255, 135, 92, .15), transparent 32%),
+                linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, .01)),
+                var(--lab-panel);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, .16);
+        }
+
+        .fresh-theme-lab__hero {
+            padding: 1.75rem;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .fresh-theme-lab__eyebrow {
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: .14em;
+            font-size: .78rem;
+            color: var(--lab-accent);
+            font-weight: 700;
+        }
+
+        .fresh-theme-lab__hero h1,
+        .fresh-theme-lab__hero p,
+        .fresh-theme-lab__controls h2,
+        .fresh-theme-lab__preview h2,
+        .fresh-theme-lab__hex h2,
+        .fresh-theme-lab__gallery h2 {
+            margin: 0;
+        }
+
+        .fresh-theme-lab__hero h1 {
+            font-size: clamp(2rem, 4vw, 3.5rem);
+            line-height: .95;
+            max-width: 12ch;
+        }
+
+        .fresh-theme-lab__hero p {
+            max-width: 58rem;
+            color: var(--lab-soft);
+            font-size: 1.02rem;
+        }
+
+        .fresh-theme-lab__hero-band {
+            display: flex;
+            gap: .75rem;
+            flex-wrap: wrap;
+        }
+
+        .fresh-theme-lab__hero-pill {
+            padding: .55rem .8rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .05);
+            border: 1px solid var(--lab-line);
+            font-size: .92rem;
+        }
+
+        .fresh-theme-lab__layout {
+            display: grid;
+            gap: 1.5rem;
+            grid-template-columns: minmax(18rem, 27rem) minmax(0, 1fr);
+        }
+
+        .fresh-theme-lab__controls,
+        .fresh-theme-lab__preview,
+        .fresh-theme-lab__hex,
+        .fresh-theme-lab__gallery {
+            padding: 1.4rem;
+        }
+
+        .fresh-theme-lab__controls {
+            display: grid;
+            gap: 1rem;
+            align-content: start;
+        }
+
+        .fresh-theme-lab__kicker {
+            margin: .35rem 0 0;
+            color: var(--lab-soft);
+            font-size: .95rem;
+        }
+
+        .fresh-theme-lab__grid,
+        .fresh-theme-lab__buttons,
+        .fresh-theme-lab__gallery-list,
+        .fresh-theme-lab__preview-columns,
+        .fresh-theme-lab__hex-list {
+            display: grid;
+            gap: .9rem;
+        }
+
+        .fresh-theme-lab__grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .fresh-theme-lab__field {
+            display: grid;
+            gap: .45rem;
+        }
+
+        .fresh-theme-lab__field--wide {
+            grid-column: 1 / -1;
+        }
+
+        .fresh-theme-lab__field label,
+        .fresh-theme-lab__field legend {
+            font-size: .85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: rgba(255, 255, 255, .8);
+        }
+
+        .fresh-theme-lab__fieldset {
+            border: 1px solid var(--lab-line);
+            border-radius: 20px;
+            padding: .85rem;
+            background: var(--lab-panel-2);
+        }
+
+        .fresh-theme-lab__fieldset .fresh-theme-lab__grid {
+            margin-top: .8rem;
+        }
+
+        .fresh-theme-lab input[type="text"],
+        .fresh-theme-lab input[type="color"],
+        .fresh-theme-lab select,
+        .fresh-theme-lab button {
+            box-sizing: border-box;
+            width: 100%;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, .12);
+            min-height: 3rem;
+        }
+
+        .fresh-theme-lab input[type="text"],
+        .fresh-theme-lab select {
+            background: rgba(255, 255, 255, .04);
+            color: #fff;
+            padding: .78rem .95rem;
+        }
+
+        .fresh-theme-lab input[type="color"] {
+            padding: .3rem;
+            background: transparent;
+        }
+
+        .fresh-theme-lab__buttons {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .fresh-theme-lab__buttons button,
+        .fresh-theme-lab__hex-copy {
+            cursor: pointer;
+            font-weight: 700;
+            letter-spacing: .02em;
+        }
+
+        .fresh-theme-lab__buttons button[type="submit"] {
+            background: linear-gradient(135deg, #ff875c, #ffb067);
+            color: #1d120d;
+        }
+
+        .fresh-theme-lab__buttons button[type="button"] {
+            background: rgba(255, 255, 255, .06);
+            color: #fff;
+        }
+
+        .fresh-theme-lab__status {
+            margin: 0;
+            min-height: 1.5rem;
+            color: var(--lab-soft);
+            font-size: .94rem;
+        }
+
+        .fresh-theme-lab__preview {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .fresh-theme-lab__preview-columns {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .fresh-theme-lab__stage {
+            border-radius: 24px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, .14);
+            min-height: 28rem;
+            background: #fff;
+        }
+
+        .fresh-theme-lab__stage-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: .9rem 1rem;
+            font-size: .88rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            border-bottom: 1px solid rgba(0, 0, 0, .08);
+        }
+
+        .fresh-theme-lab__mini {
+            min-height: 100%;
+            background: var(--background-color);
+            color: var(--text-color);
+        }
+
+        .fresh-theme-lab__mini-header {
+            padding: 1rem 1.1rem;
+            background: var(--brand-color);
+            color: var(--header-text-color, var(--text-color));
+            display: flex;
+            justify-content: space-between;
+            gap: .8rem;
+            align-items: center;
+        }
+
+        .fresh-theme-lab__mini-mark {
+            font-size: 1.15rem;
+            font-weight: 800;
+            letter-spacing: -.04em;
+        }
+
+        .fresh-theme-lab__mini-nav {
+            display: flex;
+            gap: .5rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .fresh-theme-lab__mini-nav span,
+        .fresh-theme-lab__route,
+        .fresh-theme-lab__tag {
+            padding: .35rem .65rem;
+            border-radius: 999px;
+            border: 1px solid color-mix(in srgb, var(--border-color) 75%, transparent);
+        }
+
+        .fresh-theme-lab__mini-body {
+            padding: 1rem;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .fresh-theme-lab__hero-card,
+        .fresh-theme-lab__metric-card,
+        .fresh-theme-lab__list-card {
+            border-radius: 22px;
+            padding: 1rem;
+            background: var(--theme-card-background);
+            border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, .08);
+        }
+
+        .fresh-theme-lab__hero-card h3,
+        .fresh-theme-lab__metric-card h3,
+        .fresh-theme-lab__list-card h3,
+        .fresh-theme-lab__hero-card p,
+        .fresh-theme-lab__metric-card p,
+        .fresh-theme-lab__list-card p {
+            margin: 0;
+        }
+
+        .fresh-theme-lab__hero-card p,
+        .fresh-theme-lab__metric-card p,
+        .fresh-theme-lab__list-card p {
+            margin-top: .45rem;
+            color: color-mix(in srgb, var(--text-color) 80%, transparent);
+        }
+
+        .fresh-theme-lab__action-row,
+        .fresh-theme-lab__metric-row,
+        .fresh-theme-lab__route-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .65rem;
+            margin-top: .85rem;
+        }
+
+        .fresh-theme-lab__cta {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 8rem;
+            padding: .8rem 1rem;
+            border-radius: 16px;
+            font-weight: 700;
+            text-decoration: none;
+            background: var(--button-background);
+            color: var(--button-foreground);
+            border: 1px solid color-mix(in srgb, var(--button-background) 70%, #000 20%);
+        }
+
+        .fresh-theme-lab__cta--ghost {
+            background: transparent;
+            color: var(--text-color);
+            border-color: color-mix(in srgb, var(--border-color) 75%, transparent);
+        }
+
+        .fresh-theme-lab__metric-card {
+            display: grid;
+            gap: .7rem;
+        }
+
+        .fresh-theme-lab__metric {
+            flex: 1 1 8rem;
+            min-width: 8rem;
+            padding: .8rem .9rem;
+            border-radius: 16px;
+            background: color-mix(in srgb, var(--background-color) 40%, var(--brand-color) 60%);
+            color: var(--header-text-color, var(--text-color));
+        }
+
+        .fresh-theme-lab__metric strong,
+        .fresh-theme-lab__metric span {
+            display: block;
+        }
+
+        .fresh-theme-lab__list {
+            list-style: none;
+            margin: .8rem 0 0;
+            padding: 0;
+            display: grid;
+            gap: .7rem;
+        }
+
+        .fresh-theme-lab__list li {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            padding-bottom: .7rem;
+            border-bottom: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+        }
+
+        .fresh-theme-lab__list li:last-child {
+            padding-bottom: 0;
+            border-bottom: 0;
+        }
+
+        .fresh-theme-lab__hex {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .fresh-theme-lab__hex-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .fresh-theme-lab__hex-output {
+            display: inline-flex;
+            align-items: center;
+            gap: .75rem;
+            padding: .9rem 1rem;
+            border-radius: 20px;
+            background: var(--lab-panel-2);
+            border: 1px solid var(--lab-line);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 1rem;
+        }
+
+        .fresh-theme-lab__hex-dot {
+            width: 1rem;
+            height: 1rem;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, .2);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3);
+            background: #fff;
+        }
+
+        .fresh-theme-lab__hex-list {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .fresh-theme-lab__hex-card {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            gap: .8rem;
+            align-items: center;
+            padding: .8rem .9rem;
+            border-radius: 18px;
+            background: var(--lab-panel-2);
+            border: 1px solid var(--lab-line);
+        }
+
+        .fresh-theme-lab__hex-swatch {
+            width: 2.3rem;
+            height: 2.3rem;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, .16);
+        }
+
+        .fresh-theme-lab__hex-meta strong,
+        .fresh-theme-lab__hex-meta code {
+            display: block;
+        }
+
+        .fresh-theme-lab__hex-meta strong {
+            font-size: .9rem;
+        }
+
+        .fresh-theme-lab__hex-meta code {
+            color: var(--lab-soft);
+            font-size: .82rem;
+        }
+
+        .fresh-theme-lab__hex-copy {
+            width: auto;
+            min-width: 5.2rem;
+            padding: .7rem .85rem;
+            background: rgba(255, 255, 255, .06);
+            color: #fff;
+        }
+
+        .fresh-theme-lab__gallery {
+            display: grid;
+            gap: .9rem;
+        }
+
+        .fresh-theme-lab__gallery-list {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .fresh-theme-lab__theme-card {
+            padding: 1rem;
+            border-radius: 22px;
+            border: 1px solid var(--lab-line);
+            background: var(--lab-panel-2);
+        }
+
+        .fresh-theme-lab__theme-card h3,
+        .fresh-theme-lab__theme-card p {
+            margin: 0;
+        }
+
+        .fresh-theme-lab__theme-card p {
+            margin-top: .4rem;
+            color: var(--lab-soft);
+            font-size: .92rem;
+        }
+
+        .fresh-theme-lab__palette {
+            display: flex;
+            gap: .5rem;
+            margin-top: .85rem;
+        }
+
+        .fresh-theme-lab__palette span {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, .18);
+        }
+
+        @media (max-width: 62rem) {
+            .fresh-theme-lab__layout,
+            .fresh-theme-lab__preview-columns,
+            .fresh-theme-lab__gallery-list,
+            .fresh-theme-lab__hex-list {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 40rem) {
+            .fresh-theme-lab__grid,
+            .fresh-theme-lab__buttons {
+                grid-template-columns: 1fr;
+            }
+
+            .fresh-theme-lab__hero,
+            .fresh-theme-lab__controls,
+            .fresh-theme-lab__preview,
+            .fresh-theme-lab__hex,
+            .fresh-theme-lab__gallery {
+                padding: 1rem;
+            }
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <section class="fresh-theme-lab">
+        <header class="fresh-theme-lab__hero">
+            <p class="fresh-theme-lab__eyebrow">Theme Suite</p>
+            <h1>Theme lab</h1>
+            <p>A fresh suite builder for Better Fleets. Pick a direction, tune the core colors, inspect every token as a hex value, and push the finished light and dark pair into the site theme picker.</p>
+            <div class="fresh-theme-lab__hero-band">
+                <span class="fresh-theme-lab__hero-pill">New layout</span>
+                <span class="fresh-theme-lab__hero-pill">Live dual preview</span>
+                <span class="fresh-theme-lab__hero-pill">Hex value displayer</span>
+                <span class="fresh-theme-lab__hero-pill">Reusable site preset</span>
+            </div>
+        </header>
+
+        <div class="fresh-theme-lab__layout">
+            <form id="theme-lab-form" class="fresh-theme-lab__controls">
+                <div>
+                    <h2>Build a suite</h2>
+                    <p class="fresh-theme-lab__kicker">The generated pair stays harmonised across light and dark modes, while still giving you room to set the brand direction.</p>
+                </div>
+
+                <div class="fresh-theme-lab__grid">
+                    <div class="fresh-theme-lab__field fresh-theme-lab__field--wide">
+                        <label for="theme-suite-existing">Edit current theme</label>
+                        <select id="theme-suite-existing" name="existing-theme">
+                            <option value="">Start from a fresh suite</option>
+                        </select>
+                    </div>
+
+                    <div class="fresh-theme-lab__field fresh-theme-lab__field--wide">
+                        <label for="theme-suite-preset">Preset direction</label>
+                        <select id="theme-suite-preset" name="preset"></select>
+                    </div>
+
+                    <div class="fresh-theme-lab__field fresh-theme-lab__field--wide">
+                        <label for="theme-suite-name">Preset name</label>
+                        <input id="theme-suite-name" name="theme-name" type="text" value="Signal Sunrise">
+                    </div>
+                </div>
+
+                <fieldset class="fresh-theme-lab__fieldset">
+                    <legend>Core colors</legend>
+                    <div class="fresh-theme-lab__grid">
+                        <div class="fresh-theme-lab__field">
+                            <label for="theme-suite-accent">Accent</label>
+                            <input id="theme-suite-accent" name="accent" type="color" value="#ff875c">
+                        </div>
+                        <div class="fresh-theme-lab__field">
+                            <label for="theme-suite-support">Support</label>
+                            <input id="theme-suite-support" name="support" type="color" value="#ffcd6b">
+                        </div>
+                        <div class="fresh-theme-lab__field">
+                            <label for="theme-suite-surface">Surface anchor</label>
+                            <input id="theme-suite-surface" name="surface" type="color" value="#f6efe6">
+                        </div>
+                        <div class="fresh-theme-lab__field">
+                            <label for="theme-suite-ink">Ink anchor</label>
+                            <input id="theme-suite-ink" name="ink" type="color" value="#221c18">
+                        </div>
+                    </div>
+                </fieldset>
+
+                <div class="fresh-theme-lab__grid">
+                    <div class="fresh-theme-lab__field fresh-theme-lab__field--wide">
+                        <label for="theme-suite-livery">Borrow from livery</label>
+                        <select id="theme-suite-livery" name="livery">
+                            <option value="">No livery preset</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="fresh-theme-lab__buttons">
+                    <button id="theme-lab-apply" type="submit">Apply to website</button>
+                    <button id="theme-suite-randomise" type="button">Shuffle colors</button>
+                </div>
+
+                <p id="theme-suite-status" class="fresh-theme-lab__status">Previewing the current suite locally.</p>
+            </form>
+
+            <div class="fresh-theme-lab__preview">
+                <div>
+                    <h2>Live preview</h2>
+                    <p class="fresh-theme-lab__kicker">Both previews are driven by the same theme recipe, so contrast shifts and card hierarchy are easy to compare at a glance.</p>
+                </div>
+
+                <div class="fresh-theme-lab__preview-columns">
+                    <section class="fresh-theme-lab__stage" data-theme-lab-preview="light">
+                        <div class="fresh-theme-lab__stage-head">
+                            <span>Light view</span>
+                            <span id="theme-light-name">Signal Sunrise</span>
+                        </div>
+                        <div class="fresh-theme-lab__mini light-mode" id="theme-preview-light"></div>
+                    </section>
+
+                    <section class="fresh-theme-lab__stage" data-theme-lab-preview="dark">
+                        <div class="fresh-theme-lab__stage-head">
+                            <span>Dark view</span>
+                            <span id="theme-dark-name">Signal Sunrise</span>
+                        </div>
+                        <div class="fresh-theme-lab__mini dark-mode" id="theme-preview-dark"></div>
+                    </section>
+                </div>
+            </div>
+        </div>
+
+        <section class="fresh-theme-lab__hex">
+            <div class="fresh-theme-lab__hex-top">
+                <div>
+                    <h2>Hex value displayer</h2>
+                    <p class="fresh-theme-lab__kicker">Every generated token is shown as a direct hex value so you can review, copy, and discuss the exact palette.</p>
+                </div>
+                <output id="theme-hex-display" class="fresh-theme-lab__hex-output" aria-live="polite">
+                    <span class="fresh-theme-lab__hex-dot" id="theme-hex-dot"></span>
+                    <strong id="theme-hex-token">--brand-color</strong>
+                    <span id="theme-hex-value">#FF875C</span>
+                </output>
+            </div>
+            <div id="theme-hex-list" class="fresh-theme-lab__hex-list"></div>
+        </section>
+
+        <section class="fresh-theme-lab__gallery">
+            <div>
+                <h2>Included directions</h2>
+                <p class="fresh-theme-lab__kicker">Four starting points with distinct energy, plus optional livery seeding when you want the suite to begin from a real fleet palette.</p>
+            </div>
+            <div id="theme-gallery" class="fresh-theme-lab__gallery-list"></div>
+        </section>
+    </section>
+
+    {{ livery_presets|json_script:"theme-livery-presets" }}
+{% endblock content %}
+
+{% block foot %}
+    <script>
+    (function () {
+        var presetDefinitions = [
+            {
+                id: "signal-sunrise",
+                name: "Signal Sunrise",
+                description: "Warm, energetic, and editorial.",
+                accent: "#ff875c",
+                support: "#ffcd6b",
+                surface: "#f6efe6",
+                ink: "#221c18"
+            },
+            {
+                id: "harbour-ink",
+                name: "Harbour Ink",
+                description: "Sharp marine blues with bright chart accents.",
+                accent: "#2a6df4",
+                support: "#8fd3ff",
+                surface: "#eaf3fb",
+                ink: "#10233b"
+            },
+            {
+                id: "meadow-ledger",
+                name: "Meadow Ledger",
+                description: "Grounded greens with archival warmth.",
+                accent: "#3f8754",
+                support: "#c8de86",
+                surface: "#f3f3e7",
+                ink: "#1b241b"
+            },
+            {
+                id: "night-dispatch",
+                name: "Night Dispatch",
+                description: "High-contrast neon over charcoal.",
+                accent: "#ff5d8f",
+                support: "#7f9bff",
+                surface: "#efe7f3",
+                ink: "#16131d"
+            }
+        ];
+
+        var tokenOrder = [
+            "brand-color",
+            "brand-color-darker",
+            "brand-color-darker-darker",
+            "background-color",
+            "text-color",
+            "link-color",
+            "active-link-color",
+            "border-color",
+            "border-color-darker",
+            "theme-card-background",
+            "button-background",
+            "button-foreground",
+            "header-text-color",
+            "summary-marker-color"
+        ];
+
+        var form = document.getElementById("theme-lab-form");
+        var presetSelect = document.getElementById("theme-suite-preset");
+        var nameInput = document.getElementById("theme-suite-name");
+        var accentInput = document.getElementById("theme-suite-accent");
+        var supportInput = document.getElementById("theme-suite-support");
+        var surfaceInput = document.getElementById("theme-suite-surface");
+        var inkInput = document.getElementById("theme-suite-ink");
+        var liverySelect = document.getElementById("theme-suite-livery");
+        var existingThemeSelect = document.getElementById("theme-suite-existing");
+        var statusNode = document.getElementById("theme-suite-status");
+        var galleryNode = document.getElementById("theme-gallery");
+        var hexListNode = document.getElementById("theme-hex-list");
+        var hexTokenNode = document.getElementById("theme-hex-token");
+        var hexValueNode = document.getElementById("theme-hex-value");
+        var hexDotNode = document.getElementById("theme-hex-dot");
+        var lightPreview = document.getElementById("theme-preview-light");
+        var darkPreview = document.getElementById("theme-preview-dark");
+        var lightName = document.getElementById("theme-light-name");
+        var darkName = document.getElementById("theme-dark-name");
+        var randomiseButton = document.getElementById("theme-suite-randomise");
+        var liveryDataNode = document.getElementById("theme-livery-presets");
+        var liveryPresets = [];
+        var activeHexButton = null;
+        var appliedPresetId = null;
+        var editingPresetId = null;
+        var builtInThemes = {
+            "solent-blue": {
+                id: "solent-blue",
+                name: "Solent Blue",
+                light: {
+                    "brand-color": "#8FDFFF",
+                    "brand-color-darker": "#0BB7EF",
+                    "brand-color-darker-darker": "#0B86D7",
+                    "border-color": "#66CBED",
+                    "border-color-darker": "#0B86D7",
+                    "background-color": "#F4FBFF",
+                    "text-color": "#0A2236",
+                    "link-color": "#0A63A8",
+                    "active-link-color": "#04111D",
+                    "header-text-color": "#04111D",
+                    "button-background": "#0B86D7",
+                    "button-foreground": "#FFFFFF",
+                    "summary-marker-color": "#0B86D7",
+                    "theme-card-background": "#FFFFFF"
+                },
+                dark: {
+                    "brand-color": "#0B86D7",
+                    "brand-color-darker": "#08639F",
+                    "brand-color-darker-darker": "#053A61",
+                    "border-color": "#0D4E78",
+                    "border-color-darker": "#8FDFFF",
+                    "background-color": "#08131D",
+                    "text-color": "#E8F7FF",
+                    "link-color": "#8FDFFF",
+                    "active-link-color": "#FFFFFF",
+                    "header-text-color": "#F6FDFF",
+                    "button-background": "#11A7E6",
+                    "button-foreground": "#03111A",
+                    "summary-marker-color": "#8FDFFF",
+                    "theme-card-background": "#1C2430"
+                }
+            },
+            "ultraviolet": {
+                id: "ultraviolet",
+                name: "Ultraviolet",
+                light: {
+                    "brand-color": "#A65CD1",
+                    "brand-color-darker": "#8C43BD",
+                    "brand-color-darker-darker": "#5F2F97",
+                    "border-color": "#C7B3D8",
+                    "border-color-darker": "#7D54AD",
+                    "background-color": "#F8F4FF",
+                    "text-color": "#1E1638",
+                    "link-color": "#7F35B7",
+                    "active-link-color": "#120A2D",
+                    "header-text-color": "#FDFBFF",
+                    "button-background": "#7A3FB0",
+                    "button-foreground": "#FFFFFF",
+                    "summary-marker-color": "#8C43BD",
+                    "theme-card-background": "#FFFFFF"
+                },
+                dark: {
+                    "brand-color": "#6D44C3",
+                    "brand-color-darker": "#55339D",
+                    "brand-color-darker-darker": "#2E1F75",
+                    "border-color": "#4C3A82",
+                    "border-color-darker": "#B98CE0",
+                    "background-color": "#0F0D1B",
+                    "text-color": "#F4ECFF",
+                    "link-color": "#C792FF",
+                    "active-link-color": "#FFFFFF",
+                    "header-text-color": "#F8F5FF",
+                    "button-background": "#A65CD1",
+                    "button-foreground": "#160D38",
+                    "summary-marker-color": "#ADADAD",
+                    "theme-card-background": "#1C2430"
+                }
+            },
+            "olympia": {
+                id: "olympia",
+                name: "Olympia",
+                light: {
+                    "brand-color": "#5768A0",
+                    "brand-color-darker": "#A9B8E3",
+                    "brand-color-darker-darker": "#E0EFFA",
+                    "border-color": "#A9B8E3",
+                    "border-color-darker": "#5768A0",
+                    "background-color": "#E0EFFA",
+                    "text-color": "#5768A0",
+                    "link-color": "#5768A0",
+                    "active-link-color": "#E0EFFA",
+                    "header-text-color": "#E0EFFA",
+                    "button-background": "#A9B8E3",
+                    "button-foreground": "#5768A0",
+                    "summary-marker-color": "#E0EFFA",
+                    "theme-card-background": "#E0EFFA"
+                },
+                dark: {
+                    "brand-color": "#A9B8E3",
+                    "brand-color-darker": "#E0EFFA",
+                    "brand-color-darker-darker": "#E0EFFA",
+                    "border-color": "#A9B8E3",
+                    "border-color-darker": "#E0EFFA",
+                    "background-color": "#5768A0",
+                    "text-color": "#E0EFFA",
+                    "link-color": "#A9B8E3",
+                    "active-link-color": "#5768A0",
+                    "header-text-color": "#5768A0",
+                    "button-background": "#E0EFFA",
+                    "button-foreground": "#5768A0",
+                    "summary-marker-color": "#E0EFFA",
+                    "theme-card-background": "#A9B8E3"
+                }
+            }
+        };
+
+        try {
+            liveryPresets = JSON.parse(liveryDataNode ? liveryDataNode.textContent : "[]");
+        } catch (error) {
+            liveryPresets = [];
+        }
+
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function normaliseHex(value) {
+            if (!value) {
+                return "#000000";
+            }
+
+            var compact = String(value).trim().replace(/[^0-9a-fA-F]/g, "");
+            if (compact.length === 3) {
+                compact = compact.split("").map(function (part) {
+                    return part + part;
+                }).join("");
+            }
+            if (compact.length !== 6) {
+                return "#000000";
+            }
+            return "#" + compact.toUpperCase();
+        }
+
+        function toRgb(hex) {
+            var safe = normaliseHex(hex).slice(1);
+            return {
+                red: parseInt(safe.slice(0, 2), 16),
+                green: parseInt(safe.slice(2, 4), 16),
+                blue: parseInt(safe.slice(4, 6), 16)
+            };
+        }
+
+        function fromRgb(red, green, blue) {
+            return "#" + [red, green, blue].map(function (value) {
+                return clamp(Math.round(value), 0, 255).toString(16).padStart(2, "0");
+            }).join("").toUpperCase();
+        }
+
+        function mix(left, right, ratio) {
+            var leftRgb = toRgb(left);
+            var rightRgb = toRgb(right);
+            var amount = clamp(ratio, 0, 1);
+            return fromRgb(
+                leftRgb.red + (rightRgb.red - leftRgb.red) * amount,
+                leftRgb.green + (rightRgb.green - leftRgb.green) * amount,
+                leftRgb.blue + (rightRgb.blue - leftRgb.blue) * amount
+            );
+        }
+
+        function luminance(hex) {
+            var rgb = toRgb(hex);
+            return (rgb.red * 0.2126 + rgb.green * 0.7152 + rgb.blue * 0.0722) / 255;
+        }
+
+        function readableText(hex) {
+            return luminance(hex) > 0.58 ? "#17202A" : "#F8FAFC";
+        }
+
+        function slugify(value) {
+            return String(value || "theme-suite")
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-+|-+$/g, "")
+                .slice(0, 40) || "theme-suite";
+        }
+
+        function createThemeSet(core) {
+            var accent = normaliseHex(core.accent);
+            var support = normaliseHex(core.support);
+            var surface = normaliseHex(core.surface);
+            var ink = normaliseHex(core.ink);
+
+            return {
+                light: {
+                    "brand-color": accent,
+                    "brand-color-darker": mix(accent, support, 0.3),
+                    "brand-color-darker-darker": mix(accent, ink, 0.22),
+                    "background-color": mix(surface, "#FFFFFF", 0.52),
+                    "text-color": mix(ink, "#000000", 0.12),
+                    "link-color": mix(accent, "#1D4ED8", 0.22),
+                    "active-link-color": mix(ink, "#000000", 0.24),
+                    "border-color": mix(accent, surface, 0.45),
+                    "border-color-darker": mix(accent, ink, 0.18),
+                    "theme-card-background": mix(surface, "#FFFFFF", 0.68),
+                    "button-background": accent,
+                    "button-foreground": readableText(accent),
+                    "header-text-color": readableText(accent),
+                    "summary-marker-color": mix(accent, ink, 0.18)
+                },
+                dark: {
+                    "brand-color": mix(accent, support, 0.12),
+                    "brand-color-darker": mix(accent, "#FFFFFF", 0.16),
+                    "brand-color-darker-darker": mix(accent, "#000000", 0.28),
+                    "background-color": mix(ink, "#07090D", 0.55),
+                    "text-color": mix(surface, "#FFFFFF", 0.72),
+                    "link-color": mix(support, "#FFFFFF", 0.14),
+                    "active-link-color": "#FFFFFF",
+                    "border-color": mix(accent, "#111827", 0.58),
+                    "border-color-darker": mix(accent, "#FFFFFF", 0.1),
+                    "theme-card-background": mix(ink, "#1C2430", 0.46),
+                    "button-background": mix(accent, "#FFFFFF", 0.08),
+                    "button-foreground": readableText(mix(accent, "#FFFFFF", 0.08)),
+                    "header-text-color": readableText(mix(accent, support, 0.12)),
+                    "summary-marker-color": mix(support, "#FFFFFF", 0.22)
+                }
+            };
+        }
+
+        function currentCore() {
+            return {
+                accent: accentInput.value,
+                support: supportInput.value,
+                surface: surfaceInput.value,
+                ink: inkInput.value
+            };
+        }
+
+        function currentSuite() {
+            return {
+                id: editingPresetId || appliedPresetId || slugify(nameInput.value),
+                name: nameInput.value.trim() || "Theme Suite",
+                light: createThemeSet(currentCore()).light,
+                dark: createThemeSet(currentCore()).dark
+            };
+        }
+
+        function suiteToCore(suite) {
+            return {
+                accent: normaliseHex(suite.light["brand-color"]),
+                support: normaliseHex(suite.light["brand-color-darker"] || suite.light["border-color"]),
+                surface: normaliseHex(suite.light["theme-card-background"] || suite.light["background-color"]),
+                ink: normaliseHex(suite.light["text-color"])
+            };
+        }
+
+        function previewMarkup(name, modeLabel) {
+            return [
+                '<div class="fresh-theme-lab__mini-header">',
+                '<div class="fresh-theme-lab__mini-mark">Better Fleets</div>',
+                '<div class="fresh-theme-lab__mini-nav">',
+                '<span>Fleet</span><span>Maps</span><span>' + modeLabel + '</span>',
+                "</div>",
+                "</div>",
+                '<div class="fresh-theme-lab__mini-body">',
+                '<section class="fresh-theme-lab__hero-card">',
+                "<h3>" + name + "</h3>",
+                "<p>Route profiles, fleet cards, and operator pages all inherit from the same palette.</p>",
+                '<div class="fresh-theme-lab__action-row">',
+                '<a href="#" class="fresh-theme-lab__cta">Primary action</a>',
+                '<a href="#" class="fresh-theme-lab__cta fresh-theme-lab__cta--ghost">Secondary</a>',
+                "</div>",
+                "</section>",
+                '<section class="fresh-theme-lab__metric-card">',
+                "<h3>Snapshot</h3>",
+                "<p>A quick stress test for hierarchy, fill, contrast, and accent usage.</p>",
+                '<div class="fresh-theme-lab__metric-row">',
+                '<div class="fresh-theme-lab__metric"><strong>127</strong><span>Active vehicles</span></div>',
+                '<div class="fresh-theme-lab__metric"><strong>14</strong><span>Routes tracked</span></div>',
+                '<div class="fresh-theme-lab__metric"><strong>99.1%</strong><span>Data uptime</span></div>',
+                "</div>",
+                "</section>",
+                '<section class="fresh-theme-lab__list-card">',
+                "<h3>Service board</h3>",
+                '<div class="fresh-theme-lab__route-row">',
+                '<span class="fresh-theme-lab__route">21 Coast</span>',
+                '<span class="fresh-theme-lab__route">X4 City</span>',
+                '<span class="fresh-theme-lab__tag">Live tracked</span>',
+                "</div>",
+                '<ul class="fresh-theme-lab__list">',
+                "<li><span>Vehicle cards</span><strong>Ready</strong></li>",
+                "<li><span>Operator banners</span><strong>Ready</strong></li>",
+                "<li><span>Footer theme preset</span><strong>Reusable</strong></li>",
+                "</ul>",
+                "</section>",
+                "</div>"
+            ].join("");
+        }
+
+        function applyVars(node, values) {
+            tokenOrder.forEach(function (token) {
+                node.style.setProperty("--" + token, values[token]);
+            });
+        }
+
+        function buildHexCards(values, mode) {
+            hexListNode.innerHTML = "";
+            tokenOrder.forEach(function (token, index) {
+                var value = values[token];
+                var card = document.createElement("article");
+                card.className = "fresh-theme-lab__hex-card";
+                card.innerHTML = [
+                    '<span class="fresh-theme-lab__hex-swatch" style="background:' + value + '"></span>',
+                    '<div class="fresh-theme-lab__hex-meta"><strong>--' + token + '</strong><code>' + mode + " mode" + "</code></div>",
+                    '<button class="fresh-theme-lab__hex-copy" type="button" data-token="--' + token + '" data-value="' + value + '">Copy</button>'
+                ].join("");
+                hexListNode.appendChild(card);
+                if (index === 0) {
+                    setHexDisplay("--" + token, value, null);
+                }
+            });
+        }
+
+        function setHexDisplay(token, value, button) {
+            hexTokenNode.textContent = token;
+            hexValueNode.textContent = value;
+            hexDotNode.style.background = value;
+            if (activeHexButton) {
+                activeHexButton.textContent = "Copy";
+            }
+            activeHexButton = button || null;
+            if (activeHexButton) {
+                activeHexButton.textContent = "Copied";
+            }
+        }
+
+        function renderGallery() {
+            galleryNode.innerHTML = "";
+            presetDefinitions.forEach(function (preset) {
+                var themeSet = createThemeSet(preset);
+                var card = document.createElement("article");
+                card.className = "fresh-theme-lab__theme-card";
+                card.innerHTML = [
+                    "<h3>" + preset.name + "</h3>",
+                    "<p>" + preset.description + "</p>",
+                    '<div class="fresh-theme-lab__palette">',
+                    '<span style="background:' + themeSet.light["brand-color"] + '"></span>',
+                    '<span style="background:' + themeSet.light["theme-card-background"] + '"></span>',
+                    '<span style="background:' + themeSet.dark["background-color"] + '"></span>',
+                    '<span style="background:' + themeSet.dark["link-color"] + '"></span>',
+                    "</div>"
+                ].join("");
+                galleryNode.appendChild(card);
+            });
+        }
+
+        function populatePresetSelect() {
+            presetDefinitions.forEach(function (preset) {
+                var option = document.createElement("option");
+                option.value = preset.id;
+                option.textContent = preset.name;
+                presetSelect.appendChild(option);
+            });
+        }
+
+        function populateExistingThemeSelect() {
+            var currentMode = window.siteTheme && window.siteTheme.getStoredMode ? window.siteTheme.getStoredMode() : "system";
+            existingThemeSelect.innerHTML = '<option value="">Start from a fresh suite</option>';
+
+            if (currentMode && currentMode !== "system") {
+                var currentOption = document.createElement("option");
+                currentOption.value = "current";
+                currentOption.textContent = "Current site theme";
+                existingThemeSelect.appendChild(currentOption);
+            }
+
+            Object.keys(builtInThemes).forEach(function (themeId) {
+                var option = document.createElement("option");
+                option.value = "builtin:" + themeId;
+                option.textContent = builtInThemes[themeId].name;
+                existingThemeSelect.appendChild(option);
+            });
+
+            (window.siteTheme && window.siteTheme.getCustomPresets ? window.siteTheme.getCustomPresets() : []).forEach(function (preset) {
+                var option = document.createElement("option");
+                option.value = "custom:" + preset.id;
+                option.textContent = preset.name;
+                existingThemeSelect.appendChild(option);
+            });
+        }
+
+        function getCurrentSiteSuite() {
+            if (!window.siteTheme || !window.siteTheme.getStoredMode) {
+                return null;
+            }
+
+            var mode = window.siteTheme.getStoredMode();
+            if (mode === "system" || mode === "light" || mode === "dark") {
+                return null;
+            }
+
+            if (mode.indexOf("custom:") === 0) {
+                var presetId = mode.slice(7);
+                var presets = window.siteTheme.getCustomPresets ? window.siteTheme.getCustomPresets() : [];
+                for (var index = 0; index < presets.length; index += 1) {
+                    if (presets[index].id === presetId) {
+                        return presets[index];
+                    }
+                }
+            }
+
+            if (builtInThemes[mode]) {
+                return builtInThemes[mode];
+            }
+
+            return null;
+        }
+
+        function loadExistingTheme(selection) {
+            var suite = null;
+            var overwriteExisting = false;
+
+            if (selection === "current") {
+                suite = getCurrentSiteSuite();
+                overwriteExisting = !!(suite && !builtInThemes[suite.id]);
+            } else if (selection.indexOf("builtin:") === 0) {
+                suite = builtInThemes[selection.slice(8)] || null;
+            } else if (selection.indexOf("custom:") === 0 && window.siteTheme && window.siteTheme.getCustomPresets) {
+                var customId = selection.slice(7);
+                var presets = window.siteTheme.getCustomPresets();
+                for (var index = 0; index < presets.length; index += 1) {
+                    if (presets[index].id === customId) {
+                        suite = presets[index];
+                        overwriteExisting = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!suite) {
+                return;
+            }
+
+            var core = suiteToCore(suite);
+            editingPresetId = overwriteExisting ? suite.id : null;
+            appliedPresetId = overwriteExisting ? suite.id : null;
+            nameInput.value = suite.name;
+            accentInput.value = core.accent;
+            supportInput.value = core.support;
+            surfaceInput.value = core.surface;
+            inkInput.value = core.ink;
+            renderPreview();
+            statusNode.textContent = overwriteExisting
+                ? "Loaded " + suite.name + ". Saving will update this existing site theme."
+                : "Loaded " + suite.name + " as a starting point. Saving will create a new editable copy.";
+        }
+
+        function populateLiverySelect() {
+            liveryPresets.forEach(function (livery) {
+                var option = document.createElement("option");
+                option.value = String(livery.id);
+                option.textContent = livery.name;
+                liverySelect.appendChild(option);
+            });
+        }
+
+        function choosePresetById(presetId) {
+            for (var index = 0; index < presetDefinitions.length; index += 1) {
+                if (presetDefinitions[index].id === presetId) {
+                    return presetDefinitions[index];
+                }
+            }
+            return presetDefinitions[0];
+        }
+
+        function loadPreset(preset) {
+            appliedPresetId = null;
+            editingPresetId = null;
+            existingThemeSelect.value = "";
+            presetSelect.value = preset.id;
+            nameInput.value = preset.name;
+            accentInput.value = normaliseHex(preset.accent);
+            supportInput.value = normaliseHex(preset.support);
+            surfaceInput.value = normaliseHex(preset.surface);
+            inkInput.value = normaliseHex(preset.ink);
+            statusNode.textContent = "Previewing " + preset.name + ".";
+            renderPreview();
+        }
+
+        function paletteFromLivery(livery) {
+            var colour = livery && livery.colour ? normaliseHex(livery.colour) : "#4F46E5";
+            var left = livery && livery.left_css ? normaliseHex(livery.left_css) : mix(colour, "#FFFFFF", 0.24);
+            var right = livery && livery.right_css ? normaliseHex(livery.right_css) : mix(colour, "#111827", 0.16);
+            return {
+                accent: colour,
+                support: left,
+                surface: mix(right, "#FFFFFF", 0.82),
+                ink: livery && livery.white_text ? "#111827" : mix(right, "#05070B", 0.28)
+            };
+        }
+
+        function renderPreview() {
+            var suiteName = nameInput.value.trim() || "Theme Suite";
+            var themeSet = createThemeSet(currentCore());
+            lightName.textContent = suiteName;
+            darkName.textContent = suiteName;
+            lightPreview.innerHTML = previewMarkup(suiteName, "Light");
+            darkPreview.innerHTML = previewMarkup(suiteName, "Dark");
+            applyVars(lightPreview, themeSet.light);
+            applyVars(darkPreview, themeSet.dark);
+            buildHexCards(themeSet.light, "light");
+        }
+
+        function saveCustomPreset() {
+            if (!window.siteTheme || !window.siteTheme.getCustomPresets) {
+                statusNode.textContent = "The site theme helper is unavailable on this page.";
+                return;
+            }
+
+            var suite = currentSuite();
+            var presetId = suite.id || slugify(suite.name);
+            suite.id = presetId;
+
+            var presets = window.siteTheme.getCustomPresets();
+            var nextPresets = presets.filter(function (preset) {
+                return preset.id !== presetId;
+            });
+            nextPresets.push(suite);
+
+            try {
+                localStorage.setItem("betterfleets.custom-theme-presets", JSON.stringify(nextPresets));
+                appliedPresetId = presetId;
+                editingPresetId = presetId;
+                refreshThemeSelect("custom:" + presetId);
+                populateExistingThemeSelect();
+                existingThemeSelect.value = "custom:" + presetId;
+                window.siteTheme.apply("custom:" + presetId, true);
+                statusNode.textContent = suite.name + " is now available from the site theme picker.";
+            } catch (error) {
+                statusNode.textContent = "Could not save the generated preset in this browser.";
+            }
+        }
+
+        function refreshThemeSelect(selectedValue) {
+            var select = document.getElementById("site-theme-select");
+            if (!select || !window.siteTheme) {
+                return;
+            }
+
+            var cloned = select.cloneNode(false);
+            [
+                { value: "system", label: "System" },
+                { value: "light", label: "Light" },
+                { value: "dark", label: "Dark" },
+                { value: "solent-blue", label: "Solent Blue" },
+                { value: "ultraviolet", label: "Ultraviolet" },
+                { value: "olympia", label: "Olympia" }
+            ].forEach(function (baseOption) {
+                var option = document.createElement("option");
+                option.value = baseOption.value;
+                option.textContent = baseOption.label;
+                cloned.appendChild(option);
+            });
+
+            (window.siteTheme.getCustomPresets() || []).forEach(function (preset) {
+                var option = document.createElement("option");
+                option.value = "custom:" + preset.id;
+                option.textContent = preset.name;
+                cloned.appendChild(option);
+            });
+
+            select.parentNode.replaceChild(cloned, select);
+            cloned.value = selectedValue || window.siteTheme.getStoredMode();
+            cloned.addEventListener("change", function (event) {
+                window.siteTheme.apply(event.target.value, true);
+            });
+        }
+
+        function randomHex() {
+            return fromRgb(
+                Math.floor(Math.random() * 256),
+                Math.floor(Math.random() * 256),
+                Math.floor(Math.random() * 256)
+            );
+        }
+
+        function bindHexEvents() {
+            hexListNode.addEventListener("click", function (event) {
+                var button = event.target.closest(".fresh-theme-lab__hex-copy");
+                if (!button) {
+                    return;
+                }
+
+                var token = button.getAttribute("data-token");
+                var value = button.getAttribute("data-value");
+                setHexDisplay(token, value, button);
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(value).catch(function () {
+                    });
+                }
+            });
+        }
+
+        presetSelect.addEventListener("change", function () {
+            loadPreset(choosePresetById(presetSelect.value));
+        });
+
+        [nameInput, accentInput, supportInput, surfaceInput, inkInput].forEach(function (field) {
+            field.addEventListener("input", function () {
+                renderPreview();
+                statusNode.textContent = editingPresetId
+                    ? "Preview updated. Apply when you want to update this saved theme."
+                    : "Preview updated. Apply when you want to store it as a site preset.";
+            });
+        });
+
+        existingThemeSelect.addEventListener("change", function () {
+            if (!existingThemeSelect.value) {
+                editingPresetId = null;
+                appliedPresetId = null;
+                statusNode.textContent = "Switched back to a fresh suite. Pick a preset direction or keep editing.";
+                return;
+            }
+            loadExistingTheme(existingThemeSelect.value);
+        });
+
+        liverySelect.addEventListener("change", function () {
+            if (!liverySelect.value) {
+                return;
+            }
+
+            var match = null;
+            for (var index = 0; index < liveryPresets.length; index += 1) {
+                if (String(liveryPresets[index].id) === liverySelect.value) {
+                    match = liveryPresets[index];
+                    break;
+                }
+            }
+
+            if (!match) {
+                return;
+            }
+
+            var seeded = paletteFromLivery(match);
+            accentInput.value = seeded.accent;
+            supportInput.value = seeded.support;
+            surfaceInput.value = seeded.surface;
+            inkInput.value = seeded.ink;
+            nameInput.value = match.name + " Suite";
+            appliedPresetId = null;
+            editingPresetId = null;
+            existingThemeSelect.value = "";
+            renderPreview();
+            statusNode.textContent = "Seeded from livery " + match.name + ".";
+        });
+
+        randomiseButton.addEventListener("click", function () {
+            accentInput.value = randomHex();
+            supportInput.value = randomHex();
+            surfaceInput.value = mix(randomHex(), "#FFFFFF", 0.78);
+            inkInput.value = mix(randomHex(), "#05070B", 0.7);
+            appliedPresetId = null;
+            editingPresetId = null;
+            existingThemeSelect.value = "";
+            renderPreview();
+            statusNode.textContent = "Generated a fresh color mix. Tweak anything you like before applying.";
+        });
+
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+            saveCustomPreset();
+        });
+
+        renderGallery();
+        populatePresetSelect();
+        populateLiverySelect();
+        populateExistingThemeSelect();
+        bindHexEvents();
+        loadPreset(presetDefinitions[0]);
+    })();
+    </script>
+{% endblock foot %}

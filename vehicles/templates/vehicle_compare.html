@@ -1,0 +1,337 @@
+{% extends 'page.html' %}
+
+{% block title %}Compare {{ vehicle }} – Better Fleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+<h1>Compare vehicle with Bustimes</h1>
+
+{% if not bustimes_vehicle %}
+    <div class="message">
+        <p>Could not fetch vehicle data from Bustimes API. The vehicle may not exist on Bustimes or there was an error.</p>
+    </div>
+{% endif %}
+
+<style>
+    .compare-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        margin-top: 2rem;
+    }
+
+    .compare-column {
+        padding: 1.5rem;
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+    }
+
+    .compare-column h2 {
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        font-size: 1.25rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-color);
+    }
+
+    .compare-column.local {
+        background: var(--background-color);
+    }
+
+    .compare-column.bustimes {
+        background: var(--hover-background, rgba(0, 0, 0, 0.05));
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .compare-column.bustimes {
+            background: rgba(255, 255, 255, 0.05);
+        }
+    }
+
+    .compare-field {
+        margin-bottom: 1.25rem;
+    }
+
+    .compare-field label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: var(--text-color);
+    }
+
+    .compare-field input[type="text"],
+    .compare-field select {
+        width: 100%;
+        padding: 0.625rem;
+        border: 1px solid var(--border-color);
+        border-radius: 0.25rem;
+        background: var(--input-background);
+        color: var(--text-color);
+        font-size: 1rem;
+        box-sizing: border-box;
+    }
+
+    @media (prefers-color-scheme: light) {
+        .compare-field input[type="text"],
+        .compare-field select {
+            background: white;
+        }
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .compare-field input[type="text"],
+        .compare-field select {
+            background: #1a1a1a;
+        }
+    }
+
+    .compare-field input[type="text"]:focus,
+    .compare-field select:focus {
+        outline: 2px solid var(--accent-color);
+        outline-offset: -1px;
+    }
+
+    .compare-field .value {
+        padding: 0.625rem;
+        border: 1px solid var(--border-color);
+        border-radius: 0.25rem;
+        background: var(--input-background);
+        color: var(--text-color);
+        min-height: 2.5rem;
+        display: flex;
+        align-items: center;
+    }
+
+    @media (prefers-color-scheme: light) {
+        .compare-field .value {
+            background: white;
+        }
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .compare-field .value {
+            background: #1a1a1a;
+        }
+    }
+
+    .compare-column.bustimes .compare-field .value {
+        background: var(--secondary-background, rgba(0, 0, 0, 0.1));
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .compare-column.bustimes .compare-field .value {
+            background: rgba(255, 255, 255, 0.1);
+        }
+    }
+
+    .copy-button {
+        margin-left: 0.5rem;
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+        cursor: pointer;
+        background: var(--accent-color);
+        color: var(--accent-text-color);
+        border: none;
+        border-radius: 0.25rem;
+        font-weight: 500;
+        transition: opacity 0.2s;
+    }
+
+    .copy-button:hover {
+        opacity: 0.8;
+    }
+
+    .compare-column input[type="submit"] {
+        padding: 0.75rem 1.5rem;
+        background: var(--accent-color);
+        color: var(--accent-text-color);
+        border: none;
+        border-radius: 0.25rem;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 1.5rem;
+    }
+
+    .compare-column input[type="submit"]:hover {
+        opacity: 0.9;
+    }
+
+    @media (max-width: 768px) {
+        .compare-container {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="compare-container">
+    <div class="compare-column local">
+        <h2>Local (editable)</h2>
+        <form action="{{ vehicle.get_edit_url }}" method="POST" id="compare-form">
+            {% csrf_token %}
+            
+            <div class="compare-field">
+                <label for="fleet_number">Fleet number</label>
+                <input type="text" id="fleet_number" name="fleet_number" value="{{ form.fleet_number.value|default:'' }}">
+            </div>
+
+            <div class="compare-field">
+                <label for="reg">Registration</label>
+                <input type="text" id="reg" name="reg" value="{{ form.reg.value|default:''|cut:' ' }}">
+            </div>
+
+            <div class="compare-field">
+                <label for="previous_reg">Previous registration</label>
+                <input type="text" id="previous_reg" name="previous_reg" value="{{ form.previous_reg.value|default:''|cut:' ' }}">
+            </div>
+
+            <div class="compare-field">
+                <label for="vehicle_type">Vehicle type</label>
+                <select id="vehicle_type" name="vehicle_type">
+                    <option value="">-- Select --</option>
+                    {% for type in form.fields.vehicle_type.queryset %}
+                        <option value="{{ type.id }}" {% if form.vehicle_type.value == type.id %}selected{% endif %}>{{ type }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="compare-field">
+                <label for="other_colour">Colours</label>
+                <input type="text" id="other_colour" name="other_colour" value="{{ form.other_colour.value|default:'' }}">
+            </div>
+
+            <div class="compare-field">
+                <label for="colours">Livery</label>
+                <select id="colours" name="colours">
+                    <option value="">-- Select --</option>
+                    {% for livery in form.fields.colours.queryset %}
+                        <option value="{{ livery.id }}" {% if form.colours.value == livery.id %}selected{% endif %}>{{ livery }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="compare-field">
+                <label for="branding">Branding</label>
+                <input type="text" id="branding" name="branding" value="{{ form.branding.value|default:'' }}">
+            </div>
+
+            <div class="compare-field">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" value="{{ form.name.value|default:'' }}">
+            </div>
+
+            <div class="compare-field">
+                <label for="notes">Notes</label>
+                <input type="text" id="notes" name="notes" value="{{ form.notes.value|default:'' }}">
+            </div>
+
+            <div class="compare-field">
+                <label for="operator">Operator</label>
+                <select id="operator" name="operator">
+                    <option value="">-- Select --</option>
+                    {% for operator in form.fields.operator.queryset %}
+                        <option value="{{ operator.id }}" {% if form.operator.value == operator.id %}selected{% endif %}>{{ operator }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <input type="submit" value="Save changes">
+        </form>
+    </div>
+
+    <div class="compare-column bustimes">
+        <h2>Bustimes (locked)</h2>
+        {% if bustimes_vehicle %}
+            <div class="compare-field">
+                <label>Fleet number</label>
+                <div class="value">{{ bustimes_vehicle.code|default:'' }}</div>
+                <button type="button" class="copy-button" data-field="fleet_number" data-value="{{ bustimes_vehicle.code|default:'' }}">Copy</button>
+            </div>
+
+            <div class="compare-field">
+                <label>Registration</label>
+                <div class="value">{{ bustimes_vehicle.reg|default:'' }}</div>
+                <button type="button" class="copy-button" data-field="reg" data-value="{{ bustimes_vehicle.reg|default:'' }}">Copy</button>
+            </div>
+
+            <div class="compare-field">
+                <label>Previous registration</label>
+                <div class="value">{{ bustimes_vehicle.previous_reg|default:'' }}</div>
+                <button type="button" class="copy-button" data-field="previous_reg" data-value="{{ bustimes_vehicle.previous_reg|default:'' }}">Copy</button>
+            </div>
+
+            <div class="compare-field">
+                <label>Vehicle type</label>
+                <div class="value">{{ bustimes_vehicle.vehicle_type.name|default:'' }}</div>
+            </div>
+
+            <div class="compare-field">
+                <label>Colours</label>
+                <div class="value">{{ bustimes_vehicle.livery.left|default:'' }}</div>
+                <button type="button" class="copy-button" data-field="other_colour" data-value="{{ bustimes_vehicle.livery.left|default:'' }}">Copy CSS</button>
+            </div>
+
+            <div class="compare-field">
+                <label>Livery</label>
+                <div class="value">{{ bustimes_vehicle.livery.name|default:'' }}</div>
+                <button type="button" class="copy-button" data-field="colours" data-value="{{ bustimes_vehicle.livery.name|default:'' }}">Copy name</button>
+            </div>
+
+            <div class="compare-field">
+                <label>Branding</label>
+                <div class="value">{{ bustimes_vehicle.branding|default:'' }}</div>
+                <button type="button" class="copy-button" data-field="branding" data-value="{{ bustimes_vehicle.branding|default:'' }}">Copy</button>
+            </div>
+
+            <div class="compare-field">
+                <label>Name</label>
+                <div class="value">{{ bustimes_vehicle.name|default:'' }}</div>
+                <button type="button" class="copy-button" data-field="name" data-value="{{ bustimes_vehicle.name|default:'' }}">Copy</button>
+            </div>
+
+            <div class="compare-field">
+                <label>Notes</label>
+                <div class="value">{{ bustimes_vehicle.notes|default:'' }}</div>
+                <button type="button" class="copy-button" data-field="notes" data-value="{{ bustimes_vehicle.notes|default:'' }}">Copy</button>
+            </div>
+
+            <div class="compare-field">
+                <label>Operator</label>
+                <div class="value">{{ bustimes_vehicle.operator.name|default:'' }}</div>
+            </div>
+        {% else %}
+            <p>No data available from Bustimes</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.copy-button').forEach(button => {
+        button.addEventListener('click', function() {
+            const fieldName = this.getAttribute('data-field');
+            let value = this.getAttribute('data-value');
+            
+            if (!value) return;
+            
+            // Strip spaces from registration numbers
+            if (fieldName === 'reg' || fieldName === 'previous_reg') {
+                value = value.replace(/\s/g, '').toUpperCase();
+            }
+            
+            const input = document.querySelector(`[name="${fieldName}"]`);
+            if (input) {
+                input.value = value;
+                // Trigger change event for any listeners
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+    });
+});
+</script>
+
+<p><a href="{{ vehicle.get_absolute_url }}">Back to vehicle</a></p>
+
+{% endblock content %}

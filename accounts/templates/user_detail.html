@@ -1,0 +1,553 @@
+{% extends 'page.html' %}
+
+{% block title %}{{ object.get_display_name }} - profile{% endblock %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <style>
+        /* ── Tier colours ─────────────────────────────────────── */
+        :root {
+            --tier-bronze:   #cd7f32;
+            --tier-silver:   #9ca3af;
+            --tier-gold:     #f59e0b;
+            --tier-platinum: #a78bfa;
+            --tier-none:     rgba(148,163,184,0.25);
+        }
+
+        .user-profile {
+            display: grid;
+            gap: 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .user-profile__card,
+        .user-profile__section {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+
+        .user-profile__banner {
+            min-height: 12rem;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.24), transparent 35%),
+                linear-gradient(135deg, #0f172a, #1d4ed8 50%, #38bdf8);
+        }
+
+        .user-profile__banner img {
+            width: 100%;
+            max-width: 100%;
+            min-height: 12rem;
+            max-height: 20rem;
+            object-fit: cover;
+            display: block;
+        }
+
+        .user-profile__header {
+            padding: 0 1.25rem 1.25rem;
+        }
+
+        .user-profile__avatar-wrap {
+            margin-top: -3.25rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .user-profile__avatar,
+        .user-profile__avatar-fallback {
+            width: 6.5rem;
+            height: 6.5rem;
+            border-radius: 999px;
+            border: 4px solid var(--background-color);
+            background: linear-gradient(135deg, #1d4ed8, #0f766e);
+            display: grid;
+            place-items: center;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .user-profile__avatar {
+            object-fit: cover;
+        }
+
+        .user-profile__title {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: baseline;
+        }
+
+        .user-profile__title h1 {
+            margin: 0;
+        }
+
+        .user-profile__subtitle {
+            color: var(--secondary-text-color);
+            margin: 0.35rem 0 0;
+        }
+
+        .user-profile__badges,
+        .user-profile__links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.65rem;
+            margin: 0.85rem 0 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .user-profile__badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 0.35rem 0.75rem;
+            font-size: 0.92rem;
+            font-weight: 700;
+        }
+
+        .user-profile__links li {
+            background: rgba(148, 163, 184, 0.08);
+            border-radius: 999px;
+            padding: 0.35rem 0.75rem;
+        }
+
+        /* ── Stat pills (fleet completion style) ─────────────── */
+        .user-profile__stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin: 0.85rem 0 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .user-profile__stat-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background: var(--background-color);
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .user-profile__stat-pill__num {
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--text-color);
+        }
+
+        .user-profile__stat-pill__icon {
+            font-style: normal;
+            line-height: 1;
+        }
+
+        /* ── Section headers (fleet completion style) ───────── */
+        .user-profile__section {
+            padding: 1.25rem;
+        }
+
+        .user-profile__section h2 {
+            margin-top: 0;
+            font-size: 1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-color);
+            opacity: 0.75;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.4rem;
+            margin-bottom: 1rem;
+        }
+
+        .user-profile__edit-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .user-review-list {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .user-review-card {
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 0.9rem 0.75rem;
+            background: var(--background-color);
+            transition: border-color 0.15s;
+        }
+
+        .user-review-card:hover {
+            border-color: var(--border-color-darker);
+        }
+
+        .user-review-card p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* ── Two-column layout on wider screens ──────────────── */
+        @media (min-width: 800px) {
+            .user-profile__content-grid {
+                display: grid;
+                grid-template-columns: 300px 1fr;
+                gap: 2rem;
+                align-items: start;
+            }
+        }
+
+        .user-profile__sidebar {
+            position: sticky;
+            top: 1rem;
+            max-height: calc(100vh - 2rem);
+            overflow-y: auto;
+        }
+
+        .user-profile__sidebar-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .user-profile__sidebar-section h3 {
+            margin: 0 0 0.75rem 0;
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-color);
+            opacity: 0.75;
+        }
+
+        .user-profile__sidebar-stats {
+            display: grid;
+            gap: 0.5rem;
+        }
+
+        .user-profile__sidebar-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .user-profile__sidebar-stat:last-child {
+            border-bottom: none;
+        }
+
+        .user-profile__sidebar-stat__label {
+            color: var(--secondary-text-color);
+        }
+
+        .user-profile__sidebar-stat__value {
+            font-weight: 600;
+        }
+
+        .user-profile__timeline {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .user-profile__timeline-item {
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            background: var(--background-color);
+            transition: border-color 0.15s;
+        }
+
+        .user-profile__timeline-item:hover {
+            border-color: var(--border-color-darker);
+        }
+
+        .user-profile__timeline-item__type {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--secondary-text-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .user-profile__timeline-item__date {
+            font-size: 0.85rem;
+            color: var(--secondary-text-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .user-profile__timeline-item__content {
+            margin-bottom: 0;
+        }
+
+        .user-profile__timeline-item--revision .user-profile__timeline-item__type {
+            color: #3b82f6;
+        }
+
+        .user-profile__timeline-item--review .user-profile__timeline-item__type {
+            color: #f59e0b;
+        }
+
+        .user-profile__timeline-item--photo .user-profile__timeline-item__type {
+            color: #10b981;
+        }
+
+        .user-profile__timeline-item--ride_log .user-profile__timeline-item__type {
+            color: #8b5cf6;
+        }
+
+        .user-profile__timeline-item--photo_log .user-profile__timeline-item__type {
+            color: #ec4899;
+        }
+
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <div class="user-profile">
+        <section class="user-profile__card">
+            <div class="user-profile__banner">
+                {% if object.get_profile_banner_url %}
+                    <img src="{{ object.get_profile_banner_url }}" alt="">
+                {% endif %}
+            </div>
+
+            <div class="user-profile__header">
+                <div class="user-profile__avatar-wrap">
+                    {% if object.get_profile_picture_url %}
+                        <img class="user-profile__avatar" src="{{ object.get_profile_picture_url }}" alt="{{ object.get_display_name }}">
+                    {% else %}
+                        <div class="user-profile__avatar-fallback">{{ object.get_display_name|first|upper }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="user-profile__title">
+                    <h1>
+                        {{ object.get_display_name }}
+                        {% if object.display_name and object.get_full_name_display %}
+                            <i>({{ object.get_full_name_display }})</i>
+                        {% endif %}
+                    </h1>
+                </div>
+
+                <p class="user-profile__subtitle">@{{ object.get_username_display }}</p>
+                {% if object.get_full_name_display and not object.display_name %}
+                    <p class="user-profile__subtitle">{{ object.get_full_name_display }}</p>
+                {% endif %}
+                {% if object == user %}
+                    <p class="user-profile__subtitle">This is your profile.</p>
+                {% endif %}
+
+                {% with tags=object.get_profile_tags %}
+                    {% if tags %}
+                        <div class="user-profile__badges">
+                            {% for tag in tags %}
+                                <span class="user-profile__badge" style="background:{{ tag.badge_background }};color:{{ tag.badge_text_colour }};">{{ tag.name }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <ul class="user-profile__stats">
+                    <li class="user-profile__stat-pill">
+                        <span class="user-profile__stat-pill__icon">✏️</span>
+                        <a href="/vehicles/edits{% querystring user=object.id %}"><span class="user-profile__stat-pill__num">{{ object.total_count }}</span> edit{{ object.total_count|pluralize }}</a>
+                    </li>
+                    <li class="user-profile__stat-pill">
+                        <span class="user-profile__stat-pill__icon">⭐</span>
+                        <span class="user-profile__stat-pill__num">{{ object.review_count }}</span> review{{ object.review_count|pluralize }}
+                    </li>
+                    {% if object.score is not None %}
+                        <li class="user-profile__stat-pill">
+                            <span class="user-profile__stat-pill__icon">🏆</span>
+                            <span class="user-profile__stat-pill__num">{{ object.score }}</span> points
+                        </li>
+                    {% endif %}
+                </ul>
+
+                <ul class="user-profile__links">
+                    {% if object.flickr_username %}
+                        <li><a href="{{ object.get_flickr_profile_url }}" target="_blank" rel="noopener">Flickr: {{ object.flickr_username }}</a></li>
+                    {% endif %}
+                    {% if object.discord_username %}
+                        <li>Discord: {{ object.discord_username }}</li>
+                    {% endif %}
+                    {% if object.fleet_logging_public %}
+                        <li><a href="{% url 'public_fleet_completion' object.username %}">Fleet ride completion</a></li>
+                    {% endif %}
+                    {% if object.driving_logging_public and object.is_driver %}
+                        <li><a href="{% url 'public_driving_completion' object.username %}">Driving completion</a></li>
+                    {% endif %}
+                    {% if ride_stats and object == user %}
+                        <li><a href="{% url 'fleet_completion' %}">Fleet ride completion</a></li>
+                    {% endif %}
+                    {% if photo_stats and object == user %}
+                        <li><a href="{% url 'fleet_completion' %}">Fleet photo completion</a></li>
+                    {% endif %}
+                    {% if driving_stats and object == user %}
+                        <li><a href="{% url 'driving_completion' %}">Your driving completion</a></li>
+                    {% endif %}
+                </ul>
+
+                {% if perms.accounts.change_user %}
+                    <p><a href="{% url 'admin:accounts_user_change' object.id %}">Open admin profile</a></p>
+                {% endif %}
+            </div>
+        </section>
+
+        <div class="user-profile__content-grid">
+            <aside class="user-profile__sidebar">
+                <section class="user-profile__card user-profile__sidebar-section">
+                    <div class="user-profile__section">
+                        <h3>Stats</h3>
+                        <div class="user-profile__sidebar-stats">
+                            <div class="user-profile__sidebar-stat">
+                                <span class="user-profile__sidebar-stat__label">User since</span>
+                                <span class="user-profile__sidebar-stat__value">{{ object.date_joined|date:"M Y" }}</span>
+                            </div>
+                            {% if photo_stats %}
+                                <div class="user-profile__sidebar-stat">
+                                    <span class="user-profile__sidebar-stat__label">Photos</span>
+                                    <span class="user-profile__sidebar-stat__value">{{ photo_stats.vehicles }}</span>
+                                </div>
+                            {% endif %}
+                            {% if ride_stats %}
+                                <div class="user-profile__sidebar-stat">
+                                    <span class="user-profile__sidebar-stat__label">Buses ridden</span>
+                                    <span class="user-profile__sidebar-stat__value">{{ ride_stats.vehicles }}</span>
+                                </div>
+                                <div class="user-profile__sidebar-stat">
+                                    <span class="user-profile__sidebar-stat__label">Types ridden</span>
+                                    <span class="user-profile__sidebar-stat__value">{{ ride_stats.types }}</span>
+                                </div>
+                                <div class="user-profile__sidebar-stat">
+                                    <span class="user-profile__sidebar-stat__label">Operators ridden</span>
+                                    <span class="user-profile__sidebar-stat__value">{{ ride_stats.operators }}</span>
+                                </div>
+                            {% endif %}
+                            {% if driving_stats %}
+                                <div class="user-profile__sidebar-stat">
+                                    <span class="user-profile__sidebar-stat__label">Buses driven</span>
+                                    <span class="user-profile__sidebar-stat__value">{{ driving_stats.vehicles }}</span>
+                                </div>
+                                <div class="user-profile__sidebar-stat">
+                                    <span class="user-profile__sidebar-stat__label">Types driven</span>
+                                    <span class="user-profile__sidebar-stat__value">{{ driving_stats.types }}</span>
+                                </div>
+                                <div class="user-profile__sidebar-stat">
+                                    <span class="user-profile__sidebar-stat__label">Operators driven</span>
+                                    <span class="user-profile__sidebar-stat__value">{{ driving_stats.operators }}</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </section>
+
+                {% if object.trusted %}
+                    <section class="user-profile__card user-profile__sidebar-section">
+                        <div class="user-profile__section">
+                            <h3>Trusted User</h3>
+                            {% if object.edits_approved_count > 0 %}
+                                <div class="user-profile__sidebar-stats">
+                                    <div class="user-profile__sidebar-stat">
+                                        <span class="user-profile__sidebar-stat__label">Edits approved</span>
+                                        <span class="user-profile__sidebar-stat__value">{{ object.edits_approved_count }}</span>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </section>
+                {% endif %}
+            </aside>
+
+            <main class="user-profile__main">
+                <section class="user-profile__section">
+                    <h2>Activity Timeline</h2>
+                    <div class="user-profile__timeline">
+                        {% for timeline_item in timeline_items %}
+                            <article class="user-profile__timeline-item user-profile__timeline-item--{{ timeline_item.type }}">
+                                <div class="user-profile__timeline-item__type">
+                                    {% if timeline_item.type == 'revision' %}Edit
+                                    {% elif timeline_item.type == 'review' %}Review
+                                    {% elif timeline_item.type == 'photo' %}Photo
+                                    {% elif timeline_item.type == 'ride_log' %}Ride
+                                    {% elif timeline_item.type == 'photo_log' %}Photo Log
+                                    {% endif %}
+                                </div>
+                                <div class="user-profile__timeline-item__date">
+                                    {{ timeline_item.created_at|date:"d M Y, H:i" }}
+                                </div>
+                                <div class="user-profile__timeline-item__content">
+                                    {% if timeline_item.type == 'revision' %}
+                                        <p><strong><a href="{{ timeline_item.item.vehicle.get_absolute_url }}">{{ timeline_item.item.vehicle }}</a></strong>{% if timeline_item.item.vehicle.operator %} · {{ timeline_item.item.vehicle.operator }}{% endif %}</p>
+                                        {% if timeline_item.item.changes %}
+                                            <p>{{ timeline_item.item.changes|length }} change{{ timeline_item.item.changes|length|pluralize }}</p>
+                                        {% endif %}
+                                        {% if timeline_item.item.message %}
+                                            <p>{{ timeline_item.item.message }}</p>
+                                        {% endif %}
+                                    {% elif timeline_item.type == 'review' %}
+                                        <p><strong><a href="{{ timeline_item.item.vehicle.get_absolute_url }}">{{ timeline_item.item.vehicle }}</a></strong>{% if timeline_item.item.vehicle.operator %} · {{ timeline_item.item.vehicle.operator }}{% endif %}</p>
+                                        <p>{{ timeline_item.item.get_rating_display_stars }} · {{ timeline_item.item.rating }}/5</p>
+                                        <p>{{ timeline_item.item.message|linebreaksbr }}</p>
+                                    {% elif timeline_item.type == 'photo' %}
+                                        {% for vehicle in timeline_item.item.vehicles.all %}
+                                            <p><strong><a href="{{ vehicle.get_absolute_url }}">{{ vehicle }}</a></strong>{% if vehicle.operator %} · {{ vehicle.operator }}{% endif %}</p>
+                                        {% endfor %}
+                                        {% if timeline_item.item.caption %}
+                                            <p>{{ timeline_item.item.caption }}</p>
+                                        {% endif %}
+                                    {% elif timeline_item.type == 'ride_log' %}
+                                        <p><strong><a href="{{ timeline_item.item.vehicle.get_absolute_url }}">{{ timeline_item.item.vehicle }}</a></strong>{% if timeline_item.item.vehicle.operator %} · {{ timeline_item.item.vehicle.operator }}{% endif %}</p>
+                                        <p>Rode this vehicle</p>
+                                    {% elif timeline_item.type == 'photo_log' %}
+                                        <p><strong><a href="{{ timeline_item.item.vehicle.get_absolute_url }}">{{ timeline_item.item.vehicle }}</a></strong>{% if timeline_item.item.vehicle.operator %} · {{ timeline_item.item.vehicle.operator }}{% endif %}</p>
+                                        <p>Photographed this vehicle{% if timeline_item.item.quantity > 1 %} ({{ timeline_item.item.quantity }} photos){% endif %}</p>
+                                        {% if timeline_item.item.notes %}
+                                            <p>{{ timeline_item.item.notes }}</p>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </article>
+                        {% empty %}
+                            <p>No activity yet.</p>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                {% if preserved_vehicles %}
+                    <section class="user-profile__section">
+                        <h2>Preserved Vehicles</h2>
+                        <ul class="has-smalls">
+                            {% for vehicle in preserved_vehicles %}
+                                <li>
+                                    <a href="{{ vehicle.get_absolute_url }}">
+                                        <span>{{ vehicle }}</span>
+                                        {% if vehicle.operator %}<small>{{ vehicle.operator }}</small>{% endif %}
+                                    </a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </section>
+                {% endif %}
+
+                {% if object.operatoruser_set.all %}
+                    <section class="user-profile__section">
+                        <h2>Linked operators</h2>
+                        <ul class="bulleted">
+                            {% for ou in object.operatoruser_set.all %}
+                                <li>{{ ou.operator }}</li>
+                            {% endfor %}
+                        </ul>
+                    </section>
+                {% endif %}
+            </main>
+        </div>
+    </div>
+{% endblock content %}

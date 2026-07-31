@@ -1,0 +1,154 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <p>
+        Import vehicles without starting from a specific operator. Blank fields are left unchanged on matched vehicles.
+    </p>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <div class="form-row">
+            {{ form.operator.errors }}
+            {{ form.operator.label_tag }}
+            {{ form.operator }}
+            {% if form.operator.help_text %}<p class="help">{{ form.operator.help_text }}</p>{% endif %}
+        </div>
+        <div class="form-row">
+            {{ form.manual_livery_selection.errors }}
+            {{ form.manual_livery_selection.label_tag }}
+            {{ form.manual_livery_selection }}
+            {% if form.manual_livery_selection.help_text %}<p class="help">{{ form.manual_livery_selection.help_text }}</p>{% endif %}
+        </div>
+        <div class="form-row">
+            {{ form.upload.errors }}
+            {{ form.upload.label_tag }}
+            {{ form.upload }}
+            {% if form.upload.help_text %}<p class="help">{{ form.upload.help_text }}</p>{% endif %}
+        </div>
+        <div class="form-row">
+            {{ form.rows_text.errors }}
+            {{ form.rows_text.label_tag }}
+            {{ form.rows_text }}
+            {% if form.rows_text.help_text %}<p class="help">{{ form.rows_text.help_text }}</p>{% endif %}
+        </div>
+
+        {% if livery_mapping_rows %}
+            <h2>Manual livery matching</h2>
+            <table class="adminlist">
+                <thead>
+                    <tr>
+                        <th>Imported livery</th>
+                        <th>Selection</th>
+                        <th>Preview</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in livery_mapping_rows %}
+                        <tr>
+                            <td>
+                                {{ item.raw_name }}
+                                {% if item.needs_attention %}<div>Livery not found automatically</div>{% endif %}
+                            </td>
+                            <td>
+                                <select name="livery_map_{{ forloop.counter0 }}" class="livery-map-select">
+                                    <option value="">Leave unmatched</option>
+                                    {% for livery in liveries %}
+                                        <option
+                                            value="{{ livery.pk }}"
+                                            data-css="{{ livery.left_css|default:livery.colour }}"
+                                            {% if item.selected_livery_id == livery.pk|stringformat:"s" %}selected{% endif %}
+                                        >
+                                            {{ livery.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <span class="livery-map-swatch" style="display:inline-block;width:2.5rem;height:1rem;border:1px solid #999;vertical-align:middle;"></span>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+        <div class="submit-row">
+            <button type="submit" name="action" value="preview" class="default">Preview</button>
+            {% if can_commit %}
+                <button type="submit" name="action" value="commit">Commit import</button>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if rows %}
+        <h2>Preview</h2>
+        <table class="adminlist">
+            <thead>
+                <tr>
+                    <th>Row</th>
+                    <th>Action</th>
+                    <th>Vehicle</th>
+                    <th>Operator</th>
+                    <th>Depot</th>
+                    <th>Livery</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ row.row_number }}</td>
+                        <td>{{ row.action }}</td>
+                        <td>
+                            {% if row.vehicle %}
+                                <a href="{% url 'admin:vehicles_vehicle_change' row.vehicle.pk %}">{{ row.vehicle }}</a>
+                            {% else %}
+                                {% firstof row.raw.code row.raw.fleet_number row.raw.reg row.raw.registration %}
+                            {% endif %}
+                        </td>
+                        <td>{{ row.operator_preview_label }}</td>
+                        <td>{{ row.garage_preview_label }}</td>
+                        <td>{{ row.raw_livery_name|default:"-" }}</td>
+                        <td>
+                            {% if row.errors %}
+                                {% for error in row.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            {% else %}
+                                OK
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    {% if created or updated or errors %}
+        <p>Created: {{ created }} | Updated: {{ updated }} | Errors: {{ errors }}</p>
+    {% endif %}
+</div>
+
+<script>
+function updateLiverySwatches() {
+    document.querySelectorAll(".livery-map-select").forEach(function (select) {
+        var swatch = select.closest("tr").querySelector(".livery-map-swatch");
+        if (!swatch) {
+            return;
+        }
+        var selectedOption = select.options[select.selectedIndex];
+        var css = selectedOption ? selectedOption.getAttribute("data-css") : "";
+        swatch.style.background = css || "transparent";
+    });
+}
+document.querySelectorAll(".livery-map-select").forEach(function (select) {
+    select.addEventListener("change", updateLiverySwatches);
+});
+updateLiverySwatches();
+</script>
+{% endblock %}

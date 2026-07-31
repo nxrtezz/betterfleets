@@ -1,0 +1,25 @@
+{% extends 'page.html' %}
+
+{% block title %}Debugger – bustimes.org{% endblock %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block bodyclass %}{% endblock %}
+
+{% block content %}
+
+<h1>Debuggerer</h1>
+
+<form method="POST">
+    {{ form.as_p }}
+
+    {% csrf_token %}
+
+    <input type="submit">
+</form>
+
+{% if result %}
+    <p>{{ result.message }}</p>
+{% endif %}
+
+{% endblock content %}

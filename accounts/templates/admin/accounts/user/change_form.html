@@ -1,0 +1,11 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    <li>
+        <a href="{% url 'admin:accounts_user_bypass_new_account_restriction' object_id %}" class="button">
+            Push account creation time back 1 hour (remove new account restriction)
+        </a>
+    </li>
+{% endblock %}

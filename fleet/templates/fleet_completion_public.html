@@ -1,0 +1,706 @@
+{% extends 'page.html' %}
+
+{% block title %}Fleet Completion — {{ profile_user.get_display_name }} — Better Fleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+<style>
+/* ═══════════════════════════════════════════════════════════
+   Fleet Completion (Public Profile) — Redesign
+═══════════════════════════════════════════════════════════ */
+
+:root {
+  --tier-bronze:   #cd7f32;
+  --tier-silver:   #9ca3af;
+  --tier-gold:     #f59e0b;
+  --tier-platinum: #a78bfa;
+  --tier-none:     rgba(148,163,184,0.25);
+}
+
+.fc-hero {
+  padding: 2rem 0 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.fc-hero__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2rem;
+}
+
+.fc-hero__gauge-wrap {
+  flex-shrink: 0;
+  position: relative;
+  width: 140px;
+  height: 140px;
+}
+
+.fc-gauge-svg {
+  transform: rotate(-90deg);
+  width: 140px;
+  height: 140px;
+}
+
+.fc-gauge-bg {
+  fill: none;
+  stroke: var(--tier-none);
+  stroke-width: 10;
+}
+
+.fc-gauge-fill {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-dasharray: 339.292;
+  stroke-dashoffset: 339.292;
+  transition: stroke-dashoffset 1.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fc-gauge-fill--ride   { stroke: var(--brand-color-darker); }
+.fc-gauge-fill--photo  { stroke: var(--tier-platinum); }
+.fc-gauge-fill--drive  { stroke: var(--tier-gold); }
+
+.fc-gauge-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.fc-gauge-pct {
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text-color);
+}
+
+.fc-gauge-sub {
+  font-size: 0.65rem;
+  opacity: 0.6;
+  margin-top: 0.15rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.fc-hero__info { flex: 1; min-width: 0; }
+
+.fc-hero__title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin: 0 0 0.5rem;
+  line-height: 1.1;
+}
+
+.fc-hero__subtitle {
+  opacity: 0.65;
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+}
+
+.fc-stat-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.fc-stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--background-color);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fc-stat-pill__num { font-size: 1rem; font-weight: 800; color: var(--text-color); }
+.fc-stat-pill__icon { font-style: normal; line-height: 1; }
+
+.fc-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border-color);
+  margin-bottom: 0;
+}
+
+.fc-tab {
+  padding: 0.6rem 1.1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-color);
+  opacity: 0.5;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: opacity 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.fc-tab[aria-selected="true"],
+.fc-tab:hover { opacity: 1; }
+
+.fc-tab[aria-selected="true"] { border-bottom-color: var(--brand-color-darker); }
+.fc-tab__icon { margin-right: 0.35rem; }
+
+.fc-panel { padding-top: 1.5rem; }
+
+.fc-section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.4rem;
+}
+
+.fc-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin: 0;
+  color: var(--text-color);
+  opacity: 0.75;
+}
+
+.fc-section-count { font-size: 0.8rem; opacity: 0.5; }
+
+.fc-operator-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.fc-operator-row {
+  display: grid;
+  grid-template-columns: 2rem 2.5rem 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--border-color);
+  background: var(--background-color);
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.fc-operator-row:hover { border-color: var(--border-color-darker); text-decoration: none; }
+
+.fc-operator-rank { font-size: 0.75rem; font-weight: 700; opacity: 0.4; text-align: center; }
+.fc-operator-rank--1 { color: var(--tier-gold); opacity: 1; }
+.fc-operator-rank--2 { color: var(--tier-silver); opacity: 1; }
+.fc-operator-rank--3 { color: var(--tier-bronze); opacity: 1; }
+
+.fc-operator-logo {
+  width: 2.5rem; height: 2.5rem;
+  border-radius: 0.4rem; object-fit: contain; flex-shrink: 0;
+}
+
+.fc-operator-logo-placeholder {
+  width: 2.5rem; height: 2.5rem;
+  border-radius: 0.4rem;
+  background: linear-gradient(135deg, var(--brand-color-darker), var(--tier-platinum));
+  display: grid; place-items: center;
+  color: var(--background-color); font-weight: 800; font-size: 1rem; flex-shrink: 0;
+}
+
+.fc-operator-body { min-width: 0; }
+
+.fc-operator-name {
+  font-weight: 600; font-size: 0.9rem; color: var(--text-color);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: block; margin-bottom: 0.25rem;
+}
+.fc-operator-name:hover { text-decoration: underline; }
+
+.fc-bar-wrap { height: 5px; background: var(--tier-none); border-radius: 999px; overflow: hidden; }
+
+.fc-bar {
+  height: 100%; border-radius: 999px; width: 0;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.fc-bar--ride  { background: linear-gradient(90deg, var(--brand-color-darker), var(--border-color-darker)); }
+.fc-bar--photo { background: linear-gradient(90deg, var(--tier-platinum), #c4b5fd); }
+.fc-bar--drive { background: linear-gradient(90deg, var(--tier-gold), #fcd34d); }
+
+.fc-operator-meta { text-align: right; white-space: nowrap; }
+.fc-operator-count { font-size: 0.8rem; font-weight: 700; color: var(--text-color); }
+.fc-operator-pct { font-size: 0.7rem; opacity: 0.5; }
+
+.fc-type-chart { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.fc-type-row {
+  display: grid;
+  grid-template-columns: 10rem 1fr 3rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (max-width: 480px) { .fc-type-row { grid-template-columns: 7rem 1fr 3rem; } }
+
+.fc-type-name {
+  font-size: 0.8rem; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; opacity: 0.75;
+}
+.fc-type-count { font-size: 0.8rem; font-weight: 700; text-align: right; }
+
+.fc-achievements {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.fc-achievement {
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem; padding: 0.9rem 0.75rem;
+  text-align: center; background: var(--background-color);
+  transition: transform 0.15s, border-color 0.15s;
+  cursor: default; position: relative; overflow: hidden;
+}
+.fc-achievement--locked { opacity: 0.4; filter: grayscale(0.6); }
+.fc-achievement--unlocked { border-color: var(--border-color-darker); }
+.fc-achievement--unlocked.fc-achievement--gold {
+  border-color: var(--tier-gold); box-shadow: 0 0 0 1px var(--tier-gold);
+}
+.fc-achievement--unlocked.fc-achievement--platinum {
+  border-color: var(--tier-platinum); box-shadow: 0 0 0 1px var(--tier-platinum);
+}
+.fc-achievement:hover:not(.fc-achievement--locked) { transform: translateY(-2px); }
+.fc-achievement__icon { font-size: 2rem; display: block; margin-bottom: 0.4rem; line-height: 1; }
+.fc-achievement__name { font-size: 0.75rem; font-weight: 700; line-height: 1.2; display: block; margin-bottom: 0.3rem; }
+.fc-achievement__desc { font-size: 0.65rem; opacity: 0.6; line-height: 1.3; display: block; }
+.fc-achievement__tier-dot {
+  position: absolute; top: 0.5rem; right: 0.5rem;
+  width: 0.5rem; height: 0.5rem; border-radius: 50%;
+}
+.fc-achievement--unlocked .fc-achievement__tier-dot--bronze   { background: var(--tier-bronze); }
+.fc-achievement--unlocked .fc-achievement__tier-dot--silver   { background: var(--tier-silver); }
+.fc-achievement--unlocked .fc-achievement__tier-dot--gold     { background: var(--tier-gold); }
+.fc-achievement--unlocked .fc-achievement__tier-dot--platinum { background: var(--tier-platinum); }
+
+.fc-activity { display: flex; flex-direction: column; gap: 0; }
+.fc-activity-item {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.6rem 0; border-bottom: 1px solid var(--border-color);
+}
+.fc-activity-item:last-child { border-bottom: none; }
+.fc-activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.fc-activity-dot--ride  { background: var(--brand-color-darker); }
+.fc-activity-dot--photo { background: var(--tier-platinum); }
+.fc-activity-dot--drive { background: var(--tier-gold); }
+.fc-activity-body { flex: 1; min-width: 0; }
+.fc-activity-vehicle { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-activity-vehicle a { color: var(--link-color); }
+.fc-activity-meta { font-size: 0.72rem; opacity: 0.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-activity-time { font-size: 0.72rem; opacity: 0.45; flex-shrink: 0; white-space: nowrap; }
+
+.fc-community-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.fc-community-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.4rem 0; border-bottom: 1px solid var(--border-color); font-size: 0.85rem;
+}
+.fc-community-row:last-child { border-bottom: none; }
+.fc-community-rank { width: 1.5rem; text-align: right; opacity: 0.4; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; margin-right: 0.5rem; }
+.fc-community-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fc-community-count {
+  font-weight: 700; font-size: 0.8rem; flex-shrink: 0; margin-left: 0.5rem;
+  padding: 0.15rem 0.5rem; background: var(--brand-color); border-radius: 999px; color: var(--text-color);
+}
+
+@media (min-width: 800px) {
+  .fc-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; }
+  .fc-hero__top { flex-wrap: nowrap; }
+}
+
+.fc-empty { text-align: center; padding: 2rem 1rem; opacity: 0.5; font-size: 0.9rem; }
+.fc-empty__icon { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+</style>
+{% endblock head %}
+
+{% block content %}
+
+{% load humanize %}
+
+<div class="fc-hero">
+  <div class="fc-hero__top">
+    <div class="fc-hero__gauge-wrap">
+      <svg class="fc-gauge-svg" viewBox="0 0 120 120">
+        <circle class="fc-gauge-bg" cx="60" cy="60" r="54"/>
+        <circle class="fc-gauge-fill fc-gauge-fill--ride js-gauge-fill"
+                cx="60" cy="60" r="54"
+                data-percentage="{{ ride_stats.overall_percentage|floatformat:2 }}"/>
+      </svg>
+      <div class="fc-gauge-label">
+        <span class="fc-gauge-pct">{{ ride_stats.overall_percentage|floatformat:1 }}%</span>
+        <span class="fc-gauge-sub">Ridden</span>
+      </div>
+    </div>
+
+    <div class="fc-hero__info">
+      <h1 class="fc-hero__title">{{ profile_user.get_display_name }}'s Fleet</h1>
+      <p class="fc-hero__subtitle">Fleet completion stats for {{ profile_user.get_display_name }}.</p>
+
+      <div class="fc-stat-pills">
+        <span class="fc-stat-pill">
+          <span class="fc-stat-pill__icon">🚌</span>
+          <span class="fc-stat-pill__num">{{ ride_stats.vehicles }}</span> ridden
+        </span>
+        <span class="fc-stat-pill">
+          <span class="fc-stat-pill__icon">📷</span>
+          <span class="fc-stat-pill__num">{{ photo_stats.vehicles }}</span> photographed
+        </span>
+        <span class="fc-stat-pill">
+          <span class="fc-stat-pill__icon">🏢</span>
+          <span class="fc-stat-pill__num">{{ ride_stats.operators }}</span> operators
+        </span>
+        <span class="fc-stat-pill">
+          <span class="fc-stat-pill__icon">🚍</span>
+          <span class="fc-stat-pill__num">{{ ride_stats.types }}</span> types
+        </span>
+        {% if driving_stats %}
+        <span class="fc-stat-pill">
+          <span class="fc-stat-pill__icon">🚗</span>
+          <span class="fc-stat-pill__num">{{ driving_stats.vehicles }}</span> driven
+        </span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div x-data="{ tab: 'ride' }">
+
+  <div class="fc-tabs" role="tablist">
+    <button class="fc-tab" role="tab" :aria-selected="tab === 'ride'" @click="tab = 'ride'">
+      <span class="fc-tab__icon">🚌</span> Ridden
+    </button>
+    <button class="fc-tab" role="tab" :aria-selected="tab === 'photo'" @click="tab = 'photo'">
+      <span class="fc-tab__icon">📷</span> Photographed
+    </button>
+    {% if driving_stats %}
+    <button class="fc-tab" role="tab" :aria-selected="tab === 'drive'" @click="tab = 'drive'">
+      <span class="fc-tab__icon">🚗</span> Driven
+    </button>
+    {% endif %}
+    <button class="fc-tab" role="tab" :aria-selected="tab === 'achievements'" @click="tab = 'achievements'">
+      <span class="fc-tab__icon">🏆</span> Achievements
+    </button>
+    <button class="fc-tab" role="tab" :aria-selected="tab === 'community'" @click="tab = 'community'">
+      <span class="fc-tab__icon">🌍</span> Community
+    </button>
+  </div>
+
+  <!-- RIDDEN -->
+  <div class="fc-panel" x-show="tab === 'ride'" x-cloak>
+    <div class="fc-two-col">
+      <div>
+        <div class="fc-section-header">
+          <h2 class="fc-section-title">Top Operators</h2>
+          <span class="fc-section-count">{{ personal_operator_rankings|length }} operators</span>
+        </div>
+        {% if personal_operator_rankings %}
+        <div class="fc-operator-list">
+          {% for operator in personal_operator_rankings %}
+          <div class="fc-operator-row">
+            <span class="fc-operator-rank fc-operator-rank--{{ forloop.counter }}">
+              {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}#{{ forloop.counter }}{% endif %}
+            </span>
+            {% if operator.logo %}
+              <img class="fc-operator-logo" src="{{ operator.logo.url }}" alt="{{ operator.name }}">
+            {% else %}
+              <div class="fc-operator-logo-placeholder">{{ operator.name|first|upper }}</div>
+            {% endif %}
+            <div class="fc-operator-body">
+              <a href="{{ operator.get_vehicles_url }}" class="fc-operator-name">{{ operator.name }}</a>
+              <div class="fc-bar-wrap">
+                <div class="fc-bar fc-bar--ride js-bar" data-pct="{{ operator.percentage|floatformat:2 }}" style="width:0%"></div>
+              </div>
+            </div>
+            <div class="fc-operator-meta">
+              <div class="fc-operator-count">{{ operator.logged_vehicle_count }}/{{ operator.total_vehicle_count }}</div>
+              <div class="fc-operator-pct">{{ operator.percentage|floatformat:1 }}%</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="fc-empty"><span class="fc-empty__icon">🚌</span>No vehicles ridden yet.</div>
+        {% endif %}
+      </div>
+      <div>
+        <div class="fc-section-header"><h2 class="fc-section-title">By Vehicle Type</h2></div>
+        {% if personal_type_rankings %}
+        {% with max_count=personal_type_rankings.0.logged_vehicle_count %}
+        <div class="fc-type-chart">
+          {% for row in personal_type_rankings %}
+          <div class="fc-type-row">
+            <span class="fc-type-name">{{ row.vehicle__vehicle_type__name }}</span>
+            <div class="fc-bar-wrap"><div class="fc-bar fc-bar--ride js-bar" data-raw="{{ row.logged_vehicle_count }}" data-max="{{ max_count }}" style="width:0%"></div></div>
+            <span class="fc-type-count">{{ row.logged_vehicle_count }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endwith %}
+        {% else %}
+        <div class="fc-empty"><span class="fc-empty__icon">📊</span>No vehicle types logged yet.</div>
+        {% endif %}
+
+        <div class="fc-section-header" style="margin-top:1.5rem"><h2 class="fc-section-title">Recent Rides</h2></div>
+        {% if recent_ride_logs %}
+        <div class="fc-activity">
+          {% for log in recent_ride_logs %}
+          <div class="fc-activity-item">
+            <div class="fc-activity-dot fc-activity-dot--ride"></div>
+            <div class="fc-activity-body">
+              <div class="fc-activity-vehicle"><a href="{{ log.vehicle.get_absolute_url }}">{{ log.vehicle }}</a></div>
+              <div class="fc-activity-meta">{% if log.vehicle.operator %}{{ log.vehicle.operator.name }}{% endif %}{% if log.vehicle.vehicle_type %} · {{ log.vehicle.vehicle_type }}{% endif %}</div>
+            </div>
+            <div class="fc-activity-time">{{ log.created_at|timesince }} ago</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="fc-empty" style="padding:1rem 0">No recent rides.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- PHOTOGRAPHED -->
+  <div class="fc-panel" x-show="tab === 'photo'" x-cloak>
+    <div class="fc-stat-pills" style="margin-bottom:1.5rem">
+      <span class="fc-stat-pill"><span class="fc-stat-pill__icon">📷</span><span class="fc-stat-pill__num">{{ photo_stats.vehicles }}</span> photographed</span>
+      <span class="fc-stat-pill"><span class="fc-stat-pill__icon">🎯</span><span class="fc-stat-pill__num">{{ photo_stats.overall_percentage|floatformat:1 }}%</span> overall</span>
+      <span class="fc-stat-pill"><span class="fc-stat-pill__icon">🏢</span><span class="fc-stat-pill__num">{{ photo_stats.operators }}</span> operators</span>
+    </div>
+    <div class="fc-two-col">
+      <div>
+        <div class="fc-section-header"><h2 class="fc-section-title">Top Operators</h2><span class="fc-section-count">{{ personal_photo_operator_rankings|length }}</span></div>
+        {% if personal_photo_operator_rankings %}
+        <div class="fc-operator-list">
+          {% for operator in personal_photo_operator_rankings %}
+          <div class="fc-operator-row">
+            <span class="fc-operator-rank fc-operator-rank--{{ forloop.counter }}">
+              {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}#{{ forloop.counter }}{% endif %}
+            </span>
+            {% if operator.logo %}<img class="fc-operator-logo" src="{{ operator.logo.url }}" alt="{{ operator.name }}">
+            {% else %}<div class="fc-operator-logo-placeholder">{{ operator.name|first|upper }}</div>{% endif %}
+            <div class="fc-operator-body">
+              <a href="{{ operator.get_vehicles_url }}" class="fc-operator-name">{{ operator.name }}</a>
+              <div class="fc-bar-wrap"><div class="fc-bar fc-bar--photo js-bar" data-pct="{{ operator.percentage|floatformat:2 }}" style="width:0%"></div></div>
+            </div>
+            <div class="fc-operator-meta">
+              <div class="fc-operator-count">{{ operator.logged_vehicle_count }}/{{ operator.total_vehicle_count }}</div>
+              <div class="fc-operator-pct">{{ operator.percentage|floatformat:1 }}%</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}<div class="fc-empty"><span class="fc-empty__icon">📷</span>No vehicles photographed yet.</div>{% endif %}
+      </div>
+      <div>
+        <div class="fc-section-header"><h2 class="fc-section-title">By Vehicle Type</h2></div>
+        {% if personal_photo_type_rankings %}
+        {% with max_count=personal_photo_type_rankings.0.logged_vehicle_count %}
+        <div class="fc-type-chart">
+          {% for row in personal_photo_type_rankings %}
+          <div class="fc-type-row">
+            <span class="fc-type-name">{{ row.vehicle__vehicle_type__name }}</span>
+            <div class="fc-bar-wrap"><div class="fc-bar fc-bar--photo js-bar" data-raw="{{ row.logged_vehicle_count }}" data-max="{{ max_count }}" style="width:0%"></div></div>
+            <span class="fc-type-count">{{ row.logged_vehicle_count }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endwith %}
+        {% else %}<div class="fc-empty"><span class="fc-empty__icon">📊</span>No types yet.</div>{% endif %}
+
+        <div class="fc-section-header" style="margin-top:1.5rem"><h2 class="fc-section-title">Recent Photographs</h2></div>
+        {% if recent_photo_logs %}
+        <div class="fc-activity">
+          {% for log in recent_photo_logs %}
+          <div class="fc-activity-item">
+            <div class="fc-activity-dot fc-activity-dot--photo"></div>
+            <div class="fc-activity-body">
+              <div class="fc-activity-vehicle"><a href="{{ log.vehicle.get_absolute_url }}">{{ log.vehicle }}</a></div>
+              <div class="fc-activity-meta">{% if log.vehicle.operator %}{{ log.vehicle.operator.name }}{% endif %}{% if log.vehicle.vehicle_type %} · {{ log.vehicle.vehicle_type }}{% endif %}</div>
+            </div>
+            <div class="fc-activity-time">{{ log.created_at|timesince }} ago</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}<div class="fc-empty" style="padding:1rem 0">No photographs logged yet.</div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- DRIVEN -->
+  {% if driving_stats %}
+  <div class="fc-panel" x-show="tab === 'drive'" x-cloak>
+    <div class="fc-stat-pills" style="margin-bottom:1.5rem">
+      <span class="fc-stat-pill"><span class="fc-stat-pill__icon">🚗</span><span class="fc-stat-pill__num">{{ driving_stats.vehicles }}</span> driven</span>
+      <span class="fc-stat-pill"><span class="fc-stat-pill__icon">🎯</span><span class="fc-stat-pill__num">{{ driving_stats.overall_percentage|floatformat:1 }}%</span> overall</span>
+      <span class="fc-stat-pill"><span class="fc-stat-pill__icon">🏢</span><span class="fc-stat-pill__num">{{ driving_stats.operators }}</span> operators</span>
+    </div>
+    <div class="fc-two-col">
+      <div>
+        <div class="fc-section-header"><h2 class="fc-section-title">Top Operators</h2></div>
+        {% if personal_driving_operator_rankings %}
+        <div class="fc-operator-list">
+          {% for operator in personal_driving_operator_rankings %}
+          <div class="fc-operator-row">
+            <span class="fc-operator-rank fc-operator-rank--{{ forloop.counter }}">
+              {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}#{{ forloop.counter }}{% endif %}
+            </span>
+            {% if operator.logo %}<img class="fc-operator-logo" src="{{ operator.logo.url }}" alt="{{ operator.name }}">
+            {% else %}<div class="fc-operator-logo-placeholder">{{ operator.name|first|upper }}</div>{% endif %}
+            <div class="fc-operator-body">
+              <a href="{{ operator.get_vehicles_url }}" class="fc-operator-name">{{ operator.name }}</a>
+              <div class="fc-bar-wrap"><div class="fc-bar fc-bar--drive js-bar" data-pct="{{ operator.percentage|floatformat:2 }}" style="width:0%"></div></div>
+            </div>
+            <div class="fc-operator-meta">
+              <div class="fc-operator-count">{{ operator.logged_vehicle_count }}/{{ operator.total_vehicle_count }}</div>
+              <div class="fc-operator-pct">{{ operator.percentage|floatformat:1 }}%</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}<div class="fc-empty"><span class="fc-empty__icon">🚗</span>No vehicles driven yet.</div>{% endif %}
+      </div>
+      <div>
+        <div class="fc-section-header"><h2 class="fc-section-title">By Vehicle Type</h2></div>
+        {% if personal_driving_type_rankings %}
+        {% with max_count=personal_driving_type_rankings.0.logged_vehicle_count %}
+        <div class="fc-type-chart">
+          {% for row in personal_driving_type_rankings %}
+          <div class="fc-type-row">
+            <span class="fc-type-name">{{ row.vehicle__vehicle_type__name }}</span>
+            <div class="fc-bar-wrap"><div class="fc-bar fc-bar--drive js-bar" data-raw="{{ row.logged_vehicle_count }}" data-max="{{ max_count }}" style="width:0%"></div></div>
+            <span class="fc-type-count">{{ row.logged_vehicle_count }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endwith %}
+        {% else %}<div class="fc-empty"><span class="fc-empty__icon">📊</span>No types yet.</div>{% endif %}
+        <div class="fc-section-header" style="margin-top:1.5rem"><h2 class="fc-section-title">Recent Drives</h2></div>
+        {% if recent_driving_logs %}
+        <div class="fc-activity">
+          {% for log in recent_driving_logs %}
+          <div class="fc-activity-item">
+            <div class="fc-activity-dot fc-activity-dot--drive"></div>
+            <div class="fc-activity-body">
+              <div class="fc-activity-vehicle"><a href="{{ log.vehicle.get_absolute_url }}">{{ log.vehicle }}</a></div>
+              <div class="fc-activity-meta">{% if log.vehicle.operator %}{{ log.vehicle.operator.name }}{% endif %}{% if log.vehicle.vehicle_type %} · {{ log.vehicle.vehicle_type }}{% endif %}</div>
+            </div>
+            <div class="fc-activity-time">{{ log.created_at|timesince }} ago</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}<div class="fc-empty" style="padding:1rem 0">No recent drives.</div>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ACHIEVEMENTS -->
+  <div class="fc-panel" x-show="tab === 'achievements'" x-cloak>
+    <div class="fc-section-header">
+      <h2 class="fc-section-title">Achievements</h2>
+    </div>
+    <div class="fc-achievements">
+      {% for a in achievements %}
+      <div class="fc-achievement {% if a.unlocked %}fc-achievement--unlocked fc-achievement--{{ a.tier }}{% else %}fc-achievement--locked{% endif %}" title="{{ a.description }}">
+        <div class="fc-achievement__tier-dot fc-achievement__tier-dot--{{ a.tier }}"></div>
+        <span class="fc-achievement__icon">{{ a.icon }}</span>
+        <span class="fc-achievement__name">{{ a.name }}</span>
+        <span class="fc-achievement__desc">{{ a.description }}</span>
+        {% if not a.unlocked %}<span class="fc-achievement__desc" style="margin-top:0.3rem;opacity:0.4">🔒 Locked</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- COMMUNITY -->
+  <div class="fc-panel" x-show="tab === 'community'" x-cloak>
+    <div class="fc-two-col">
+      <div>
+        <div class="fc-section-header"><h2 class="fc-section-title">Most Logged Operators</h2><span class="fc-section-count">site-wide</span></div>
+        <div class="fc-community-list">
+          {% for operator in overall_operator_rankings %}
+          <div class="fc-community-row">
+            <span class="fc-community-rank">#{{ forloop.counter }}</span>
+            <a href="{{ operator.get_vehicles_url }}" class="fc-community-name">{{ operator }}</a>
+            <span class="fc-community-count">{{ operator.logged_vehicle_count }}</span>
+          </div>
+          {% empty %}<div class="fc-empty">No data yet.</div>{% endfor %}
+        </div>
+      </div>
+      <div>
+        <div class="fc-section-header"><h2 class="fc-section-title">Most Logged Vehicle Types</h2><span class="fc-section-count">site-wide</span></div>
+        <div class="fc-community-list">
+          {% for row in overall_type_rankings %}
+          <div class="fc-community-row">
+            <span class="fc-community-rank">#{{ forloop.counter }}</span>
+            <span class="fc-community-name">{{ row.vehicle__vehicle_type__name }}</span>
+            <span class="fc-community-count">{{ row.logged_vehicle_count }}</span>
+          </div>
+          {% empty %}<div class="fc-empty">No data yet.</div>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  function animateGauge() {
+    document.querySelectorAll('.js-gauge-fill').forEach(function (el) {
+      var pct = parseFloat(el.dataset.percentage) || 0;
+      var circumference = 2 * Math.PI * 54;
+      var offset = circumference - (pct / 100) * circumference;
+      requestAnimationFrame(function () { el.style.strokeDashoffset = offset; });
+    });
+  }
+
+  function animateBars() {
+    var bars = document.querySelectorAll('.js-bar');
+    if (!bars.length) return;
+    function setBar(bar) {
+      var pct = bar.dataset.pct;
+      if (pct !== undefined) { bar.style.width = parseFloat(pct) + '%'; return; }
+      var raw = parseFloat(bar.dataset.raw), max = parseFloat(bar.dataset.max);
+      if (!isNaN(raw) && !isNaN(max) && max > 0) bar.style.width = (raw / max * 100) + '%';
+    }
+    if ('IntersectionObserver' in window) {
+      var obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) { setBar(e.target); obs.unobserve(e.target); } });
+      }, { threshold: 0.1 });
+      bars.forEach(function (b) { obs.observe(b); });
+    } else { bars.forEach(setBar); }
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    animateGauge();
+    animateBars();
+    document.querySelectorAll('.fc-tab').forEach(function (btn) {
+      btn.addEventListener('click', function () { setTimeout(animateBars, 50); });
+    });
+  });
+})();
+</script>
+
+{% endblock content %}
+
+{% block foot %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+{% endblock %}

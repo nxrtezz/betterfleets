@@ -1,0 +1,148 @@
+{% extends 'page.html' %}
+
+{% block title %}Review moderation{% endblock %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block bodyclass %}wide{% endblock %}
+
+{% block head %}
+    <style>
+        .review-moderation-page {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .review-moderation-toolbar,
+        .review-moderation-card {
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+        }
+
+        .review-moderation-toolbar form,
+        .review-moderation-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+
+        .review-moderation-toolbar label {
+            flex: 1 1 14rem;
+        }
+
+        .review-moderation-toolbar input[type='search'],
+        .review-moderation-toolbar select,
+        .review-report-reason {
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 0.35rem;
+        }
+
+        .review-moderation-meta,
+        .review-moderation-flags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            padding: 0;
+            margin: 0.75rem 0 0;
+            list-style: none;
+        }
+
+        .review-moderation-meta li,
+        .review-moderation-flags li {
+            background: rgba(148, 163, 184, 0.08);
+            border-radius: 999px;
+            padding: 0.3rem 0.7rem;
+        }
+
+        .review-moderation-card h2 {
+            margin-top: 0;
+        }
+
+        .review-moderation-note {
+            color: var(--secondary-text-color);
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <div class="review-moderation-page">
+        <h1>Review moderation</h1>
+
+        <section class="review-moderation-toolbar">
+            <form method="get">
+                <label>
+                    Search reviews, users or vehicles
+                    <input type="search" name="q" value="{{ query }}" placeholder="Review text, username, reg or code">
+                </label>
+                <label>
+                    Status
+                    <select name="status">
+                        <option value="queue"{% if status_filter == 'queue' %} selected{% endif %}>Queue</option>
+                        <option value="pending"{% if status_filter == 'pending' %} selected{% endif %}>Pending</option>
+                        <option value="published"{% if status_filter == 'published' %} selected{% endif %}>Published</option>
+                        <option value="hidden"{% if status_filter == 'hidden' %} selected{% endif %}>Hidden</option>
+                        <option value="all"{% if status_filter == 'all' %} selected{% endif %}>All</option>
+                    </select>
+                </label>
+                <input type="submit" value="Filter">
+            </form>
+        </section>
+
+        {% if reviews %}
+            {% for review in reviews %}
+                <article class="review-moderation-card">
+                    <h2><a href="{{ review.vehicle.get_absolute_url }}">{{ review.vehicle }}</a>{% if review.vehicle.operator %} · {{ review.vehicle.operator }}{% endif %}</h2>
+                    <p><strong>{{ review.user }}</strong> · {{ review.rating }}/5 · {{ review.status|title }}</p>
+                    <p>{{ review.message|linebreaksbr }}</p>
+
+                    <ul class="review-moderation-meta">
+                        <li>{{ review.updated_at|date:"j F Y H:i" }}</li>
+                        <li>{{ review.open_report_count }} open report{{ review.open_report_count|pluralize }}</li>
+                        {% if review.user.blocked_from_reviews %}
+                            <li>User blocked from reviews</li>
+                        {% endif %}
+                    </ul>
+
+                    {% if review.flagged_terms %}
+                        <ul class="review-moderation-flags">
+                            {% for term in review.flagged_terms %}
+                                <li>{{ term }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+                    {% if review.moderation_notes %}
+                        <p class="review-moderation-note">{{ review.moderation_notes }}</p>
+                    {% endif %}
+
+                    {% for report in review.open_reports %}
+                        <div>
+                            <p><strong>Report from {{ report.reporter|default:"unknown user" }}</strong></p>
+                            {% if report.reason %}
+                                <p class="review-report-reason">{{ report.reason }}</p>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+
+                    <form method="post" class="review-moderation-actions">
+                        {% csrf_token %}
+                        <input type="hidden" name="review_id" value="{{ review.id }}">
+                        <button type="submit" name="action" value="publish" class="button">Publish</button>
+                        <button type="submit" name="action" value="hide" class="button">Hide</button>
+                        {% if perms.vehicles.delete_review %}
+                            <button type="submit" name="action" value="delete" class="button">Delete</button>
+                        {% endif %}
+                    </form>
+                </article>
+            {% endfor %}
+        {% else %}
+            <section class="review-moderation-card">
+                <p>No reviews matched this filter.</p>
+            </section>
+        {% endif %}
+    </div>
+{% endblock content %}

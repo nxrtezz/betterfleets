@@ -1,0 +1,216 @@
+{% extends 'page.html' %}
+{% load static %}
+
+{% block title %}{{ object.title }} - bustimes.org{% endblock %}
+
+{% block head %}
+    {% include 'includes/theme_styles.html' with page_theme=page_theme profile=object profile_class='organisation-profile' %}
+    <link rel="stylesheet" href="/liveries.{{ liveries_css_version }}.css">
+    <style>
+        .bus-group-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin: 0 0 1rem;
+        }
+
+        .bus-group-search-dialog {
+            width: min(42rem, calc(100vw - 2rem));
+            border: 0;
+            border-radius: 1rem;
+            padding: 0;
+            box-shadow: 0 1.2rem 3rem rgba(15, 23, 42, 0.28);
+        }
+
+        .bus-group-search-dialog::backdrop {
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        .bus-group-search-panel {
+            padding: 1rem;
+        }
+
+        .bus-group-search-panel form {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .bus-group-search-results {
+            display: grid;
+            gap: 0.75rem;
+            max-height: 22rem;
+            overflow-y: auto;
+        }
+
+        .bus-group-search-result {
+            display: grid;
+            gap: 0.25rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 0.75rem 0.9rem;
+        }
+
+        .bus-group-search-result small {
+            color: var(--secondary-text-color);
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+
+<section class="organisation-profile">
+    <div class="organisation-profile__banner"{% if object.banner %} style="background-image:url('{{ object.banner.url }}')"{% endif %}></div>
+    <div class="organisation-profile__body">
+        <div class="organisation-profile__meta">
+            <p class="organisation-profile__eyebrow">Bus group</p>
+            <h1>{{ object.title }}</h1>
+            {% if object.description %}<p class="organisation-profile__description">{{ object.description|linebreaksbr }}</p>{% endif %}
+            <ul class="organisation-profile__stats">
+                <li><strong>{{ vehicles|length }}</strong> buses</li>
+                <li><strong>{{ operators_count }}</strong> operators</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+{% if request.user.is_superuser %}
+    <div class="bus-group-actions">
+        <button type="button" id="open-bus-group-search">Add bus</button>
+    </div>
+    <dialog class="bus-group-search-dialog" id="bus-group-search-dialog">
+        <div class="bus-group-search-panel">
+            <form method="post">
+                {% csrf_token %}
+                <label for="bus-group-search-input">Search buses</label>
+                <input id="bus-group-search-input" type="search" placeholder="Fleet number, code, reg, operator or name">
+                <div class="bus-group-search-results" id="bus-group-search-results">
+                    <p>Search for a bus to add it to this group.</p>
+                </div>
+                <div class="horizontal">
+                    <button type="submit">Add selected buses</button>
+                    <button type="button" id="close-bus-group-search">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </dialog>
+{% endif %}
+
+{% if vehicles %}
+    <div class="table-wrapper">
+        <table class="fleet compact">
+            <thead>
+                <tr>
+                    <th scope="col" colspan="2"></th>
+                    <th scope="col">Livery</th>
+                    {% if branding_column %}<th scope="col">Branding</th>{% endif %}
+                    <th scope="col">Type</th>
+                    {% if name_column %}<th scope="col" class="trivia">Name</th>{% endif %}
+                    {% if notes_column %}<th scope="col" class="trivia">Notes</th>{% endif %}
+                    {% if garage_column %}<th scope="col" class="trivia">Garage</th>{% endif %}
+                    <th scope="col">Operator</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vehicle in vehicles %}
+                    <tr id="{{ vehicle.slug }}"{% if vehicle.row_class %} class="{{ vehicle.row_class }}"{% endif %}>
+                        <td class="tabular"{% if not vehicle.reg %} colspan="2"{% endif %}>
+                            <a href="{{ vehicle.get_fleet_code_url }}">
+                                {% if vehicle.fleet_code or vehicle.fleet_number %}
+                                    {% firstof vehicle.fleet_code vehicle.fleet_number %}
+                                {% elif not vehicle.reg %}
+                                    {{ vehicle.code }}
+                                {% endif %}
+                            </a>
+                        </td>
+                        {% if vehicle.reg %}
+                            <td>
+                                <a href="{{ vehicle.get_absolute_url }}" class="reg">{{ vehicle.get_reg }}</a>
+                            </td>
+                        {% endif %}
+                        <td{% if vehicle.colours or vehicle.livery_id %} class="livery-cell"{% endif %}{% if branding_column %}{% if not vehicle.branding or not vehicle.livery_name %} colspan="2"{% endif %}{% endif %}>
+                            {% if vehicle.livery and vehicle.livery.livery_type == 'svg' %}
+                                {{ vehicle.livery.preview }}
+                            {% elif vehicle.colours or vehicle.livery_id %}<div class="livery{% if vehicle.livery_id %} livery-{{ vehicle.livery_id }}{% else %}" style="background:{{ vehicle.get_livery }}{% endif %}"></div>{% endif %}
+                            {% if vehicle.livery_name %}{{ vehicle.livery_name }}{% else %}{{ vehicle.branding }}{% endif %}
+                        </td>
+                        {% if vehicle.branding and vehicle.livery_name %}<td>{{ vehicle.branding }}</td>{% endif %}
+                        <td>{% if vehicle.is_spare_ticket_machine %}{{ vehicle.notes }}{% else %}{{ vehicle.vehicle_type_name|default:"" }}{% endif %}</td>
+                        {% if name_column %}<td class="trivia">{{ vehicle.name }}</td>{% endif %}
+                        {% if notes_column %}<td class="trivia">{% if not vehicle.is_spare_ticket_machine %}{{ vehicle.notes }}{% endif %}</td>{% endif %}
+                        {% if garage_column %}<td class="trivia">{{ vehicle.garage_name|default:'' }}</td>{% endif %}
+                        <td>{% if vehicle.operator %}<a href="{{ vehicle.operator.get_absolute_url }}">{{ vehicle.operator }}</a>{% endif %}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <p>No buses have been added to this group yet.</p>
+{% endif %}
+
+{% endblock content %}
+
+{% block foot %}
+{{ block.super }}
+{% if request.user.is_superuser %}
+<script>
+(function () {
+    var openButton = document.getElementById("open-bus-group-search");
+    var closeButton = document.getElementById("close-bus-group-search");
+    var dialog = document.getElementById("bus-group-search-dialog");
+    var input = document.getElementById("bus-group-search-input");
+    var results = document.getElementById("bus-group-search-results");
+
+    if (!openButton || !closeButton || !dialog || !input || !results) {
+        return;
+    }
+
+    function renderResults(items) {
+        if (!items.length) {
+            results.innerHTML = "<p>No buses matched that search.</p>";
+            return;
+        }
+        results.innerHTML = items.map(function (item) {
+            var disabled = item.already_added ? " disabled" : "";
+            var stateLabel = item.already_added ? "Already in group" : "Select";
+            return (
+                '<label class="bus-group-search-result">' +
+                '<span><input type="checkbox" name="vehicle_ids" value="' + item.id + '"' + disabled + "> " +
+                item.label + "</span>" +
+                '<small>' + item.meta + "</small>" +
+                '<small>' + stateLabel + "</small>" +
+                "</label>"
+            );
+        }).join("");
+    }
+
+    async function runSearch() {
+        var query = input.value.trim();
+        if (!query) {
+            results.innerHTML = "<p>Search for a bus to add it to this group.</p>";
+            return;
+        }
+        results.innerHTML = "<p>Searching...</p>";
+        var response = await fetch("{% url 'bus_group_vehicle_search' object.slug %}?q=" + encodeURIComponent(query));
+        if (!response.ok) {
+            results.innerHTML = "<p>Search failed. Please try again.</p>";
+            return;
+        }
+        var payload = await response.json();
+        renderResults(payload.results || []);
+    }
+
+    openButton.addEventListener("click", function () {
+        dialog.showModal();
+        input.focus();
+    });
+    closeButton.addEventListener("click", function () {
+        dialog.close();
+    });
+    input.addEventListener("input", function () {
+        window.clearTimeout(runSearch._timer);
+        runSearch._timer = window.setTimeout(runSearch, 250);
+    });
+})();
+</script>
+{% endif %}
+{% endblock foot %}

@@ -1,0 +1,45 @@
+services:
+  web_dev:
+    build: .
+    entrypoint: sh -c "uv sync --group dev --group test; DEBUG=1 exec ./manage.py runserver 0.0.0.0:8000"
+    container_name: django_web_dev
+    environment:
+      - SECRET_KEY=${SECRET_KEY-}
+      - DATABASE_URL=${DATABASE_URL-postgis://dev_user:dev_password@postgres_dev:5432/betterfleets_dev}
+      - REDIS_URL=${REDIS_URL-redis://redis_dev:6379}
+      - NTA_API_KEY
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - PYTHONWARNINGS=all
+    ports:
+      - "8010:8000"
+    restart: on-failure
+    volumes:
+      - .:/app:cached
+      - media_dev:/app/media
+    depends_on:
+      - postgres_dev
+      - redis_dev
+
+  postgres_dev:
+    image: postgis/postgis
+    container_name: postgres_dev
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    environment:
+      - PGUSER=dev_user
+      - POSTGRES_PASSWORD=dev_password
+      - POSTGRES_DB=betterfleets_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis_dev:
+    image: redis
+    container_name: redis_dev
+
+volumes:
+  postgres_data_dev:
+  media_dev:

@@ -1,0 +1,120 @@
+{% extends 'page.html' %}
+
+{% block title %}Operators - betterfleets{% endblock %}
+
+{% block meta_description %}
+    <meta name="description" content="Browse bus operators and their vehicle fleets.">
+{% endblock meta_description %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <style>
+        /* ── Tier colours ─────────────────────────────────────── */
+        :root {
+            --tier-bronze:   #cd7f32;
+            --tier-silver:   #9ca3af;
+            --tier-gold:     #f59e0b;
+            --tier-platinum: #a78bfa;
+            --tier-none:     rgba(148,163,184,0.25);
+        }
+
+        /* ── Section headers (fleet completion style) ───────── */
+        .fleet-section-header {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.4rem;
+        }
+
+        .fleet-section-title {
+            font-size: 1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            margin: 0;
+            color: var(--text-color);
+            opacity: 0.75;
+        }
+
+        .fleet-section-count {
+            font-size: 0.8rem;
+            opacity: 0.5;
+        }
+
+        /* ── Operator cards ──────────────────────────────────── */
+        .operator-list {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+        }
+
+        .operator-card {
+            display: grid;
+            gap: 0.85rem;
+            padding: 0.9rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            background: var(--background-color);
+            transition: border-color 0.15s;
+        }
+
+        .operator-card:hover {
+            border-color: var(--border-color-darker);
+        }
+
+        .operator-card__logo {
+            width: 100%;
+            max-width: 12rem;
+            max-height: 7rem;
+            object-fit: contain;
+            margin: 0 auto;
+            display: block;
+        }
+
+        .operator-card h2 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .operator-card h2 a {
+            color: var(--text-color);
+        }
+
+        .operator-card__meta {
+            color: var(--secondary-text-color);
+            font-size: 0.9rem;
+            margin: 0;
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <div class="fleet-section-header">
+        <h1 class="fleet-section-title" style="font-size: 1.75rem; opacity: 1;">Operators</h1>
+        <span class="fleet-section-count">{{ operators.paginator.count }} operator{{ operators.paginator.count|pluralize }}</span>
+    </div>
+    <p>Browse bus operators and their vehicle fleets.</p>
+
+    {% if operators %}
+        <div class="operator-list">
+            {% for operator in operators %}
+                <article class="operator-card">
+                    {% if operator.logo %}
+                        <img class="operator-card__logo" src="{{ operator.logo.url }}" alt="{{ operator.name }}">
+                    {% endif %}
+                    <h2><a href="{{ operator.get_absolute_url }}">{{ operator.name }}</a></h2>
+                    {% if operator.vehicle_count %}
+                        <p class="operator-card__meta">{{ operator.vehicle_count }} vehicle{{ operator.vehicle_count|pluralize }}</p>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </div>
+
+        {% include 'pagination.html' with page=operators %}
+    {% else %}
+        <p>No operators are listed yet.</p>
+    {% endif %}
+{% endblock content %}

@@ -1,0 +1,14 @@
+{% extends "page.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="card" style="max-width: 500px; margin: 50px auto; padding: 30px; text-align: center;">
+        <h1>Discord Account Linking</h1>
+        <p style="margin: 20px 0;">Use this code to link your Discord account to your BetterFleets account:</p>
+        <div style="font-size: 48px; font-weight: bold; letter-spacing: 5px; margin: 30px 0; color: #5865F2;">{{ code }}</div>
+        <p style="color: var(--secondary-text-color); font-size: 14px;">This code will expire in 10 minutes.</p>
+        <p style="margin-top: 20px;">In Discord, use the command:</p>
+        <code style="background: var(--brand-color); border: 1px solid var(--border-color); padding: 10px 15px; border-radius: 5px; display: inline-block; margin-top: 10px;">/link {{ code }}</code>
+    </div>
+</div>
+{% endblock %}

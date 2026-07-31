@@ -1,0 +1,17 @@
+{% extends "page.html" %}
+{% block title %}Import TS JSON - Better Fleets{% endblock %}
+
+{% block content %}
+<h1>Import Transport Statistics JSON</h1>
+<p>Upload a TS JSON file to automatically log matching vehicles.</p>
+<form action="{{ request.get_full_path }}" method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+    <p>
+        <label for="ts_import"><strong>TS JSON File:</strong></label><br>
+        <input type="file" name="ts_import" id="ts_import" accept=".json,.jsom" required>
+    </p>
+    <p>
+        <button type="submit" class="button">Import File</button>
+    </p>
+</form>
+{% endblock %}

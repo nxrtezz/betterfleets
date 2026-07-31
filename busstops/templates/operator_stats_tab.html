@@ -1,0 +1,59 @@
+<div class="stats-tab">
+    <div class="stats-overview">
+        <div class="stat-card">
+            <div class="stat-card__value">{{ stats.total_vehicles }}</div>
+            <div class="stat-card__label">Total Vehicles</div>
+        </div>
+    </div>
+    
+    <div class="stats-section">
+        <h3>Vehicle Types</h3>
+        <div class="stats-chart">
+            {% for vt in stats.vehicle_types %}
+            <div class="stats-bar">
+                <div class="stats-bar__label">{{ vt.name }}</div>
+                <div class="stats-bar__bar">
+                    <div class="stats-bar__fill" style="width: {{ vt.percentage }}%"></div>
+                </div>
+                <div class="stats-bar__value">{{ vt.count }} ({{ vt.percentage }}%)</div>
+            </div>
+            {% empty %}
+            <p>No vehicle type data available.</p>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div class="stats-section">
+        <h3>Liveries</h3>
+        <div class="livery-stats-grid">
+            {% for livery in stats.liveries %}
+            <div class="livery-stat-item">
+                <div class="livery-stat-item__preview" style="background: {{ livery.css|default:livery.colour }}"></div>
+                <div class="livery-stat-item__info">
+                    <div class="livery-stat-item__name">{{ livery.name }}</div>
+                    <div class="livery-stat-item__count">{{ livery.count }} ({{ livery.percentage }}%)</div>
+                </div>
+            </div>
+            {% empty %}
+            <p>No livery data available.</p>
+            {% endfor %}
+        </div>
+    </div>
+    
+    {% if stats.garages %}
+    <div class="stats-section">
+        <h3>Garages</h3>
+        <div class="stats-chart">
+            {% for garage in stats.garages %}
+            <div class="stats-bar">
+                <div class="stats-bar__label">{{ garage.name }}</div>
+                <div class="stats-bar__bar">
+                    <div class="stats-bar__fill" style="width: {{ garage.percentage }}%"></div>
+                </div>
+                <div class="stats-bar__value">{{ garage.count }} ({{ garage.percentage }}%)</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>

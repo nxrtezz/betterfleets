@@ -1,0 +1,6 @@
+{% if object.has_user_attribution %}
+    <p class="entity-user-attribution">
+        <a href="{{ object.user.get_absolute_url }}">{{ object.user.get_display_name }}</a>
+        {{ object.get_user_role_display_for_template }} this {{ object.get_user_attribution_entity_label }}.
+    </p>
+{% endif %}

@@ -1,0 +1,38 @@
+{% extends 'page.html' %}
+
+{% block title %}Edit stop details - {{ stop.get_long_name }} - bustimes.org{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+
+{% if not form %}
+    <h1>Thank you</h1>
+
+    {% if request_entry.pending %}
+        <p>Your stop changes have been sent for approval.</p>
+    {% else %}
+        <p>Stop details updated.</p>
+    {% endif %}
+
+    <ul class="revisions-list">
+        {% include "request_log.html" with request_entry=request_entry %}
+    </ul>
+{% else %}
+    {% if recent_entries %}
+        <p class="message">This stop has already been edited recently:</p>
+        {% include "revision_feed.html" with entries=recent_entries %}
+    {% endif %}
+
+    <h1>Edit stop details</h1>
+
+    <p><a href="{{ stop.get_absolute_url }}">{{ stop.get_long_name }}</a></p>
+
+    <form action="{{ stop.get_edit_url }}" method="POST">
+        {{ form.as_p }}
+        {% csrf_token %}
+        <input type="submit" value="Save changes">
+    </form>
+{% endif %}
+
+{% endblock content %}

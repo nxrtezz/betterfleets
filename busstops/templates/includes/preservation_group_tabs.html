@@ -1,0 +1,7 @@
+<ul class="tabs">
+    <li>{% if active_tab == 'overview' %}Overview{% else %}<a href="{{ object.get_absolute_url }}">Overview</a>{% endif %}</li>
+    <li>{% if active_tab == 'vehicles' %}Vehicles ({{ object.vehicle_count }}){% else %}<a href="{{ object.get_vehicles_url }}">Vehicles ({{ object.vehicle_count }})</a>{% endif %}</li>
+    {% if events_count %}
+        <li>{% if active_tab == 'events' %}Events ({{ events_count }}){% else %}<a href="{{ object.get_events_url }}">Events ({{ events_count }})</a>{% endif %}</li>
+    {% endif %}
+</ul>

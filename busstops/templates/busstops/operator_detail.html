@@ -1,0 +1,310 @@
+{% extends 'page.html' %}
+
+{% block head %}
+    <meta property="og:title" content="{{ object }}">
+    <style>
+        /* ── Tier colours ─────────────────────────────────────── */
+        :root {
+            --tier-bronze:   #cd7f32;
+            --tier-silver:   #9ca3af;
+            --tier-gold:     #f59e0b;
+            --tier-platinum: #a78bfa;
+            --tier-none:     rgba(148,163,184,0.25);
+        }
+
+        /* ── Section headers (fleet completion style) ───────── */
+        .fleet-section-header {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.4rem;
+        }
+
+        .fleet-section-title {
+            font-size: 1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            margin: 0;
+            color: var(--text-color);
+            opacity: 0.75;
+        }
+
+        .fleet-section-count {
+            font-size: 0.8rem;
+            opacity: 0.5;
+        }
+
+        /* ── Stat pills (fleet completion style) ─────────────── */
+        .fleet-stat-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .fleet-stat-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background: var(--background-color);
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .fleet-stat-pill__num {
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--text-color);
+        }
+
+        .fleet-stat-pill__icon {
+            font-style: normal;
+            line-height: 1;
+        }
+
+        .ticket-family {
+            display: block;
+            padding: 1rem;
+        }
+
+        .ticket-family + .ticket-family {
+            margin-top: 1rem;
+        }
+
+        .ticket-family__meta,
+        .ticket-variant__meta {
+            color: var(--text-color);
+            opacity: 0.8;
+        }
+
+        .ticket-variants {
+            display: grid;
+            gap: 0.75rem;
+            margin-top: 0.75rem;
+        }
+
+        .ticket-variant {
+            border-top: 1px solid var(--border-color);
+            padding-top: 0.75rem;
+        }
+
+        .ticket-variant h4 {
+            margin-bottom: 0.35rem;
+        }
+
+        .operator-liveries {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+        }
+
+        .operator-livery-card {
+            display: grid;
+            gap: 0.85rem;
+            padding: 0.9rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            background: var(--background-color);
+            transition: border-color 0.15s;
+        }
+
+        .operator-livery-card:hover {
+            border-color: var(--border-color-darker);
+        }
+
+        .operator-livery-card__swatch {
+            min-height: 5.5rem;
+            aspect-ratio: 9 / 4;
+            border-radius: 0.85rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .operator-livery-card h3,
+        .operator-livery-card p {
+            margin: 0;
+        }
+
+        .operator-livery-card__meta {
+            color: var(--secondary-text-color);
+        }
+    </style>
+{% endblock head %}
+
+{% block bodyclass %}{% endblock %}
+
+{% block content %}
+
+{% include 'includes/disruption_banner.html' with situations=situations %}
+
+{% include 'includes/operator_tabs.html' with active_operator_tab=active_tab services_count=services|length event_services_count=event_services_count liveries_count=liveries_count %}
+
+<div class="ad-wrapper">
+    <div id="AFM_inContentTop_ad"></div>
+</div>
+
+{% include 'situations.html' %}
+
+{% if request.user.is_authenticated %}
+    <p><a class="button" href="{% url 'request_new_vehicle' object.slug %}">Request a new vehicle</a></p>
+{% endif %}
+
+{% if active_tab == 'blocks' %}
+    <form class="timetable-date" method="GET">
+        <input type="hidden" name="tab" value="blocks">
+        <input type="date" name="date" aria-label="Date" value="{{ blocks_date.isoformat }}">
+        <input type="submit" value="Go">
+    </form>
+
+    <h2>Blocks for {{ blocks_date|date:"l j F Y" }}</h2>
+
+    <div id="blocks-tab-root"></div>
+    <script>
+        window.BLOCKS_TAB_PROPS = {
+            operatorNoc: "{{ object.noc }}",
+            date: "{{ blocks_date.isoformat }}"
+        };
+    </script>
+{% elif active_tab == 'depots' %}
+    {% include 'includes/depot_section.html' with depot_section_class='' %}
+{% elif active_tab == 'liveries' %}
+    <div class="fleet-section-header">
+        <h2 class="fleet-section-title">Liveries</h2>
+        <span class="fleet-section-count">{{ liveries|length }} livery{{ liveries|length|pluralize }}</span>
+    </div>
+
+    {% if liveries %}
+        <div class="operator-liveries">
+            {% for livery in liveries %}
+                <article class="operator-livery-card">
+                    {% if livery.preview_css %}
+                        {% if livery.published %}
+                            <a href="{{ livery.get_absolute_url }}">
+                                <div class="operator-livery-card__swatch" style="background:{{ livery.preview_css }}"></div>
+                            </a>
+                        {% else %}
+                            <div class="operator-livery-card__swatch" style="background:{{ livery.preview_css }}"></div>
+                        {% endif %}
+                    {% endif %}
+                    <div>
+                        <h3>
+                            {% if livery.published %}
+                                <a href="{{ livery.get_absolute_url }}">{{ livery.name }}</a>
+                            {% else %}
+                                {{ livery.name }}
+                            {% endif %}
+                        </h3>
+                        <p class="operator-livery-card__meta">{{ livery.vehicle_count }} vehicle{{ livery.vehicle_count|pluralize }} in this operator's fleet</p>
+                    </div>
+                    {% if livery.creator %}
+                        <p class="operator-livery-card__meta">Created by {{ livery.creator }}</p>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No liveries are currently listed for this operator.</p>
+    {% endif %}
+{% elif active_tab == 'tickets' %}
+    <div class="fleet-section-header">
+        <h2 class="fleet-section-title">Tickets</h2>
+    </div>
+
+    {% if tickets_link %}
+        <p><a class="button" href="{{ tickets_link }}">Buy tickets</a></p>
+    {% endif %}
+
+    {% if operator_tickets %}
+        <ul class="ticket-list">
+            {% for ticket in operator_tickets %}
+                <li>
+                    <a href="{{ ticket.url }}">{{ ticket.name }}</a>
+                    {% if ticket.route_count %}
+                        <span class="ticket-family__meta">· {{ ticket.route_count }} route{{ ticket.route_count|pluralize }}</span>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No tickets are listed for this operator yet.</p>
+    {% endif %}
+{% else %}
+    <div class="fleet-section-header">
+        <h2 class="fleet-section-title">Services</h2>
+        <span class="fleet-section-count">{{ services|length }} route{{ services|length|pluralize }}</span>
+    </div>
+
+    <div class="fleet-stat-pills">
+        <span class="fleet-stat-pill">
+            <span class="fleet-stat-pill__icon">🚌</span>
+            <span class="fleet-stat-pill__num">{{ services|length }}</span> route{{ services|length|pluralize }}
+        </span>
+        {% if non_current_services %}
+        <span class="fleet-stat-pill">
+            <span class="fleet-stat-pill__icon">📋</span>
+            <span class="fleet-stat-pill__num">{{ non_current_services|length }}</span> non-current
+        </span>
+        {% endif %}
+        {% if event_services %}
+        <span class="fleet-stat-pill">
+            <span class="fleet-stat-pill__icon">🎉</span>
+            <span class="fleet-stat-pill__num">{{ event_services|length }}</span> event{{ event_services|pluralize }}
+        </span>
+        {% endif %}
+        {% if rail_replacement_services %}
+        <span class="fleet-stat-pill">
+            <span class="fleet-stat-pill__icon">🚂</span>
+            <span class="fleet-stat-pill__num">{{ rail_replacement_services|length }}</span> rail replacement
+        </span>
+        {% endif %}
+    </div>
+
+    {% include 'services.html' with services=services %}
+    {% if non_current_services %}
+        <details class="card">
+            <summary>Non-current routes ({{ non_current_services|length }})</summary>
+            <p>Routes kept outside the current main list.</p>
+            {% include 'services.html' with services=non_current_services %}
+        </details>
+    {% endif %}
+    {% if event_services %}
+        <details class="card">
+            <summary>Events ({{ event_services|length }})</summary>
+            <p>Event-specific routes.</p>
+            {% include 'services.html' with services=event_services %}
+        </details>
+    {% endif %}
+    {% if rail_replacement_services %}
+        <details class="card">
+            <summary>Rail replacement ({{ rail_replacement_services|length }})</summary>
+            <p>Rail replacement services operated by this operator.</p>
+            {% include 'services.html' with services=rail_replacement_services %}
+        </details>
+    {% endif %}
+{% endif %}
+
+{% include 'operator-contact-details.html' %}
+
+{% if perms.busstops.change_operator %}
+    <ul class="horizontal">
+        <li><a href="{% url 'admin:busstops_operator_change' object.noc %}">✎ operator</a></li>
+        <li><a href="{% url 'admin:busstops_service_changelist' %}?operator__noc__exact={{ object.noc|urlencode }}&amp;current__exact=1">✎ services</a></li>
+        <li><a href="{% url 'admin:vehicles_vehicle_changelist' %}?operator__noc__exact={{ object.noc|urlencode }}">✎ vehicles</a></li>
+        <li><a href="{% url 'admin:bustimes_timetabledatasource_changelist' %}?operators__exact={{ object.noc|urlencode }}">✎ timetable data sources</a></li>
+    </ul>
+{% endif %}
+
+{% endblock content %}
+
+{% block foot %}
+{% load static %}
+{% if active_tab == 'blocks' %}
+<script src="{% static 'dist/js/app.js' %}"></script>
+{% endif %}
+{% endblock foot %}

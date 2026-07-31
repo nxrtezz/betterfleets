@@ -1,0 +1,20 @@
+{% extends "page.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="card" style="max-width: 600px; margin: 50px auto; padding: 30px; text-align: center;">
+        <h1>Driver Status Required</h1>
+        <p style="margin: 20px 0;">You do not currently have driver status. Driver status is required to view driving statistics.</p>
+        
+        <p style="margin: 20px 0;">If you are a bus driver or drive these vehicles for work, you can request driver status.</p>
+        
+        <a href="{% url 'request_driver_status' %}" style="display: inline-block; background: #5865F2; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; text-decoration: none; margin: 10px;">
+            Request Driver Status
+        </a>
+        
+        <a href="{% url 'user_detail' user.pk %}" style="display: inline-block; margin-top: 20px; color: #666; text-decoration: none;">
+            ← Back to profile
+        </a>
+    </div>
+</div>
+{% endblock %}

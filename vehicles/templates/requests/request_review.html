@@ -1,0 +1,232 @@
+{% extends 'page.html' %}
+{% load humanize %}
+
+{% block title %}Review Requests - Better Fleets{% endblock %}
+
+{% block head %}
+<style>
+.requests-list { list-style:none; padding:0; margin:0; display:grid; gap:.75rem; }
+.requests-list li { 
+    border:1px solid var(--border-color); 
+    border-radius:.5rem; 
+    padding:.75rem 1rem; 
+    background:var(--background-color);
+    position:relative;
+}
+.request-meta { 
+    font-size:.875rem; 
+    color:var(--text-color); 
+    margin:.25rem 0 .5rem 0;
+    line-height:1.3;
+    opacity:0.8;
+}
+.request-actions { 
+    margin:.75rem 0 0 0; 
+    display:flex; 
+    gap:.5rem; 
+    flex-wrap:wrap;
+}
+.request-actions form { 
+    margin:0; 
+    display:inline; 
+}
+.request-actions textarea { 
+    width:100%; 
+    min-height:3rem; 
+    margin:.5rem 0;
+    font-size:.875rem;
+    padding:.5rem;
+    border:1px solid var(--border-color);
+    border-radius:.25rem;
+    background:var(--background-color);
+    color:var(--text-color);
+}
+.request-details { 
+    margin:.5rem 0; 
+    font-size:.9rem;
+    line-height:1.4;
+}
+.request-details strong { 
+    color:var(--text-color); 
+    margin-right:.25rem;
+}
+.status-pending { 
+    background:var(--brand-color-darker); 
+    color:var(--button-foreground); 
+    padding:.15rem .5rem; 
+    border-radius:999px; 
+    font-size:.75rem; 
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.025em;
+}
+.status-approved { 
+    background:#28a745; 
+    color:#fff; 
+    padding:.15rem .5rem; 
+    border-radius:999px; 
+    font-size:.75rem; 
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.025em;
+}
+.status-rejected { 
+    background:#dc3545; 
+    color:#fff; 
+    padding:.15rem .5rem; 
+    border-radius:999px; 
+    font-size:.75rem; 
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.025em;
+}
+.request-type { 
+    background:var(--brand-color-darker); 
+    color:var(--button-foreground); 
+    padding:.15rem .5rem; 
+    border-radius:999px; 
+    font-size:.75rem; 
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.025em;
+    margin-right:.5rem;
+}
+.button-small { 
+    font-size:.875rem; 
+    padding:.375rem .75rem;
+}
+.approve-btn { background:#28a745; border-color:#28a745; }
+.reject-btn { background:#dc3545; border-color:#dc3545; }
+.approve-btn:hover { background:#218838; border-color:#1e7e34; }
+.reject-btn:hover { background:#c82333; border-color:#bd2130; }
+.review-section { 
+    margin-bottom:2rem; 
+}
+.review-section h2 { 
+    margin-bottom:1rem; 
+    color:var(--text-color);
+    font-size:1.25rem;
+}
+.message { 
+    background:var(--brand-color-darker); 
+    border:1px solid var(--border-color); 
+    border-radius:.25rem; 
+    padding:.75rem; 
+    margin-bottom:1rem;
+    color:var(--text-color);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="review-section">
+    <h1>Request Review</h1>
+    <p style="margin-bottom:1.5rem; color:var(--text-color); opacity:0.8;">Only superusers can approve these requests. Approval creates the requested object immediately.</p>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="message">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+</div>
+
+<div class="review-section">
+    <h2>Pending Requests</h2>
+    {% if pending_requests %}
+        <ul class="requests-list">
+            {% for addition_request in pending_requests %}
+                <li>
+                    <div style="display:flex; align-items:center; margin-bottom:.5rem;">
+                        <span class="request-type">{{ addition_request.get_request_type_display }}</span>
+                        <strong style="font-size:1.1rem; color:var(--text-color);">{{ addition_request.get_summary }}</strong>
+                    </div>
+                    
+                    <div class="request-meta">
+                        Requested by <strong>{{ addition_request.requested_by }}</strong> 
+                        &centerdot; {{ addition_request.created_at|naturaltime }}
+                        ({{ addition_request.created_at|date:'j M Y H:i' }})
+                    </div>
+                    
+                    {% if addition_request.summary_items %}
+                        <div class="request-details" style="background:var(--brand-color-darker); padding:.75rem; border-radius:.25rem; border-left:4px solid var(--brand-color);">
+                            <strong style="display:block; margin-bottom:.5rem; color:var(--button-foreground); font-size:.9rem; text-transform:uppercase; letter-spacing:.025em;">Request Details:</strong>
+                            {% for label, value in addition_request.summary_items %}
+                                {% if value %}
+                                    <div style="margin-bottom:.25rem;">
+                                        <span style="color:var(--button-foreground); opacity:0.8; font-size:.85rem; min-width:100px; display:inline-block;">{{ label }}:</span>
+                                        <span style="color:var(--button-foreground); font-weight:500;">{{ value }}</span>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    
+                    <div class="request-actions">
+                        <form method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="request_id" value="{{ addition_request.id }}">
+                            <input type="hidden" name="action" value="approve">
+                            <button type="submit" class="button button-small approve-btn">👍 Approve</button>
+                        </form>
+                        
+                        <form method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="request_id" value="{{ addition_request.id }}">
+                            <input type="hidden" name="action" value="reject">
+                            <button type="submit" class="button button-small reject-btn" onclick="this.form.querySelector('textarea').style.display='block'; return false;">⚠️ Reject</button>
+                            <textarea name="review_notes" placeholder="Optional reason for requester" style="display:none;"></textarea>
+                        </form>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p style="color:var(--text-color); opacity:0.8; font-style:italic;">No pending requests right now.</p>
+    {% endif %}
+</div>
+
+<div class="review-section">
+    <h2>Recently Processed</h2>
+    {% if recent_requests %}
+        <ul class="requests-list">
+            {% for addition_request in recent_requests %}
+                <li>
+                    <div style="display:flex; align-items:center; margin-bottom:.5rem;">
+                        {% if addition_request.status == 'approved' %}
+                            <span class="status-approved">Approved</span>
+                        {% elif addition_request.status == 'rejected' %}
+                            <span class="status-rejected">Rejected</span>
+                        {% endif %}
+                        <span class="request-type">{{ addition_request.get_request_type_display }}</span>
+                        <strong style="font-size:1.05rem; color:var(--text-color);">{{ addition_request.get_summary }}</strong>
+                    </div>
+                    
+                    <div class="request-meta">
+                        {% if addition_request.reviewed_by %}
+                            Reviewed by <strong>{{ addition_request.reviewed_by }}</strong>
+                        {% endif %}
+                        &centerdot; {{ addition_request.reviewed_at|naturaltime }}
+                        ({{ addition_request.reviewed_at|date:'j M Y H:i' }})
+                    </div>
+                    
+                    {% if addition_request.created_object_repr %}
+                        <div class="request-details" style="background:#28a745; padding:.75rem; border-radius:.25rem; border-left:4px solid #1e7e34;">
+                            <strong style="display:block; margin-bottom:.25rem; color:#fff; font-size:.85rem;">Created Object:</strong>
+                            <span style="color:#fff;">{{ addition_request.created_object_repr }}</span>
+                        </div>
+                    {% endif %}
+                    
+                    {% if addition_request.review_notes %}
+                        <div class="request-details" style="background:var(--brand-color-darker); padding:.75rem; border-radius:.25rem; border-left:4px solid var(--brand-color);">
+                            <strong style="display:block; margin-bottom:.25rem; color:var(--button-foreground); font-size:.85rem;">Review Note:</strong>
+                            <span style="color:var(--button-foreground);">{{ addition_request.review_notes }}</span>
+                        </div>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p style="color:var(--text-color); opacity:0.8; font-style:italic;">No processed requests yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

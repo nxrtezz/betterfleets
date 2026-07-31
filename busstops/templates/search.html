@@ -1,0 +1,82 @@
+{% extends 'page.html' %}
+
+{% block title %}{% firstof query 'Search' %} - bustimes.org{% endblock %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block content %}
+
+<h1>Search</h1>
+
+<p>Search operators, vehicles, preservation groups and users</p>
+
+<form method="get" action="/search" class="search">
+
+<p>{{ form.q }} <input type="submit" value="Search"></p>
+
+</form>
+
+{% if form.is_valid %}
+    {% if operators %}
+        <h2 id="operators">{{ operators.paginator.count }} operator{{ operators.paginator.count|pluralize }}</h2>
+
+        <ul>
+            {% for result in operators %}
+                <li><a href="{{ result.get_absolute_url }}">{{ result.headline|safe }}</a></li>
+            {% endfor %}
+        </ul>
+
+        {% include 'pagination.html' with page=operators hash='#operators' %}
+    {% endif %}
+
+    {% if vehicles %}
+    <h2>{{ vehicles|length }} vehicle{{ vehicles|length|pluralize }}</h2>
+
+    <ul class="has-smalls">
+        {% for result in vehicles %}
+            <li>
+                <a href="{{ result.get_absolute_url }}">
+                    <span>{% if result.withdrawn %}<s>{{ result }}</s>{% else %}{{ result }}{% endif %}</span>
+                    {% if result.operator %}
+                        <small>{{ result.operator }}</small>
+                    {% endif %}
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if preservation_groups %}
+        <h2>{{ preservation_groups|length }} preservation group{{ preservation_groups|length|pluralize }}</h2>
+
+        <ul class="has-smalls">
+            {% for result in preservation_groups %}
+                <li>
+                    <a href="{{ result.get_absolute_url }}">
+                        <span>{{ result.name }}</span>
+                        <small>{{ result.vehicle_count }} preserved vehicle{{ result.vehicle_count|pluralize }}</small>
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if users %}
+        <h2>{{ users|length }} user{{ users|length|pluralize }}</h2>
+
+        <ul class="has-smalls">
+            {% for result in users %}
+                <li>
+                    <a href="{{ result.get_absolute_url }}">
+                        <span>{{ result.get_display_name }}</span>
+                        <small>@{{ result.get_username_display }} · {{ result.total_count }} edit{{ result.total_count|pluralize }} · {{ result.review_count }} review{{ result.review_count|pluralize }}</small>
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+{% endif %}
+
+
+{% endblock content %}

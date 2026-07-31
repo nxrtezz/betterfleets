@@ -1,0 +1,68 @@
+{% extends 'page.html' %}
+
+{% block title %}Rules & FAQ{% endblock %}
+
+{% block canonical %}
+    <link rel="canonical" href="https://bustimes.org/rules">
+{% endblock canonical %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+
+<h1>Vehicle editing rules</h1>
+
+<p>Vehicle details such as type, livery, branding, and status can be edited by the community. If you want to help, please keep edits careful, provable, and useful.</p>
+
+<ol class="rules">
+    <li>If a vehicle is tracking as the wrong vehicle because the ticket machine code is wrong, do not try to fix that with a fleet edit. Wait for the operator data to be corrected.</li>
+    <li>Only edit a vehicle if you are confident the information is correct.</li>
+    <li>If you cannot reasonably prove a change, do not submit it.</li>
+    <li>Do not reverse someone else’s work without a good reason. If something looks wrong, please <a href="/contact">contact us</a>.</li>
+    <li>Trusted users have faster approval powers, but they are still expected to follow the same evidence standards as everyone else.</li>
+</ol>
+
+<h2>Trusted users</h2>
+
+<ol class="rules">
+    <li>A trusted user is someone who has shown that they can make accurate, careful contributions consistently.</li>
+    <li>Trusted users can approve some edits directly, so accuracy matters even more.</li>
+    <li>There is no instant route to trusted status. It is earned through good edits, patience, and consistency.</li>
+    <li>If a trusted user stops meeting those standards, that status can be removed.</li>
+</ol>
+
+<p>Users can <a href="/contact">report content</a> they believe is harmful, illegal, or otherwise unsuitable. Harmful or abusive material may be removed, and accounts may lose editing access.</p>
+
+{% if form %}
+    <form method="POST">
+        {{ form.as_p }}
+        {% csrf_token %}
+        <input type="submit" value="Let me edit">
+    </form>
+{% else %}
+
+<h2>FAQ</h2>
+
+<h3>How do I add a vehicle?</h3>
+
+<p>If you know an operator has vehicles missing from Better Fleets, sign in and use the vehicle request flow, or <a href="/contact">contact us</a> if more context is needed.</p>
+
+<h3>How do I edit a vehicle?</h3>
+
+<p>Open the vehicle page and use the edit link. Some changes are applied immediately for trusted users, while others go through review.</p>
+
+<h3>Can I use this data?</h3>
+
+<p>Yes. Public data published here is available through <a href="/api/">the API</a>, subject to any upstream source restrictions and credits.</p>
+
+<h3>I have a different question</h3>
+
+<p><a href="/contact">Ask us</a> or join the <a href="https://discord.gg/QfmMuYH88Q">Discord server</a>.</p>
+
+<h3>Why does this site resemble Bustimes.org?</h3>
+
+<p>Because parts of the project were built with reference to the public Bustimes.org codebase. That upstream work is credited in our legal pages and retained source notices, including the Mozilla Public License 2.0 that applies to the adapted code.</p>
+
+{% endif %}
+
+{% endblock content %}

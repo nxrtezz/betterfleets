@@ -1,0 +1,742 @@
+{% extends 'page.html' %}
+
+{% block title %}Fleet list – {{ object }} – bustimes.org{% endblock %}
+
+{% block canonical %}
+    <link rel="canonical" href="https://bustimes.org{% firstof group.get_vehicles_url object.get_absolute_url %}">
+{% endblock canonical %}
+
+{% block head %}
+    <link rel="stylesheet" href="/liveries.{{ liveries_css_version }}.css">
+    <style>
+        /* ── Tier colours ─────────────────────────────────────── */
+        :root {
+            --tier-bronze:   #cd7f32;
+            --tier-silver:   #9ca3af;
+            --tier-gold:     #f59e0b;
+            --tier-platinum: #a78bfa;
+            --tier-none:     rgba(148,163,184,0.25);
+        }
+
+        /* ── Section headers (fleet completion style) ───────── */
+        .fleet-section-header {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.4rem;
+        }
+
+        .fleet-section-title {
+            font-size: 1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            margin: 0;
+            color: var(--text-color);
+            opacity: 0.75;
+        }
+
+        .fleet-section-count {
+            font-size: 0.8rem;
+            opacity: 0.5;
+        }
+
+        /* ── Stat pills (fleet completion style) ─────────────── */
+        .fleet-stat-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .fleet-stat-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background: var(--background-color);
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .fleet-stat-pill__num {
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--text-color);
+        }
+
+        .fleet-stat-pill__icon {
+            font-style: normal;
+            line-height: 1;
+        }
+
+        {% if timeline_data %}
+        .fleet-timeline {
+            margin: 1.5rem 0;
+            padding: 1.25rem;
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+        }
+        .fleet-timeline-header {
+            font-weight: 700;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            margin-bottom: 1rem;
+            color: var(--text-color);
+            opacity: 0.75;
+        }
+        .fleet-timeline-track {
+            position: relative;
+            height: 40px;
+            background: var(--tier-none);
+            border-radius: 20px;
+            margin: 1rem 0;
+        }
+        .fleet-timeline-marker {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px;
+            height: 12px;
+            background: var(--brand-color-darker);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .fleet-timeline-marker:hover {
+            width: 16px;
+            height: 16px;
+            background: var(--tier-gold);
+        }
+        .fleet-timeline-marker.active {
+            width: 16px;
+            height: 16px;
+            background: var(--tier-gold);
+            box-shadow: 0 0 0 4px rgba(245,158,11,0.3);
+        }
+        .fleet-timeline-slider {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background: var(--tier-gold);
+            border-radius: 50%;
+            cursor: grab;
+            box-shadow: 0 0 0 4px rgba(245,158,11,0.3);
+            z-index: 10;
+        }
+        .fleet-timeline-slider:active {
+            cursor: grabbing;
+        }
+        .fleet-timeline-label {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            color: var(--secondary-text-color);
+            white-space: nowrap;
+        }
+        .fleet-timeline-current {
+            text-align: center;
+            font-weight: 600;
+            color: var(--text-color);
+            margin-top: 0.5rem;
+        }
+        .fleet-timeline-vehicles-count {
+            text-align: center;
+            font-size: 0.875rem;
+            color: var(--secondary-text-color);
+            margin-top: 0.25rem;
+        }
+        {% endif %}
+    </style>
+{% endblock head %}
+
+{% block bodyclass %}{% endblock %}
+
+{% block content %}
+
+<div class="fleet-section-header">
+    <h1 class="fleet-section-title" style="font-size: 1.75rem; opacity: 1;">{{ object }}</h1>
+</div>
+
+{% if all_operators %}
+    {% if all_operators_have_logos %}
+        <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0; align-items: center;">
+            {% for operator in active_operators %}
+                {% if operator.logo %}
+                    <a href="{{ operator.get_absolute_url }}" title="{{ operator.name }}">
+                        <img src="{{ operator.logo.url }}" alt="{{ operator.name }}" style="width: 80px; height: auto; object-fit: contain;">
+                    </a>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>
+            {% for operator in active_operators %}
+                <a href="{{ operator.get_absolute_url }}">{{ operator.name }}</a>{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+        </p>
+    {% endif %}
+{% endif %}
+
+{% if not parent %}
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <ul class="tabs" style="margin: 0;">
+            <li><a href="{{ object.get_absolute_url }}">Routes</a></li>
+            <li><a href="{{ object.get_absolute_url }}?tab=liveries">Liveries{% if liveries_count %} ({{ liveries_count }}){% endif %}</a></li>
+            <li><a href="{{ object.get_absolute_url }}/map">Map</a></li>
+            {% if depots_count %}
+                {% if active_operator_tab == 'depots' %}
+                    <li>Garages ({{ depots_count }})</li>
+                {% else %}
+                    <li><a href="{{ object.get_vehicles_url }}?tab=depots">Garages ({{ depots_count }})</a></li>
+                {% endif %}
+            {% endif %}
+            <li>{{ vehicles|length }} vehicle{{ vehicles|length|pluralize }}</li>
+        </ul>
+        {% if request.user.is_authenticated %}
+            <button id="pin-operator-btn" data-operator-id="{{ object.id }}" data-pinned="{% if is_pinned %}true{% else %}false{% endif %}" style="background: none; border: none; cursor: pointer; padding: 0.5rem; font-size: 1.2rem;" title="Pin operator">
+                {% if is_pinned %}📌{% else %}📍{% endif %}
+            </button>
+        {% endif %}
+        
+        <div>
+            {% if view_mode == 'table' %}
+                <a href="?view=card" class="button" style="padding: 0.5rem 1rem; font-size: 0.9rem;">Change to card view</a>
+            {% else %}
+                <a href="?view=table" class="button" style="padding: 0.5rem 1rem; font-size: 0.9rem;">Change to table view</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="fleet-stat-pills">
+        <span class="fleet-stat-pill">
+            <span class="fleet-stat-pill__icon">🚌</span>
+            <span class="fleet-stat-pill__num">{{ vehicles|length }}</span> vehicle{{ vehicles|length|pluralize }}
+        </span>
+        {% if liveries_count %}
+        <span class="fleet-stat-pill">
+            <span class="fleet-stat-pill__icon">🎨</span>
+            <span class="fleet-stat-pill__num">{{ liveries_count }}</span> livery{{ liveries_count|pluralize }}
+        </span>
+        {% endif %}
+        {% if depots_count %}
+        <span class="fleet-stat-pill">
+            <span class="fleet-stat-pill__icon">🏢</span>
+            <span class="fleet-stat-pill__num">{{ depots_count }}</span> garage{{ depots_count|pluralize }}
+        </span>
+        {% endif %}
+    </div>
+    
+    {% if not historical %}
+    <div class="fleet-filters" style="margin: 1rem 0; padding: 1rem; background: var(--background-color); border: 1px solid var(--border-color); border-radius: 0.5rem;">
+        <form method="get" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;">
+            <div style="flex: 0 0 auto;">
+                <label style="font-weight: 600; margin-right: 0.5rem;">Filters:</label>
+            </div>
+            
+            <div style="flex: 0 0 auto;">
+                <select name="garage" style="padding: 0.5rem; border-radius: 0.25rem; border: 1px solid var(--border-color);">
+                    <option value="">All Garages</option>
+                    {% for depot in object.depot_set.all %}
+                    <option value="{{ depot.id }}" {% if selected_garage.id == depot.id %}selected{% endif %}>{{ depot.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div style="flex: 0 0 auto;">
+                <select name="livery" style="padding: 0.5rem; border-radius: 0.25rem; border: 1px solid var(--border-color);">
+                    <option value="">All Liveries</option>
+                    {% for livery in available_liveries %}
+                    <option value="{{ livery.id }}" {% if selected_livery.id == livery.id %}selected{% endif %}>{{ livery.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div style="flex: 0 0 auto;">
+                <select name="vehicle_type" style="padding: 0.5rem; border-radius: 0.25rem; border: 1px solid var(--border-color);">
+                    <option value="">All Vehicle Types</option>
+                    {% for vt in available_vehicle_types %}
+                    <option value="{{ vt.id }}" {% if selected_vehicle_type.id == vt.id %}selected{% endif %}>{{ vt.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            {% if request.user.is_authenticated %}
+            <div style="flex: 0 0 auto;">
+                <select name="logged" style="padding: 0.5rem; border-radius: 0.25rem; border: 1px solid var(--border-color);">
+                    <option value="">All Vehicles</option>
+                    <option value="ridden" {% if logged_filter == 'ridden' %}selected{% endif %}>Ridden</option>
+                    <option value="photographed" {% if logged_filter == 'photographed' %}selected{% endif %}>Photographed</option>
+                    <option value="not_ridden" {% if logged_filter == 'not_ridden' %}selected{% endif %}>Not Ridden</option>
+                    <option value="not_photographed" {% if logged_filter == 'not_photographed' %}selected{% endif %}>Not Photographed</option>
+                </select>
+            </div>
+            {% endif %}
+            
+            <div style="flex: 0 0 auto;">
+                <button type="submit" class="button" style="padding: 0.5rem 1rem;">Apply</button>
+                <a href="{{ object.get_vehicles_url }}" style="margin-left: 0.5rem; text-decoration: underline;">Clear</a>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+    {% if active_operator_tab == 'fleet' and has_dvla_status_data %}
+        <p>
+            {% if show_dvla_status %}
+                <a href="{{ object.get_vehicles_url }}">Hide DVLA tax and euro status</a>
+            {% else %}
+                <a href="{{ object.get_vehicles_url }}?show_dvla_status=1">Show DVLA tax and euro status</a>
+            {% endif %}
+        </p>
+    {% endif %}
+{% endif %}
+
+<p>This is <strong>not intended to be a complete fleet list</strong>. It’s really a list of
+{% firstof parent object %}
+{% if parent and operators and operators|length < 10 %}
+    ({% for operator in operators %}{% if not forloop.first and not forloop.last %}, {% elif forloop.last and not forloop.first %} and {% endif %}{{ operator }}{% endfor %})
+{% endif %}
+ticket machines, a byproduct of the live bus tracking.</p>
+
+<p>Remember:</p>
+
+<ul class="bulleted">
+    <li>Ticket machines IDs sometimes don’t correspond with the actual vehicles they’re attached to. (Equipment gets swapped between vehicles, etc.)</li>
+    <li>Vehicles don’t always track all the time. If a journey isn’t listed, it doesn’t necessarily mean it didn’t operate.</li>
+    {% if garage_column %}
+        <li>“Garage” information is worked out automatically, using the Garage field in the operator’s timetable data and the last trip a vehicle worked.</li>
+    {% endif %}
+</ul>
+
+{% if object.group %}
+    <p>There’s also <a href="{{ object.group.get_absolute_url }}">a list of all {{ object.group }} vehicles</a>.</p>
+{% endif %}
+
+{% if not parent %}
+    <ul class="horizontal">
+        <li><a href="/vehicles/edits?operator={{ object.noc }}&status=approved">Recent changes</a></li>
+        {% if request.user.is_authenticated %}
+            <li><a href="{% url 'request_new_vehicle' object.slug %}">Request a new vehicle</a></li>
+        {% endif %}
+        {% if request.user.trusted %}
+            <li><a href="/vehicles/edits?operator={{ object.noc }}&status=pending">Pending edits and requests</a></li>
+        {% endif %}
+        {% if request.user.is_superuser %}
+            <li><a href="{% url 'dashboard_home' %}">Dashboard</a></li>
+            <li>
+                <form action="{% url 'clear_operator_logs' object.slug %}" method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" onclick="return confirm('Are you sure you want to clear ALL logs for {{ object.name }}? This action cannot be undone.');" style="background: none; border: none; color: inherit; cursor: pointer; padding: 0; text-decoration: underline;">Clear all logs</button>
+                </form>
+            </li>
+            <li><a href="{% url 'admin:vehicles_vehicle_changelist' %}?operator={{ object.noc }}">✎</a></li>
+        {% endif %}
+    </ul>
+{% endif %}
+
+{% if timeline_data %}
+<div class="fleet-timeline">
+    <div class="fleet-timeline-header">Fleet Timeline</div>
+    <div class="fleet-timeline-track" id="timeline-track">
+        <div class="fleet-timeline-slider" id="timeline-slider" style="left: 100%;"></div>
+        {% for marker in timeline_data.markers %}
+        <div class="fleet-timeline-marker" data-date="{{ marker }}" style="left: {{ forloop.counter0|floatformat:2 }}%;"></div>
+        {% endfor %}
+    </div>
+    <div class="fleet-timeline-current">Current: <span id="timeline-current-date">{{ timeline_data.current }}</span></div>
+    <div class="fleet-timeline-vehicles-count">Showing <span id="timeline-vehicles-count">{{ vehicles|length }}</span> vehicles</div>
+</div>
+{% endif %}
+
+{% if active_operator_tab == 'depots' and not parent %}
+{% include 'includes/depot_section.html' with depot_section_class='' depot_map_html=depot_map_html %}
+{% else %}
+{% if view_mode == 'card' %}
+    <style>
+        .vehicle-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .vehicle-card {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .vehicle-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .vehicle-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .livery-icon {
+            width: 2.5rem;
+            height: 1.5rem;
+            border-radius: 0.25rem;
+            flex-shrink: 0;
+        }
+
+        .vehicle-info {
+            flex: 1;
+        }
+
+        .vehicle-fleet-reg {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .vehicle-type {
+            font-size: 0.875rem;
+            color: var(--text-color);
+            opacity: 0.7;
+        }
+
+        .vehicle-details {
+            font-size: 0.85rem;
+            color: var(--text-color);
+            opacity: 0.8;
+        }
+
+        .vehicle-details div {
+            margin-bottom: 0.25rem;
+        }
+    </style>
+
+    <div class="vehicle-cards">
+        {% for vehicle in vehicles %}
+            <div class="vehicle-card">
+                <div class="vehicle-header">
+                    {% if vehicle.livery and vehicle.livery.livery_type == 'svg' and vehicle.livery.svg %}
+                        <img src="{{ vehicle.livery.svg.url }}" alt="{{ vehicle.livery.name }}" title="{{ vehicle.livery.name }}" class="livery-icon" onerror="console.error('Failed to load livery SVG/PNG for vehicle {{ vehicle.slug }}: {{ vehicle.livery.name }} (ID: {{ vehicle.livery_id }}). URL: {{ vehicle.livery.svg.url|default:'None' }}. Falling back to CSS.'); this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="livery-icon" style="background: {{ vehicle.get_livery }}; display: none;"></div>
+                    {% elif vehicle.colours or vehicle.livery_id %}
+                        <div class="livery-icon" style="background: {{ vehicle.get_livery }};"></div>
+                    {% else %}
+                        <div class="livery-icon" style="background: #ccc;"></div>
+                    {% endif %}
+                    
+                    <div class="vehicle-info">
+                        <div class="vehicle-fleet-reg">
+                            <a href="{{ vehicle.get_absolute_url }}">
+                                {% if vehicle.fleet_code or vehicle.fleet_number %}
+                                    {% if vehicle.operated_by_id and vehicle.operated_by_id != object.id %}
+                                        <em>{% firstof vehicle.fleet_code vehicle.fleet_number %}</em>
+                                    {% else %}
+                                        {% firstof vehicle.fleet_code vehicle.fleet_number %}
+                                    {% endif %}
+                                {% else %}
+                                    {% if vehicle.reg %}{% if vehicle.preserved %}<em>{{ vehicle.get_reg }}</em>{% else %}{{ vehicle.get_reg }}{% endif %}{% else %}No reg{% endif %}
+                                {% endif %}
+                                {% if vehicle.reg %} - {% if vehicle.preserved %}<em>{{ vehicle.get_reg }}</em>{% else %}{{ vehicle.get_reg }}{% endif %}{% endif %}
+                            </a>
+                        </div>
+                        <div class="vehicle-type">{{ vehicle.vehicle_type_name|default:"Unknown" }}</div>
+                    </div>
+                </div>
+
+                <div class="vehicle-details">
+                    {% if vehicle.livery_name %}
+                        <div><strong>Livery:</strong> {{ vehicle.livery_name }}</div>
+                    {% endif %}
+                    {% if vehicle.branding %}
+                        <div><strong>Branding:</strong> {{ vehicle.branding }}</div>
+                    {% endif %}
+                    {% if vehicle.name %}
+                        <div><strong>Name:</strong> {{ vehicle.name }}</div>
+                    {% endif %}
+                    {% if vehicle.garage_name %}
+                        <div><strong>Garage:</strong> {{ vehicle.garage_name }}</div>
+                    {% endif %}
+                    {% if show_dvla_status and vehicle.dvla_tax_status %}
+                        <div><strong>Tax status:</strong> {{ vehicle.dvla_tax_status }}</div>
+                    {% endif %}
+                    {% if show_dvla_status and vehicle.dvla_euro_status %}
+                        <div><strong>Euro status:</strong> {{ vehicle.dvla_euro_status }}</div>
+                    {% endif %}
+                    {% if vehicle.feature_names %}
+                        <div><strong>Features:</strong> {{ vehicle.feature_names }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+<div class="table-wrapper">
+{% if error_message %}
+    <p>{{ error_message }}</p>
+{% else %}
+    <table class="fleet compact">
+        <thead>
+            <tr>
+                <th scope="col" colspan="2"></th>
+                {% if not parent and last_tracked_column %}<th scope="col" colspan="2">Last tracked</th>{% endif %}
+                <th scope="col">Livery</th>
+                {% if branding_column %}<th scope="col">Branding</th>{% endif %}
+                <th scope="col">Type</th>
+                {% if name_column %}<th scope="col" class="trivia">Name</th>{% endif %}
+                {% if notes_column %}<th scope="col" class="trivia">Notes</th>{% endif %}
+                {% if garage_column %}<th scope="col" class="trivia">Garage</th>{% endif %}
+                {% if show_dvla_status %}<th scope="col" class="trivia">Tax status</th><th scope="col" class="trivia">Euro status</th>{% endif %}
+                {% for col in columns %}<th scope="col" class="trivia">{{ col.name }}</th>{% endfor %}
+                {% if features_column %}<th scope="col" class="trivia">Special features</th>{% endif %}
+                {% if parent %}<th>Operator</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for vehicle in vehicles %}
+                <tr id="{{ vehicle.slug }}"{% if vehicle.row_class %} class="{{ vehicle.row_class }}"{% endif %}>
+                    <td class="tabular"{% if not vehicle.reg %} colspan="2"{% endif %}>
+                        <a href="{{ vehicle.get_fleet_code_url }}"{% if vehicle.vehicle_type.style == "train" and vehicle.fleet_code %} target="_blank" rel="noopener"{% endif %}>
+                            {% if vehicle.fleet_code or vehicle.fleet_number %}
+                                {% if vehicle.operated_by_id and vehicle.operated_by_id != object.id %}
+                                    <em>{% firstof vehicle.fleet_code vehicle.fleet_number %}</em>
+                                {% else %}
+                                    {% firstof vehicle.fleet_code vehicle.fleet_number %}
+                                {% endif %}
+                            {% elif not vehicle.reg %}
+                                {{ vehicle.code }}
+                            {% endif %}
+                        </a>
+                    </td>
+                    {% if vehicle.reg %}
+                        <td>
+                            <a href="{{ vehicle.get_absolute_url }}" class="reg">
+                                {% if vehicle.preserved %}<em>{{ vehicle.get_reg }}</em>{% else %}{{ vehicle.get_reg }}{% endif %}
+                            </a>
+                        </td>
+                    {% endif %}
+                    {% if not parent and last_tracked_column %}<td class="last-seen">
+                        {% if vehicle.last_seen %}
+                            {{ vehicle.last_seen.service|default:"-" }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="last-seen">
+                        {% if vehicle.last_seen %}
+                            {% if vehicle.last_seen.today %}
+                                {{ vehicle.last_seen.when|time:"H:i" }}
+                            {% elif vehicle.last_seen.when.year == today.year %}
+                                {{ vehicle.last_seen.when|date:"j M" }}
+                            {% else %}
+                                {{ vehicle.last_seen.when|date:"j M Y" }}
+                            {% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>{% endif %}
+                    <td{% if vehicle.colours or vehicle.livery_id %} class="livery-cell"{% endif %}{% if branding_column %}{% if not vehicle.branding or not vehicle.livery_name %} colspan="2"{% endif %}{% endif %}>
+                        {% if vehicle.livery and vehicle.livery.livery_type == 'svg' %}
+                            <img src="{{ vehicle.livery.svg.url }}" style="height:1.5em;width:2.25em;object-fit:contain;vertical-align:middle;position:absolute;left:0.5em;top:0.2em;" alt="{{ vehicle.livery.name }}" title="{{ vehicle.livery.name }}" onerror="console.error('Failed to load livery SVG/PNG for vehicle {{ vehicle.slug }}: {{ vehicle.livery.name }} (ID: {{ vehicle.livery_id }}). URL: {{ vehicle.livery.svg.url|default:'None' }}. Falling back to CSS.'); this.style.display='none';">
+                        {% elif vehicle.colours or vehicle.livery_id %}<div class="livery{% if vehicle.livery_id %} livery-{{ vehicle.livery_id }}{% else %}" style="background:{{ vehicle.get_livery }}{% endif %}"></div>{% endif %}
+                        {% if vehicle.livery_name %}{{ vehicle.livery_name }}{% else %}{{ vehicle.branding }}{% endif %}
+                    </td>
+                    {% if vehicle.branding and vehicle.livery_name %}<td>{{ vehicle.branding }}</td>{% endif %}
+                    <td>{% if vehicle.is_spare_ticket_machine %}{{ vehicle.notes }}{% else %}{{ vehicle.vehicle_type_name|default:"" }}{% endif %}</td>
+                    {% if name_column %}<td class="trivia">{{ vehicle.name }}</td>{% endif %}
+                    {% if notes_column %}<td class="trivia">{% if not vehicle.is_spare_ticket_machine %}{{ vehicle.notes }}{% endif %}</td>{% endif %}
+                    {% if garage_column %}<td class="trivia">{{ vehicle.garage_name|default:'' }}</td>{% endif %}
+                    {% if show_dvla_status %}<td class="trivia">{{ vehicle.dvla_tax_status|default:'' }}</td><td class="trivia">{{ vehicle.dvla_euro_status|default:'' }}</td>{% endif %}
+                    {% for value in vehicle.column_values %}<td class="trivia">{{ value }}</td>{% endfor %}
+                    {% if features_column %}<td class="trivia">{{ vehicle.feature_names }}</td>{% endif %}
+                    {% if parent %}<td>{{ vehicle.operator_name }}</td>{% endif %}
+                    <td>{{ vehicle.get_flickr_link }}</td>
+                    {% if vehicle.is_editable %}
+                        <td><a href="{{ vehicle.get_edit_url }}">Edit{% if vehicle.pending_edits %}<abbr title="pending edits">*</abbr>{% endif %}</a></td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+{% if selected_garage %}
+    <p>Showing vehicles for garage <strong>{{ selected_garage }}</strong>. <a href="{{ object.get_vehicles_url }}">Show all vehicles</a></p>
+{% endif %}
+
+{% if active_operator_tab != 'depots' %}
+{% include 'pagination.html' with page=vehicles %}
+{% endif %}
+
+{% if timeline_data %}
+<script>
+(function() {
+    const track = document.getElementById('timeline-track');
+    const slider = document.getElementById('timeline-slider');
+    const currentDateSpan = document.getElementById('timeline-current-date');
+    const vehiclesCountSpan = document.getElementById('timeline-vehicles-count');
+    const markers = document.querySelectorAll('.fleet-timeline-marker');
+    
+    if (!track || !slider) return;
+    
+    const timelineData = {
+        earliest: '{{ timeline_data.earliest }}',
+        latest: '{{ timeline_data.latest }}',
+        markers: {{ timeline_data.markers|safe }}
+    };
+    
+    // Vehicle data with joined/left dates
+    const vehicleData = [
+        {% for vehicle in vehicles %}
+        {
+            id: '{{ vehicle.slug }}',
+            joined: '{{ vehicle.joined_fleet|default:"" }}',
+            left: '{{ vehicle.left_fleet|default:"" }}',
+            withdrawn: {{ vehicle.withdrawn|yesno:"true,false" }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    function parseDate(dateStr) {
+        if (!dateStr) return null;
+        const parts = dateStr.split('-');
+        if (parts.length !== 2) return null;
+        return new Date(parseInt(parts[1]), parseInt(parts[0]) - 1, 1);
+    }
+    
+    function filterVehicles(selectedDate) {
+        const selected = parseDate(selectedDate);
+        if (!selected) return;
+        
+        let visibleCount = 0;
+        vehicleData.forEach(vehicle => {
+            const row = document.getElementById(vehicle.id);
+            if (!row) return;
+            
+            const joined = parseDate(vehicle.joined);
+            const left = parseDate(vehicle.left);
+            
+            // Vehicle is visible if:
+            // - It has joined the fleet before or at selected date
+            // - AND (it hasn't left OR left after selected date OR is not withdrawn)
+            const hasJoined = joined && joined <= selected;
+            const hasLeft = left && left <= selected;
+            const isVisible = hasJoined && (!hasLeft || !vehicle.withdrawn);
+            
+            if (isVisible) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        
+        vehiclesCountSpan.textContent = visibleCount;
+    }
+    
+    function updateSliderPosition(percent) {
+        slider.style.left = percent + '%';
+        const markerIndex = Math.round((percent / 100) * (timelineData.markers.length - 1));
+        const selectedDate = timelineData.markers[markerIndex];
+        currentDateSpan.textContent = selectedDate;
+        filterVehicles(selectedDate);
+    }
+    
+    // Handle slider drag
+    let isDragging = false;
+    
+    slider.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        const rect = track.getBoundingClientRect();
+        let percent = ((e.clientX - rect.left) / rect.width) * 100;
+        percent = Math.max(0, Math.min(100, percent));
+        
+        updateSliderPosition(percent);
+    });
+    
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+    
+    // Handle marker clicks
+    markers.forEach((marker, index) => {
+        marker.addEventListener('click', () => {
+            const percent = (index / (markers.length - 1)) * 100;
+            updateSliderPosition(percent);
+        });
+    });
+    
+    // Handle track clicks
+    track.addEventListener('click', (e) => {
+        if (e.target === slider || e.target.classList.contains('fleet-timeline-marker')) return;
+        
+        const rect = track.getBoundingClientRect();
+        let percent = ((e.clientX - rect.left) / rect.width) * 100;
+        percent = Math.max(0, Math.min(100, percent));
+        
+        updateSliderPosition(percent);
+    });
+    
+    // Initialize with latest date
+    filterVehicles(timelineData.latest);
+})();
+{% endif %}
+
+{% if request.user.is_authenticated %}
+<script>
+(function() {
+    const pinBtn = document.getElementById('pin-operator-btn');
+    if (!pinBtn) return;
+
+    pinBtn.addEventListener('click', function() {
+        const operatorId = pinBtn.dataset.operatorId;
+        const isPinned = pinBtn.dataset.pinned === 'true';
+
+        const formData = new FormData();
+        formData.append('operator_id', operatorId);
+
+        fetch('{% url "toggle_pin_operator" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                pinBtn.dataset.pinned = data.pinned ? 'true' : 'false';
+                pinBtn.textContent = data.pinned ? '📌' : '📍';
+            }
+        })
+        .catch(error => console.error('Error pinning operator:', error));
+    });
+})();
+</script>
+{% endif %}
+
+{% endblock content %}

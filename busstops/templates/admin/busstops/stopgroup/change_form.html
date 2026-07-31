@@ -1,0 +1,39 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <style>
+        .stop-group-selector {
+            max-width: 1100px;
+        }
+        .stop-group-selector-map {
+            height: 460px;
+            width: 100%;
+            margin: 1rem 0;
+            border: 1px solid var(--hairline-color, #d4d4d4);
+            background: #f3f4f6;
+        }
+        .stop-group-selector-status {
+            margin-top: 0.5rem;
+            color: var(--body-quiet-color, #666);
+        }
+        .stop-group-selector-list {
+            margin: 0;
+            padding-left: 1.5rem;
+        }
+        .stop-group-selector-list li {
+            margin-bottom: 0.35rem;
+        }
+        .stop-group-selector-list li.empty {
+            color: var(--body-quiet-color, #666);
+        }
+        .stop-group-selector-remove {
+            margin-right: 0.5rem;
+        }
+        .stop-group-selector-popup button {
+            margin-top: 0.5rem;
+        }
+    </style>
+    <script src="{% static 'admin/js/stopgroup-selector.js' %}"></script>
+{% endblock extrahead %}

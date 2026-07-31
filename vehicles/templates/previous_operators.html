@@ -1,0 +1,23 @@
+{% if previous_operators %}
+<div class="previous-operators">
+    <h3>Previous Operators</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Previous Operator</th>
+                <th>Joined fleet</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for operator in previous_operators %}
+            <tr>
+                <td>
+                    <a href="{{ operator.operator.get_absolute_url }}">{{ operator.operator }}</a>
+                </td>
+                <td>{{ operator.joined_fleet|default:"Unknown" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}

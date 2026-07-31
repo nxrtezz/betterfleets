@@ -1,0 +1,17 @@
+{% if situations %}
+<div class="message">
+    <p><strong>Service disruption{% if situations|length != 1 %}s{% endif %} affecting this operator</strong></p>
+    <ul class="has-smalls">
+        {% for situation in situations %}
+            {% if situation.summary != 'Does not stop here' %}
+                <li>
+                    <a href="{{ situation.get_absolute_url }}">{{ situation.summary|default:situation }}</a>
+                    {% if situation.predicted_end %}
+                        <small>Expected until {{ situation.predicted_end|date:"j M Y H:i" }}</small>
+                    {% endif %}
+                </li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}

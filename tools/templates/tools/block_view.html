@@ -1,0 +1,92 @@
+{% extends "page.html" %}
+
+{% block content %}
+<style>
+.bus-icon {
+    width: 60px;
+    height: 40px;
+    border-radius: 8px;
+    margin: 0 auto;
+    border: 2px solid #333;
+    position: relative;
+    overflow: hidden;
+}
+.bus-icon-left {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100%;
+    border-radius: 8px 0 0 8px;
+}
+.bus-icon-right {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 50%;
+    height: 100%;
+    border-radius: 0 8px 8px 0;
+}
+</style>
+
+<div class="container">
+    <h1>Block View</h1>
+    
+    <form method="get" class="mb-4">
+        <div class="row">
+            <div class="col-md-4">
+                <label for="operator">Operator ID:</label>
+                <input type="text" id="operator" name="operator" value="{{ operator_id }}" class="form-control" placeholder="e.g., SCSO">
+            </div>
+            <div class="col-md-4">
+                <label for="garage">Garage ID (optional):</label>
+                <input type="text" id="garage" name="garage" value="{{ garage_id }}" class="form-control" placeholder="e.g., 23">
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary">Search</button>
+            </div>
+        </div>
+    </form>
+    
+    {% if vehicles %}
+    <div class="row">
+        {% for vehicle in vehicles %}
+        <div class="col-md-3 col-sm-6 mb-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <div class="bus-icon mb-2">
+                        <div class="bus-icon-left" data-livery="{{ vehicle.livery_left }}"></div>
+                        <div class="bus-icon-right" data-livery="{{ vehicle.livery_right }}"></div>
+                    </div>
+                    <h5 class="card-title">{{ vehicle.fleet_code }}</h5>
+                    <p class="card-text text-muted small">{{ vehicle.reg }}</p>
+                    {% if vehicle.error %}
+                        <p class="card-text text-danger">{{ vehicle.error }}</p>
+                    {% else %}
+                        <div class="mt-2">
+                            {% for block in vehicle.blocks %}
+                            <span class="badge bg-secondary">{{ block }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">Enter an operator ID to view vehicles and their blocks.</p>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.bus-icon-left, .bus-icon-right').forEach(function(el) {
+        const livery = el.getAttribute('data-livery');
+        if (livery) {
+            el.style.background = livery;
+        }
+    });
+});
+</script>
+{% endblock %}

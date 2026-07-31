@@ -1,0 +1,387 @@
+{% extends 'page.html' %}
+{% load static %}
+
+{% block head %}
+    {% include 'includes/theme_styles.html' with page_theme=page_theme profile=object profile_class='organisation-profile' %}
+    <style>
+        .manufacturer-model-grid {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+        }
+
+        .manufacturer-model-card {
+            background: var(--org-card, var(--background-color));
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            box-shadow: 0 0.65rem 1.8rem rgba(15, 23, 42, 0.08);
+            overflow: hidden;
+        }
+
+        .manufacturer-model-card[open] {
+            box-shadow: 0 0.9rem 2.2rem rgba(15, 23, 42, 0.12);
+        }
+
+        .manufacturer-model-card summary {
+            cursor: pointer;
+            list-style: none;
+            padding: 1rem 1rem 0.9rem;
+        }
+
+        .manufacturer-model-card summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .manufacturer-model-card__top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .manufacturer-model-card__title {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .manufacturer-model-card__meta {
+            margin: 0.35rem 0 0;
+            color: var(--secondary-text-color);
+            font-size: 0.95rem;
+        }
+
+        .manufacturer-model-card__badge {
+            border-radius: 999px;
+            padding: 0.28rem 0.75rem;
+            font-size: 0.78rem;
+            font-weight: 700;
+            white-space: nowrap;
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+
+        .manufacturer-model-card__badge--live {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .manufacturer-model-card__stats {
+            display: grid;
+            gap: 0.65rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin-top: 0.9rem;
+        }
+
+        .manufacturer-model-card__stat {
+            background: rgba(148, 163, 184, 0.12);
+            border-radius: 0.85rem;
+            padding: 0.7rem 0.8rem;
+        }
+
+        .manufacturer-model-card__stat strong {
+            display: block;
+            font-size: 1.15rem;
+        }
+
+        .manufacturer-model-card__body {
+            border-top: 1px solid var(--border-color);
+            padding: 1rem;
+        }
+
+        .manufacturer-model-card__section-title {
+            margin: 0 0 0.6rem;
+            font-size: 0.95rem;
+        }
+
+        .manufacturer-model-card__variants {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .manufacturer-model-card__variant {
+            border: 1px solid var(--border-color);
+            border-radius: 0.85rem;
+            padding: 0.8rem 0.9rem;
+            background: color-mix(in srgb, var(--background-color) 82%, transparent);
+        }
+
+        .manufacturer-model-card__variant h4 {
+            margin: 0 0 0.35rem;
+            font-size: 1rem;
+        }
+
+        .manufacturer-model-card__variant p,
+        .manufacturer-model-card__hint {
+            margin: 0;
+            color: var(--secondary-text-color);
+            font-size: 0.95rem;
+        }
+
+        .manufacturer-model-card__chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            margin-top: 0.6rem;
+        }
+
+        .manufacturer-model-card__chip {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 0.22rem 0.65rem;
+            background: rgba(148, 163, 184, 0.16);
+            font-size: 0.83rem;
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+
+<section class="organisation-profile">
+    <div class="organisation-profile__banner"{% if object.banner %} style="background-image:url('{{ object.banner.url }}')"{% endif %}></div>
+    <div class="organisation-profile__body">
+        {% if object.logo %}
+            <img src="{{ object.logo.url }}" alt="" class="organisation-profile__logo" style="max-width:min(42vw,14rem);max-height:clamp(6rem,15vw,10rem);width:auto;height:auto;object-fit:contain;">
+        {% endif %}
+        <div class="organisation-profile__meta">
+            {% if object.legal_name %}<p class="organisation-profile__eyebrow">{{ object.legal_name }}</p>{% endif %}
+            <h1>{{ object.short_name|default:object.name }}</h1>
+            {% if object.slogan %}<p class="organisation-profile__slogan"><i>{{ object.slogan }}</i></p>{% endif %}
+            {% if object.description %}<p class="organisation-profile__description">{{ object.description|linebreaksbr }}</p>{% endif %}
+            <ul class="organisation-profile__stats">
+                <li><strong>{{ vehicle_group_count }}</strong> vehicle groups</li>
+                <li><strong>{{ vehicles_count }}</strong> active vehicles</li>
+                <li><strong>{{ demonstrator_count }}</strong> demonstrators</li>
+                <li><strong>{{ sites_count }}</strong> key sites</li>
+            </ul>
+            {% include 'includes/social_icons.html' with social_links=social_links %}
+            {% if object.website or object.email or object.phone %}
+                <ul class="organisation-profile__contact">
+                    {% if object.website %}<li><a href="{{ object.website }}" rel="nofollow">{{ object.website }}</a></li>{% endif %}
+                    {% if object.email %}<li><a href="mailto:{{ object.email }}">{{ object.email }}</a></li>{% endif %}
+                    {% if object.phone %}<li>{{ object.phone }}</li>{% endif %}
+                </ul>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<ul class="tabs">
+    <li>{% if active_tab == 'models' %}Vehicle groups ({{ vehicle_group_count }}){% else %}<a href="?tab=models">Vehicle groups ({{ vehicle_group_count }})</a>{% endif %}</li>
+    <li>{% if active_tab == 'sites' %}Factories & key buildings ({{ sites_count }}){% else %}<a href="?tab=sites">Factories & key buildings ({{ sites_count }})</a>{% endif %}</li>
+    <li>{% if active_tab == 'stats' %}Stats{% else %}<a href="?tab=stats">Stats</a>{% endif %}</li>
+    <li>{% if active_tab == 'fleet' %}Demonstrator fleet ({{ demonstrator_count }}){% else %}<a href="?tab=fleet">Demonstrator fleet ({{ demonstrator_count }})</a>{% endif %}</li>
+</ul>
+
+{% if active_tab == 'models' %}
+    {% if vehicle_groups %}
+        <p class="depot-list__intro">Click a vehicle group to reveal the linked vehicle types, production status, and fleet coverage.</p>
+        <div class="manufacturer-model-grid">
+            {% for group in vehicle_groups %}
+                <details class="manufacturer-model-card"{% if group.vehicle_types|length == 1 %} open{% endif %}>
+                    <summary>
+                        <div class="manufacturer-model-card__top">
+                            <div>
+                                <h3 class="manufacturer-model-card__title">{{ group.name }}</h3>
+                                <p class="manufacturer-model-card__meta">Vehicle group</p>
+                            </div>
+                            <span class="manufacturer-model-card__badge{% if group.in_production_count %} manufacturer-model-card__badge--live{% endif %}">
+                                {% if group.in_production_count %}In production{% else %}Out of production{% endif %}
+                            </span>
+                        </div>
+                        <div class="manufacturer-model-card__stats">
+                            {% if group.vehicle_count %}
+                                <div class="manufacturer-model-card__stat">
+                                    <strong>{{ group.vehicle_count }}</strong>
+                                    active vehicles
+                                </div>
+                            {% endif %}
+                            {% if group.demonstrator_count %}
+                                <div class="manufacturer-model-card__stat">
+                                    <strong>{{ group.demonstrator_count }}</strong>
+                                    demonstrators
+                                </div>
+                            {% endif %}
+                            {% if group.preserved_vehicle_count %}
+                                <div class="manufacturer-model-card__stat">
+                                    <strong>{{ group.preserved_vehicle_count }}</strong>
+                                    preserved
+                                </div>
+                            {% endif %}
+                            <div class="manufacturer-model-card__stat">
+                                <strong>{{ group.vehicle_types|length }}</strong>
+                                vehicle types
+                            </div>
+                            <div class="manufacturer-model-card__stat">
+                                <strong>{{ group.in_production_count }}</strong>
+                                in production
+                            </div>
+                        </div>
+                    </summary>
+                    <div class="manufacturer-model-card__body">
+                        <h4 class="manufacturer-model-card__section-title">Vehicle types</h4>
+                        <div class="manufacturer-model-card__variants">
+                            {% for model in group.vehicle_types %}
+                                <article class="manufacturer-model-card__variant">
+                                    <h4>{{ model.name }}</h4>
+                                    <p>
+                                        {% if model.active_production %}In production{% else %}Out of production{% endif %}
+                                        / Vehicle group: {{ group.name }}
+                                    </p>
+                                    <div class="manufacturer-model-card__chips">
+                                        <span class="manufacturer-model-card__chip">{{ model.get_style_display|default:model.style|default:"-" }}</span>
+                                        <span class="manufacturer-model-card__chip">{{ model.get_fuel_display|default:model.fuel|default:"-" }}</span>
+                                        {% if model.company %}<span class="manufacturer-model-card__chip">{{ model.company }}</span>{% endif %}
+                                        {% if model.existing_vehicle_count %}<span class="manufacturer-model-card__chip">{{ model.existing_vehicle_count }} exist</span>{% endif %}
+                                        {% if model.demonstrator_count %}<span class="manufacturer-model-card__chip">{{ model.demonstrator_count }} demos</span>{% endif %}
+                                        {% if model.preserved_vehicle_count %}<span class="manufacturer-model-card__chip">{{ model.preserved_vehicle_count }} preserved</span>{% endif %}
+                                    </div>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </details>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No vehicle groups are linked to this manufactor yet.</p>
+    {% endif %}
+{% elif active_tab == 'sites' %}
+    {% if sites %}
+        {% if site_map_html %}
+            <div class="depot-map-root">{{ site_map_html|safe }}</div>
+            <p class="depot-list__intro">Factories, headquarters, proving grounds, and other notable manufactor sites.</p>
+        {% endif %}
+        <ul class="division-depots garage-list">
+            {% for site in sites %}
+                <li>
+                    <strong>{{ site.name }}</strong>
+                    {% if site.address %}<span>{{ site.address }}</span>{% endif %}
+                    {% if site.notes %}<small>{{ site.notes }}</small>{% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No factories or key buildings are listed for this manufactor yet.</p>
+    {% endif %}
+{% elif active_tab == 'stats' %}
+    {% if vehicles_count %}
+        <div class="organisation-stats">
+            <p class="organisation-stats__intro">Active fleet coverage linked to <strong>{{ object }}</strong>.</p>
+            <div class="organisation-stats__grid">
+                {% if stats_charts.style %}
+                    <figure class="organisation-stats__chart">
+                        <figcaption>Vehicles by body style</figcaption>
+                        <div class="organisation-stats__canvas-wrap">
+                            <canvas id="manufacturer-chart-style" role="img" aria-label="Vehicles by body style"></canvas>
+                        </div>
+                    </figure>
+                {% endif %}
+                {% if stats_charts.fuel %}
+                    <figure class="organisation-stats__chart">
+                        <figcaption>Vehicles by fuel type</figcaption>
+                        <div class="organisation-stats__canvas-wrap">
+                            <canvas id="manufacturer-chart-fuel" role="img" aria-label="Vehicles by fuel type"></canvas>
+                        </div>
+                    </figure>
+                {% endif %}
+                {% if stats_charts.operator %}
+                    <figure class="organisation-stats__chart">
+                        <figcaption>Vehicles by operator</figcaption>
+                        <div class="organisation-stats__canvas-wrap">
+                            <canvas id="manufacturer-chart-operator" role="img" aria-label="Vehicles by operator"></canvas>
+                        </div>
+                    </figure>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <p>There are no active vehicles linked to this manufactor yet.</p>
+    {% endif %}
+{% elif active_tab == 'fleet' %}
+    {% if demonstrator_count %}
+        <div class="table-wrapper">
+            <table class="fleet compact">
+                <thead>
+                    <tr>
+                        <th scope="col">Operator</th>
+                        <th scope="col">Fleet</th>
+                        <th scope="col">Registration</th>
+                        <th scope="col">Model</th>
+                        <th scope="col">Garage</th>
+                        <th scope="col">Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vehicle in fleet %}
+                        <tr id="{{ vehicle.slug }}">
+                            <td>{% if vehicle.operator_id %}<a href="{{ vehicle.operator.get_absolute_url }}">{{ vehicle.operator_name }}</a>{% else %}Manufacturer / unallocated{% endif %}</td>
+                            <td><a href="{{ vehicle.get_absolute_url }}">{% if vehicle.fleet_code or vehicle.fleet_number %}{% firstof vehicle.fleet_code vehicle.fleet_number %}{% else %}{{ vehicle.code }}{% endif %}</a></td>
+                            <td>{% if vehicle.reg %}<a href="{{ vehicle.get_absolute_url }}" class="reg">{{ vehicle.get_reg }}</a>{% endif %}</td>
+                            <td>{{ vehicle.vehicle_type_name }}</td>
+                            <td>{{ vehicle.garage_name }}</td>
+                            <td>{{ vehicle.notes }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include 'pagination.html' with page=fleet %}
+        <p class="depot-list__intro">This tab highlights vehicles explicitly marked as demonstrators.</p>
+    {% else %}
+        <p>No demonstrator fleet is currently identified for this manufactor.</p>
+    {% endif %}
+{% endif %}
+
+{% endblock content %}
+
+{% block foot %}
+{{ block.super }}
+{% if active_tab == 'stats' and vehicles_count %}
+{{ stats_charts|json_script:"manufacturer-stats-charts" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    var payload = document.getElementById("manufacturer-stats-charts");
+    if (!payload || typeof Chart === "undefined") {
+        return;
+    }
+    var charts = JSON.parse(payload.textContent);
+    var defs = [
+        ["style", "manufacturer-chart-style"],
+        ["fuel", "manufacturer-chart-fuel"],
+        ["operator", "manufacturer-chart-operator"]
+    ];
+    for (var i = 0; i < defs.length; i++) {
+        var key = defs[i][0];
+        var id = defs[i][1];
+        var spec = charts[key];
+        var canvas = document.getElementById(id);
+        if (!spec || !canvas) {
+            continue;
+        }
+        var chartBorderColor = getComputedStyle(document.documentElement).getPropertyValue("--background-color") || "transparent";
+        new Chart(canvas, {
+            type: "doughnut",
+            data: {
+                labels: spec.labels,
+                datasets: [{
+                    data: spec.data,
+                    backgroundColor: spec.colors,
+                    borderWidth: 1,
+                    borderColor: chartBorderColor
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: "bottom" }
+                }
+            }
+        });
+    }
+})();
+</script>
+{% endif %}
+{% endblock foot %}

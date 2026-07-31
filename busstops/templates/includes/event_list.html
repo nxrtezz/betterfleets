@@ -1,0 +1,42 @@
+{% if events %}
+    <div class="table-wrapper">
+        <table class="compact">
+            <thead>
+                <tr>
+                    <th scope="col">Event</th>
+                    <th scope="col">Date</th>
+                    <th scope="col">Location</th>
+                    <th scope="col">Vehicles</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in events %}
+                    <tr>
+                        <td>
+                            {% if event.website %}
+                                <a href="{{ event.website }}" rel="nofollow">{{ event.name }}</a>
+                            {% else %}
+                                {{ event.name }}
+                            {% endif %}
+                            {% if event.description %}
+                                <p>{{ event.description|linebreaksbr }}</p>
+                            {% endif %}
+                        </td>
+                        <td>{{ event.get_date_display }}</td>
+                        <td>{{ event.location }}</td>
+                        <td>
+                            {% for vehicle in event.vehicles.all %}
+                                {% if not forloop.first %}, {% endif %}
+                                <a href="{{ vehicle.get_absolute_url }}">{% firstof vehicle.fleet_code vehicle.fleet_number vehicle.code %}</a>
+                            {% empty %}
+                                —
+                            {% endfor %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <p>No events are listed yet.</p>
+{% endif %}

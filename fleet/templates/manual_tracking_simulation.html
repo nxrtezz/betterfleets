@@ -1,0 +1,647 @@
+{% extends 'page.html' %}
+
+{% block title %}Manual Tracking Simulation - Better Fleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        .simulation-container {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .simulation-controls {
+            padding: 1.25rem;
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+        }
+
+        .simulation-controls h2 {
+            margin-top: 0;
+        }
+
+        .simulation-controls .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .simulation-controls label {
+            display: block;
+            margin-bottom: 0.25rem;
+            font-weight: 500;
+        }
+
+        .simulation-controls input,
+        .simulation-controls select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+        }
+
+        .simulation-controls button {
+            padding: 0.5rem 1rem;
+            background: #1d4ed8;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            margin-right: 0.5rem;
+        }
+
+        .simulation-controls button:hover {
+            background: #1e40af;
+        }
+
+        .simulation-controls button:disabled {
+            background: rgba(148, 163, 184, 0.3);
+            cursor: not-allowed;
+        }
+
+        .simulation-controls button.stop-btn {
+            background: #dc2626;
+        }
+
+        .simulation-controls button.stop-btn:hover {
+            background: #b91c1c;
+        }
+
+        .route-selection {
+            padding: 1.25rem;
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+        }
+
+        .route-selection h2 {
+            margin-top: 0;
+        }
+
+        .route-type-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .route-type-tabs button {
+            flex: 1;
+            padding: 0.5rem;
+            background: rgba(148, 163, 184, 0.2);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            cursor: pointer;
+        }
+
+        .route-type-tabs button.active {
+            background: #1d4ed8;
+            color: white;
+            border-color: #1d4ed8;
+        }
+
+        .stop-selection,
+        .service-selection {
+            display: none;
+        }
+
+        .stop-selection.active,
+        .service-selection.active {
+            display: block;
+        }
+
+        .selected-stops {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: rgba(148, 163, 184, 0.1);
+            border-radius: 0.5rem;
+        }
+
+        .selected-stops ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .selected-stops li {
+            padding: 0.25rem 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .selected-stops li button {
+            background: #dc2626;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .map-container {
+            padding: 1.25rem;
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+        }
+
+        .map-container h2 {
+            margin-top: 0;
+        }
+
+        .map-container #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 0.5rem;
+            background: rgba(148, 163, 184, 0.1);
+        }
+
+        .simulation-status {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            background: rgba(148, 163, 184, 0.1);
+        }
+
+        .simulation-status.active {
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .simulation-status.error {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .speed-control input[type="range"] {
+            flex: 1;
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    {% csrf_token %}
+    <h1>Manual Tracking Simulation</h1>
+
+    <div class="simulation-container">
+        <section class="simulation-controls">
+            <h2>Vehicle Selection</h2>
+            <div class="form-group">
+                <label for="operatorSelect">Select Operator:</label>
+                <select id="operatorSelect">
+                    <option value="">-- Select Operator --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="vehicleSelect">Select Vehicle:</label>
+                <select id="vehicleSelect" disabled>
+                    <option value="">-- Select Operator First --</option>
+                </select>
+            </div>
+            <div id="selectedVehicle" style="display: none; margin-top: 1rem; padding: 0.75rem; background: rgba(148, 163, 184, 0.1); border-radius: 0.5rem;">
+                <strong>Selected:</strong> <span id="selectedVehicleName"></span>
+                <input type="hidden" id="selectedVehicleId">
+            </div>
+
+            <h2 style="margin-top: 1.5rem;">Simulation Controls</h2>
+            <div class="form-group">
+                <label for="simulationName">Simulation Name:</label>
+                <input type="text" id="simulationName" placeholder="e.g. City Centre Route Test">
+            </div>
+            <div class="form-group">
+                <label for="speedMultiplier">Speed Multiplier:</label>
+                <div class="speed-control">
+                    <input type="range" id="speedMultiplier" min="0.5" max="5" step="0.5" value="1">
+                    <span id="speedValue">1.0x</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <button id="createSimulationBtn" type="button" disabled>Create Simulation</button>
+                <button id="startSimulationBtn" type="button" class="stop-btn" disabled>Start Simulation</button>
+                <button id="stopSimulationBtn" type="button" class="stop-btn" disabled>Stop Simulation</button>
+            </div>
+            <div id="simulationStatus" class="simulation-status"></div>
+        </section>
+
+        <section class="route-selection">
+            <h2>Route Selection</h2>
+            <div class="route-type-tabs">
+                <button id="stopsTab" class="active" type="button">Select Bus Stops</button>
+                <button id="serviceTab" type="button">Select Service Route</button>
+            </div>
+
+            <div id="stopSelection" class="stop-selection active">
+                <p>Click on the map to select bus stops for your route. Select at least 2 stops.</p>
+                <div class="selected-stops">
+                    <strong>Selected Stops:</strong>
+                    <ul id="selectedStopsList"></ul>
+                </div>
+            </div>
+
+            <div id="serviceSelection" class="service-selection">
+                <p><em>Uses the operator selected above</em></p>
+                <div class="form-group">
+                    <label for="serviceSelect">Select Service:</label>
+                    <select id="serviceSelect" disabled>
+                        <option value="">-- Select Operator First --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="directionSelect">Select Direction:</label>
+                    <select id="directionSelect" disabled>
+                        <option value="">-- Select Service First --</option>
+                        <option value="outbound">Outbound</option>
+                        <option value="inbound">Inbound</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <section class="map-container">
+            <h2>Map</h2>
+            <div id="map"></div>
+            <p id="mapStatus" style="margin-top: 0.5rem; color: var(--secondary-text-color);"></p>
+        </section>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const operatorSelect = document.getElementById('operatorSelect');
+            const vehicleSelect = document.getElementById('vehicleSelect');
+            const selectedVehicleDiv = document.getElementById('selectedVehicle');
+            const selectedVehicleName = document.getElementById('selectedVehicleName');
+            const selectedVehicleId = document.getElementById('selectedVehicleId');
+            const simulationName = document.getElementById('simulationName');
+            const speedMultiplier = document.getElementById('speedMultiplier');
+            const speedValue = document.getElementById('speedValue');
+            const createSimulationBtn = document.getElementById('createSimulationBtn');
+            const startSimulationBtn = document.getElementById('startSimulationBtn');
+            const stopSimulationBtn = document.getElementById('stopSimulationBtn');
+            const simulationStatus = document.getElementById('simulationStatus');
+            const stopsTab = document.getElementById('stopsTab');
+            const serviceTab = document.getElementById('serviceTab');
+            const stopSelection = document.getElementById('stopSelection');
+            const serviceSelection = document.getElementById('serviceSelection');
+            const selectedStopsList = document.getElementById('selectedStopsList');
+            const serviceSelect = document.getElementById('serviceSelect');
+            const directionSelect = document.getElementById('directionSelect');
+            const mapStatus = document.getElementById('mapStatus');
+
+            let map = null;
+            let selectedStops = [];
+            let currentSimulationId = null;
+            let simulationInterval = null;
+
+            // Load operators on page load
+            loadOperators();
+
+            // Initialize Leaflet map
+            function initMap() {
+                map = L.map('map').setView([54, -2], 5);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+
+                // Add click handler to select stops
+                map.on('click', function(e) {
+                    if (!stopSelection.classList.contains('active')) return;
+                    
+                    const lat = e.latlng.lat;
+                    const lng = e.latlng.lng;
+                    
+                    // Add stop to selection
+                    const stopId = selectedStops.length + 1;
+                    selectedStops.push({ lat, lng, stop_id: stopId });
+                    
+                    // Add marker
+                    const marker = L.marker([lat, lng], {
+                        title: `Stop ${stopId}`
+                    }).addTo(map);
+                    marker.bindPopup(`Stop ${stopId}<br><button onclick="removeStop(${stopId - 1})">Remove</button>`).openPopup();
+                    
+                    updateSelectedStopsList();
+                });
+            }
+
+            function updateSelectedStopsList() {
+                selectedStopsList.innerHTML = selectedStops.map((stop, index) => 
+                    `<li>
+                        <span>Stop ${index + 1}: ${stop.lat.toFixed(4)}, ${stop.lng.toFixed(4)}</span>
+                        <button onclick="removeStop(${index})">Remove</button>
+                    </li>`
+                ).join('');
+                
+                // Enable/disable create button
+                const routeType = stopSelection.classList.contains('active') ? 'stops' : 'service';
+                if (routeType === 'stops') {
+                    createSimulationBtn.disabled = selectedStops.length < 2 || !selectedVehicleId.value;
+                } else {
+                    createSimulationBtn.disabled = !serviceSelect.value || !directionSelect.value || !selectedVehicleId.value;
+                }
+            }
+
+            window.removeStop = function(index) {
+                selectedStops.splice(index, 1);
+                // Re-number stops
+                selectedStops.forEach((stop, i) => stop.stop_id = i + 1);
+                updateSelectedStopsList();
+                // Clear and redraw markers
+                map.eachLayer(layer => {
+                    if (layer instanceof L.Marker) {
+                        map.removeLayer(layer);
+                    }
+                });
+                selectedStops.forEach(stop => {
+                    L.marker([stop.lat, stop.lng]).addTo(map)
+                        .bindPopup(`Stop ${stop.stop_id}`);
+                });
+            };
+
+            // Speed multiplier display
+            speedMultiplier.addEventListener('input', function() {
+                speedValue.textContent = parseFloat(this.value).toFixed(1) + 'x';
+            });
+
+            // Tab switching
+            stopsTab.addEventListener('click', function() {
+                stopsTab.classList.add('active');
+                serviceTab.classList.remove('active');
+                stopSelection.classList.add('active');
+                serviceSelection.classList.remove('active');
+                updateSelectedStopsList();
+            });
+
+            serviceTab.addEventListener('click', function() {
+                serviceTab.classList.add('active');
+                stopsTab.classList.remove('active');
+                serviceSelection.classList.add('active');
+                stopSelection.classList.remove('active');
+                updateSelectedStopsList();
+            });
+
+            // Load operators
+            async function loadOperators() {
+                try {
+                    const response = await fetch('/operators.json');
+                    const data = await response.json();
+                    
+                    operatorSelect.innerHTML = '<option value="">-- Select Operator --</option>';
+                    data.groups.forEach(group => {
+                        group.items.forEach(operator => {
+                            const option = document.createElement('option');
+                            option.value = operator.id;
+                            option.textContent = operator.name;
+                            operatorSelect.appendChild(option);
+                        });
+                    });
+                } catch (error) {
+                    console.error('Error loading operators:', error);
+                }
+            }
+
+            // Load vehicles for operator
+            operatorSelect.addEventListener('change', async function() {
+                const operatorId = this.value;
+                vehicleSelect.innerHTML = '<option value="">-- Select Vehicle --</option>';
+                vehicleSelect.disabled = !operatorId;
+                serviceSelect.innerHTML = '<option value="">-- Select Service --</option>';
+                serviceSelect.disabled = !operatorId;
+                directionSelect.disabled = true;
+                
+                if (!operatorId) return;
+                
+                try {
+                    // Load vehicles
+                    const vehicleResponse = await fetch(`/custom-tracking/vehicles.json?operator_id=${operatorId}`);
+                    const vehicles = await vehicleResponse.json();
+                    
+                    vehicles.forEach(vehicle => {
+                        const option = document.createElement('option');
+                        option.value = vehicle.id;
+                        option.textContent = vehicle.name;
+                        vehicleSelect.appendChild(option);
+                    });
+                    
+                    // Load services
+                    const serviceResponse = await fetch(`/operators/${operatorId}/services.json`);
+                    const services = await serviceResponse.json();
+                    
+                    services.forEach(service => {
+                        const option = document.createElement('option');
+                        option.value = service.id;
+                        option.textContent = service.line_name;
+                        serviceSelect.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Error loading vehicles/services:', error);
+                }
+            });
+
+            // Vehicle selection
+            vehicleSelect.addEventListener('change', function() {
+                const vehicleId = this.value;
+                const vehicleName = this.options[this.selectedIndex].textContent;
+                
+                if (vehicleId) {
+                    selectedVehicleId.value = vehicleId;
+                    selectedVehicleName.textContent = vehicleName;
+                    selectedVehicleDiv.style.display = 'block';
+                } else {
+                    selectedVehicleId.value = '';
+                    selectedVehicleName.textContent = '';
+                    selectedVehicleDiv.style.display = 'none';
+                }
+                
+                updateSelectedStopsList();
+            });
+
+            // Enable direction when service selected
+            serviceSelect.addEventListener('change', function() {
+                directionSelect.disabled = !this.value;
+                updateSelectedStopsList();
+            });
+
+            directionSelect.addEventListener('change', updateSelectedStopsList);
+
+            // Create simulation
+            createSimulationBtn.addEventListener('click', async function() {
+                const name = simulationName.value.trim();
+                if (!name) {
+                    simulationStatus.textContent = 'Please enter a simulation name';
+                    simulationStatus.className = 'simulation-status error';
+                    return;
+                }
+
+                const routeType = stopSelection.classList.contains('active') ? 'stops' : 'service';
+                const payload = {
+                    vehicle_id: selectedVehicleId.value,
+                    name: name,
+                    route_type: routeType,
+                    speed_multiplier: parseFloat(speedMultiplier.value),
+                };
+
+                if (routeType === 'stops') {
+                    payload.stops = selectedStops;
+                } else {
+                    payload.service_id = serviceSelect.value;
+                    payload.direction = directionSelect.value;
+                }
+
+                try {
+                    const response = await fetch('/custom-tracking/simulation/create', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        currentSimulationId = data.simulation_id;
+                        simulationStatus.textContent = 'Simulation created! Calculating route...';
+                        simulationStatus.className = 'simulation-status';
+                        
+                        // Calculate route
+                        await calculateRoute(data.simulation_id);
+                    } else {
+                        simulationStatus.textContent = 'Error: ' + data.error;
+                        simulationStatus.className = 'simulation-status error';
+                    }
+                } catch (error) {
+                    console.error('Error creating simulation:', error);
+                    simulationStatus.textContent = 'Error creating simulation';
+                    simulationStatus.className = 'simulation-status error';
+                }
+            });
+
+            // Calculate route
+            async function calculateRoute(simulationId) {
+                try {
+                    const response = await fetch(`/custom-tracking/simulation/${simulationId}/calculate-route`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        }
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        simulationStatus.textContent = `Route calculated! Distance: ${(data.distance / 1000).toFixed(1)}km, Duration: ${(data.duration / 60).toFixed(1)}min`;
+                        simulationStatus.className = 'simulation-status active';
+                        startSimulationBtn.disabled = false;
+                        
+                        // Draw route on map
+                        // (This would require fetching the route geometry and drawing it)
+                    } else {
+                        simulationStatus.textContent = 'Error calculating route: ' + data.error;
+                        simulationStatus.className = 'simulation-status error';
+                    }
+                } catch (error) {
+                    console.error('Error calculating route:', error);
+                    simulationStatus.textContent = 'Error calculating route';
+                    simulationStatus.className = 'simulation-status error';
+                }
+            }
+
+            // Start simulation
+            startSimulationBtn.addEventListener('click', async function() {
+                if (!currentSimulationId) return;
+                
+                try {
+                    const response = await fetch(`/custom-tracking/simulation/${currentSimulationId}/update`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        },
+                        body: JSON.stringify({ is_active: true })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        simulationStatus.textContent = 'Simulation started!';
+                        simulationStatus.className = 'simulation-status active';
+                        startSimulationBtn.disabled = true;
+                        stopSimulationBtn.disabled = false;
+                        
+                        // Start animation
+                        startAnimation();
+                    }
+                } catch (error) {
+                    console.error('Error starting simulation:', error);
+                }
+            });
+
+            // Stop simulation
+            stopSimulationBtn.addEventListener('click', async function() {
+                if (!currentSimulationId) return;
+                
+                try {
+                    const response = await fetch(`/custom-tracking/simulation/${currentSimulationId}/update`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        },
+                        body: JSON.stringify({ is_active: false })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        simulationStatus.textContent = 'Simulation stopped';
+                        simulationStatus.className = 'simulation-status';
+                        startSimulationBtn.disabled = false;
+                        stopSimulationBtn.disabled = true;
+                        
+                        // Stop animation
+                        if (simulationInterval) {
+                            clearInterval(simulationInterval);
+                            simulationInterval = null;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error stopping simulation:', error);
+                }
+            });
+
+            // Animation logic (simplified - would need proper route following)
+            function startAnimation() {
+                if (simulationInterval) clearInterval(simulationInterval);
+                
+                simulationInterval = setInterval(async () => {
+                    // Update progress
+                    // This would calculate position along route based on speed limits
+                    // For now, just update progress incrementally
+                    const response = await fetch(`/custom-tracking/simulation/${currentSimulationId}/update`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        },
+                        body: JSON.stringify({ 
+                            progress: Math.random() * 0.1, // Simplified
+                            current_position: {
+                                lat: 51.5 + Math.random() * 0.1,
+                                lng: -0.1 + Math.random() * 0.1,
+                                heading: Math.random() * 360
+                            }
+                        })
+                    });
+                }, 1000);
+            }
+
+            // Initialize map
+            initMap();
+        });
+    </script>
+{% endblock %}

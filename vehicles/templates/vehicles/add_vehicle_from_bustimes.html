@@ -1,0 +1,134 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}Add Vehicle from Bustimes.org{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <div class="module">
+        <h1>Add Vehicle from Bustimes.org</h1>
+        
+        {% if messages %}
+            {% for message in messages %}
+                <div class="message {{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <p>Enter a bustimes.org vehicle URL to fetch and add vehicle data to the database.</p>
+        
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-row">
+                <div>
+                    <label for="id_bustimes_url">Bustimes.org URL:</label>
+                    <input type="url" name="bustimes_url" id="id_bustimes_url" required 
+                           placeholder="https://bustimes.org/vehicles/eyms-20318"
+                           value="{{ request.POST.bustimes_url|default:'' }}">
+                    <p class="help">Example: https://bustimes.org/vehicles/eyms-20318</p>
+                </div>
+            </div>
+            
+            <div class="submit-row">
+                <input type="submit" value="Fetch and Add Vehicle" class="default">
+            </div>
+        </form>
+        
+        <div class="help-box">
+            <h2>How it works:</h2>
+            <ol>
+                <li>Enter a bustimes.org vehicle URL</li>
+                <li>The system will extract the vehicle slug from the URL</li>
+                <li>It will call the bustimes.org API to fetch vehicle data</li>
+                <li>Related objects (operator, vehicle type, livery) will be created if needed</li>
+                <li>The vehicle will be added to the database and you'll be redirected to edit it</li>
+            </ol>
+            
+            <p><strong>Note:</strong> This will check if a vehicle with the same registration already exists to avoid duplicates.</p>
+        </div>
+    </div>
+</div>
+
+<style>
+.message {
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+}
+
+.message.error {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.message.success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.form-row {
+    margin-bottom: 20px;
+}
+
+.form-row label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.form-row input[type="url"] {
+    width: 100%;
+    max-width: 500px;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.help {
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+}
+
+.submit-row {
+    margin-top: 20px;
+}
+
+.submit-row input[type="submit"] {
+    background-color: #007cba;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.submit-row input[type="submit"]:hover {
+    background-color: #005a87;
+}
+
+.help-box {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.help-box h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.help-box ol {
+    margin-bottom: 15px;
+}
+
+.help-box li {
+    margin-bottom: 5px;
+}
+</style>
+{% endblock %}

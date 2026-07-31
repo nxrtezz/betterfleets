@@ -1,0 +1,720 @@
+{% extends 'page.html' %}
+
+{% block title %}Import from TransitTracker - Better Fleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+    <h1>Import from TransitTracker</h1>
+
+    <p>
+        Import ridden logs from <a href="https://transittracker.net" target="_blank" rel="noopener">TransitTracker</a>.
+        This will scrape fleet completion pages and create matching ride logs in the database.
+    </p>
+
+    <form id="import-form">
+        {% csrf_token %}
+        
+        <!-- Step 1: TransitTracker Username -->
+        <section class="form-section" id="step-1">
+            <h2>Step 1: TransitTracker Username</h2>
+            <div class="form-group">
+                <label for="transittracker_username">TransitTracker username:</label>
+                <input 
+                    type="text" 
+                    id="transittracker_username" 
+                    name="transittracker_username" 
+                    placeholder="e.g., Lm009"
+                >
+            </div>
+            <div class="form-group">
+                <label for="datasource">Data source:</label>
+                <select id="datasource" name="datasource">
+                    <option value="BUSTIM" selected>Bustimes (bus operators)</option>
+                    <option value="GBRAIL">GB Rail (train operators)</option>
+                </select>
+            </div>
+            <button type="button" id="check-username-btn" class="primary-button">Check Username</button>
+            <div id="username-check-result" class="result-message"></div>
+        </section>
+
+        <!-- Step 2: Target User -->
+        <section class="form-section" id="step-2" style="display: none;">
+            <h2>Step 2: Target User</h2>
+            <div class="form-group">
+                <label for="target-user">Select user to apply logs to:</label>
+                <div class="user-search-container">
+                    <input 
+                        type="text" 
+                        id="user-search-input" 
+                        placeholder="Search users..."
+                        autocomplete="off"
+                    >
+                    <input type="hidden" id="target-user" name="target_user" required>
+                    <div id="selected-user-display" class="selected-user"></div>
+                    <div id="user-search-results" class="search-results"></div>
+                </div>
+            </div>
+            <button type="button" id="get-operators-btn" class="primary-button" disabled>Get Operators</button>
+            <div id="operators-result" class="result-message"></div>
+        </section>
+
+        <!-- Step 3: Select Operators -->
+        <section class="form-section" id="step-3" style="display: none;">
+            <h2>Step 3: Select Operators</h2>
+            <p>Select the operators you want to import logs for:</p>
+            
+            <div class="operator-selection">
+                <div class="selection-buttons">
+                    <button type="button" id="select-all">Select All</button>
+                    <button type="button" id="deselect-all">Deselect All</button>
+                </div>
+                
+                <ul class="operator-list" id="operator-list">
+                    <!-- Operators will be loaded dynamically -->
+                </ul>
+            </div>
+            <button type="button" id="preview-btn" class="secondary-button" disabled>Preview</button>
+            <div id="preview-result" class="result-message"></div>
+        </section>
+
+        <!-- Step 4: Preview and Apply -->
+        <section class="form-section" id="step-4" style="display: none;">
+            <h2>Step 4: Preview and Apply</h2>
+            <div id="preview-results"></div>
+            <div class="action-buttons">
+                <button type="button" id="apply-btn" class="primary-button">Apply Import</button>
+                <button type="button" id="abort-btn" class="secondary-button">Abort</button>
+            </div>
+        </section>
+    </form>
+
+    <div id="final-results" class="results-container" style="display: none;">
+        <h2>Import Results</h2>
+        <div id="final-content"></div>
+    </div>
+
+    <script>
+        let selectedUser = null;
+        let transittrackerOperators = [];
+        let previewData = null;
+
+        // User search functionality
+        const userSearchInput = document.getElementById('user-search-input');
+        const userSearchResults = document.getElementById('user-search-results');
+        const targetUserInput = document.getElementById('target-user');
+        const selectedUserDisplay = document.getElementById('selected-user-display');
+        let searchTimeout;
+
+        userSearchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+            
+            if (query.length < 2) {
+                userSearchResults.innerHTML = '';
+                return;
+            }
+            
+            searchTimeout = setTimeout(() => {
+                fetch('{% url "transittracker_user_search" %}?q=' + encodeURIComponent(query))
+                    .then(response => response.json())
+                    .then(data => {
+                        userSearchResults.innerHTML = '';
+                        
+                        if (data.users && data.users.length > 0) {
+                            data.users.forEach(user => {
+                                const div = document.createElement('div');
+                                div.className = 'search-result-item';
+                                div.textContent = user.display_name + ' (@' + user.username + ')';
+                                div.addEventListener('click', () => selectUser(user));
+                                userSearchResults.appendChild(div);
+                            });
+                        } else {
+                            userSearchResults.innerHTML = '<div class="no-results">No users found</div>';
+                        }
+                    });
+            }, 300);
+        });
+
+        function selectUser(user) {
+            selectedUser = user;
+            targetUserInput.value = user.id;
+            userSearchInput.value = user.username;
+            selectedUserDisplay.textContent = 'Selected: ' + user.display_name + ' (@' + user.username + ')';
+            userSearchResults.innerHTML = '';
+            document.getElementById('get-operators-btn').disabled = false;
+        }
+
+        // Step 1: Check username
+        document.getElementById('check-username-btn').addEventListener('click', function() {
+            const transittrackerUsername = document.getElementById('transittracker_username').value.trim();
+            const datasource = document.getElementById('datasource').value;
+
+            if (!transittrackerUsername) {
+                showResult('username-check-result', 'Please enter a TransitTracker username.', 'error');
+                return;
+            }
+
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = 'Checking...';
+
+            const formData = new FormData();
+            formData.append('transittracker_username', transittrackerUsername);
+            formData.append('datasource', datasource);
+
+            fetch('{% url "transittracker_check_username" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.textContent = 'Check Username';
+
+                if (data.success && data.exists && data.public) {
+                    showResult('username-check-result', 'Username found and profile is public!', 'success');
+                    document.getElementById('step-2').style.display = 'block';
+                } else if (data.success && data.exists && !data.public) {
+                    showResult('username-check-result', 'Username found but profile is not public.', 'error');
+                } else {
+                    showResult('username-check-result', data.error || 'Username not found.', 'error');
+                }
+            })
+            .catch(error => {
+                btn.disabled = false;
+                btn.textContent = 'Check Username';
+                showResult('username-check-result', 'An error occurred: ' + error.message, 'error');
+            });
+        });
+
+        // Step 2: Get operators
+        document.getElementById('get-operators-btn').addEventListener('click', function() {
+            const transittrackerUsername = document.getElementById('transittracker_username').value.trim();
+            const datasource = document.getElementById('datasource').value;
+
+            if (!selectedUser) {
+                showResult('operators-result', 'Please select a target user.', 'error');
+                return;
+            }
+
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = 'Loading...';
+
+            const formData = new FormData();
+            formData.append('transittracker_username', transittrackerUsername);
+            formData.append('datasource', datasource);
+
+            fetch('{% url "transittracker_get_operators" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.textContent = 'Get Operators';
+
+                if (data.success && data.operators.length > 0) {
+                    transittrackerOperators = data.operators;
+                    showResult('operators-result', `Found ${data.operators.length} operators.`, 'success');
+                    renderOperatorList(data.operators);
+                    document.getElementById('step-3').style.display = 'block';
+                } else if (data.success && data.operators.length === 0) {
+                    showResult('operators-result', 'No operators found for this user.', 'error');
+                } else {
+                    showResult('operators-result', data.error || 'Failed to get operators.', 'error');
+                }
+            })
+            .catch(error => {
+                btn.disabled = false;
+                btn.textContent = 'Get Operators';
+                showResult('operators-result', 'An error occurred: ' + error.message, 'error');
+            });
+        });
+
+        function renderOperatorList(operators) {
+            const operatorList = document.getElementById('operator-list');
+            operatorList.innerHTML = '';
+
+            operators.forEach(operator => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <label>
+                        <input 
+                            type="checkbox" 
+                            name="operators" 
+                            value="${operator.noc}"
+                            id="operator-${operator.noc}"
+                        >
+                        ${operator.name} (${operator.noc})
+                    </label>
+                `;
+                operatorList.appendChild(li);
+            });
+
+            // Add change listeners
+            document.querySelectorAll('input[name="operators"]').forEach(cb => {
+                cb.addEventListener('change', validateOperators);
+            });
+        }
+
+        // Operator selection
+        document.getElementById('select-all').addEventListener('click', function() {
+            document.querySelectorAll('input[name="operators"]').forEach(function(checkbox) {
+                checkbox.checked = true;
+            });
+            validateOperators();
+        });
+
+        document.getElementById('deselect-all').addEventListener('click', function() {
+            document.querySelectorAll('input[name="operators"]').forEach(function(checkbox) {
+                checkbox.checked = false;
+            });
+            validateOperators();
+        });
+
+        function validateOperators() {
+            const selectedOperators = Array.from(document.querySelectorAll('input[name="operators"]:checked'))
+                .map(cb => cb.value);
+            document.getElementById('preview-btn').disabled = selectedOperators.length === 0;
+        }
+
+        // Step 3: Preview
+        document.getElementById('preview-btn').addEventListener('click', function() {
+            const transittrackerUsername = document.getElementById('transittracker_username').value.trim();
+            const targetUser = targetUserInput.value;
+            const selectedOperators = Array.from(document.querySelectorAll('input[name="operators"]:checked'))
+                .map(cb => cb.value);
+            const datasource = document.getElementById('datasource').value;
+
+            if (selectedOperators.length === 0) {
+                showResult('preview-result', 'Please select at least one operator.', 'error');
+                return;
+            }
+
+            const previewBtn = this;
+            previewBtn.disabled = true;
+            previewBtn.textContent = 'Loading...';
+
+            const formData = new FormData();
+            formData.append('transittracker_username', transittrackerUsername);
+            formData.append('target_user', targetUser);
+            formData.append('datasource', datasource);
+            selectedOperators.forEach(op => formData.append('operators', op));
+
+            fetch('{% url "transittracker_preview" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                previewBtn.disabled = false;
+                previewBtn.textContent = 'Preview';
+
+                if (data.success) {
+                    previewData = data;
+                    showResult('preview-result', '', 'success');
+                    renderPreviewResults(data);
+                    document.getElementById('step-4').style.display = 'block';
+                } else {
+                    showResult('preview-result', 'Preview failed: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                previewBtn.disabled = false;
+                previewBtn.textContent = 'Preview';
+                showResult('preview-result', 'An error occurred: ' + error.message, 'error');
+            });
+        });
+
+        function renderPreviewResults(data) {
+            const previewResults = document.getElementById('preview-results');
+            let html = '<p><strong>Total new logs to be created: ' + data.total_new_logs + '</strong></p>';
+            html += '<table class="preview-table">';
+            html += '<thead><tr><th>Operator</th><th>Vehicles Found</th><th>Matched</th><th>New Logs</th><th>Skipped</th></tr></thead>';
+            html += '<tbody>';
+            
+            for (const [operator, stats] of Object.entries(data.preview)) {
+                html += '<tr>';
+                html += '<td>' + operator + '</td>';
+                html += '<td>' + stats.vehicles_found + '</td>';
+                html += '<td>' + stats.matched + '</td>';
+                html += '<td>' + stats.new_logs + '</td>';
+                html += '<td>' + stats.skipped + '</td>';
+                html += '</tr>';
+            }
+            
+            html += '</tbody></table>';
+            previewResults.innerHTML = html;
+        }
+
+        // Step 4: Apply
+        document.getElementById('apply-btn').addEventListener('click', function() {
+            if (!confirm('Are you sure you want to import these logs? This action cannot be undone.')) {
+                return;
+            }
+
+            const transittrackerUsername = document.getElementById('transittracker_username').value.trim();
+            const targetUser = targetUserInput.value;
+            const selectedOperators = Array.from(document.querySelectorAll('input[name="operators"]:checked'))
+                .map(cb => cb.value);
+            const datasource = document.getElementById('datasource').value;
+
+            const applyBtn = this;
+            applyBtn.disabled = true;
+            applyBtn.textContent = 'Importing...';
+
+            const formData = new FormData();
+            formData.append('transittracker_username', transittrackerUsername);
+            formData.append('target_user', targetUser);
+            formData.append('datasource', datasource);
+            selectedOperators.forEach(op => formData.append('operators', op));
+
+            fetch('{% url "transittracker_import_run" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                applyBtn.disabled = false;
+                applyBtn.textContent = 'Apply Import';
+
+                const finalResults = document.getElementById('final-results');
+                const finalContent = document.getElementById('final-content');
+                finalResults.style.display = 'block';
+
+                if (data.success) {
+                    let html = '<p class="success">Import completed successfully!</p>';
+                    html += '<ul>';
+                    html += '<li>Operators scraped: ' + data.results.operators_scraped + '</li>';
+                    html += '<li>Total vehicles found: ' + data.results.total_vehicles_found + '</li>';
+                    html += '<li>Matched to database: ' + data.results.matched + '</li>';
+                    html += '<li><strong>Ride logs created: ' + data.results.created + '</strong></li>';
+                    html += '<li>Skipped: ' + data.results.skipped + '</li>';
+                    if (data.results.errors > 0) {
+                        html += '<li class="error">Errors: ' + data.results.errors + '</li>';
+                    }
+                    html += '</ul>';
+                    finalContent.innerHTML = html;
+                    
+                    // Hide step 4
+                    document.getElementById('step-4').style.display = 'none';
+                } else {
+                    finalContent.innerHTML = '<p class="error">Import failed: ' + data.error + '</p>';
+                }
+            })
+            .catch(error => {
+                applyBtn.disabled = false;
+                applyBtn.textContent = 'Apply Import';
+                document.getElementById('final-results').style.display = 'block';
+                document.getElementById('final-content').innerHTML = '<p class="error">An error occurred: ' + error.message + '</p>';
+            });
+        });
+
+        // Abort
+        document.getElementById('abort-btn').addEventListener('click', function() {
+            if (confirm('Are you sure you want to abort?')) {
+                // Reset the form
+                document.getElementById('import-form').reset();
+                document.getElementById('step-2').style.display = 'none';
+                document.getElementById('step-3').style.display = 'none';
+                document.getElementById('step-4').style.display = 'none';
+                document.getElementById('final-results').style.display = 'none';
+                document.getElementById('preview-results').innerHTML = '';
+                document.getElementById('username-check-result').innerHTML = '';
+                document.getElementById('operators-result').innerHTML = '';
+                document.getElementById('preview-result').innerHTML = '';
+                selectedUser = null;
+                transittrackerOperators = [];
+                previewData = null;
+            }
+        });
+
+        function showResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = 'result-message ' + type;
+        }
+
+        // Close search results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.user-search-container')) {
+                userSearchResults.innerHTML = '';
+            }
+        });
+    </script>
+
+    <style>
+        :root {
+            --bg-color: var(--background-color);
+            --text-color: var(--text-color);
+            --border-color: var(--border-color);
+            --input-bg: var(--background-color);
+            --button-primary-bg: var(--button-background);
+            --button-primary-text: var(--button-foreground);
+            --button-secondary-bg: var(--border-color);
+            --button-secondary-text: var(--text-color);
+            --success-color: #28a745;
+            --error-color: #dc3545;
+        }
+
+        .form-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-color);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        input[type="text"], select {
+            width: 100%;
+            max-width: 400px;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            font-size: 1rem;
+        }
+
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: var(--brand-color);
+            box-shadow: 0 0 0 3px rgba(139, 223, 255, 0.2);
+        }
+
+        .user-search-container {
+            position: relative;
+            max-width: 400px;
+        }
+
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--bg-color);
+            z-index: 1000;
+            margin-top: 4px;
+        }
+
+        .search-result-item {
+            padding: 0.75rem;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+
+        .search-result-item:hover {
+            background-color: var(--brand-color);
+            color: var(--button-primary-text);
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .no-results {
+            padding: 0.75rem;
+            color: var(--text-color);
+            opacity: 0.7;
+        }
+
+        .selected-user {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background-color: var(--brand-color);
+            color: var(--button-primary-text);
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .operator-selection {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            border-radius: 6px;
+            background-color: var(--bg-color);
+        }
+
+        .selection-buttons {
+            margin-bottom: 1rem;
+        }
+
+        .selection-buttons button {
+            margin-right: 0.5rem;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .selection-buttons button:hover {
+            background-color: var(--brand-color);
+            color: var(--button-primary-text);
+        }
+
+        .operator-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .operator-list li {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .operator-list li:last-child {
+            border-bottom: none;
+        }
+
+        .operator-list label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            margin-bottom: 0;
+        }
+
+        .operator-list input[type="checkbox"] {
+            margin-right: 0.75rem;
+            width: auto;
+            max-width: none;
+        }
+
+        .primary-button, .secondary-button {
+            padding: 0.75rem 2rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+        }
+
+        .primary-button {
+            background-color: var(--button-primary-bg);
+            color: var(--button-primary-text);
+        }
+
+        .primary-button:hover:not(:disabled) {
+            background-color: var(--brand-color-darker);
+        }
+
+        .primary-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .secondary-button {
+            background-color: var(--button-secondary-bg);
+            color: var(--button-secondary-text);
+        }
+
+        .secondary-button:hover:not(:disabled) {
+            background-color: var(--brand-color);
+            color: var(--button-primary-text);
+        }
+
+        .result-message {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 4px;
+        }
+
+        .result-message.success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .result-message.error {
+            background-color: var(--error-color);
+            color: white;
+        }
+
+        .results-container {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-color);
+        }
+
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .preview-table th, .preview-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+
+        .preview-table th {
+            font-weight: 600;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .preview-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .success {
+            color: var(--success-color);
+            font-weight: 600;
+        }
+
+        .error {
+            color: var(--error-color);
+            font-weight: 600;
+        }
+
+        .results-container ul {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .results-container li {
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+        }
+
+        .action-buttons {
+            margin-top: 1rem;
+        }
+    </style>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'page.html' %}
+
+{% block title %}Driving completion - Better Fleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+    <h1>Driving completion</h1>
+
+    <p>
+        You have driven <strong>{{ driving_stats.vehicles }}</strong> vehicles across
+        <strong>{{ driving_stats.operators }}</strong> operators and
+        <strong>{{ driving_stats.types }}</strong> vehicle types.
+        Overall driving completion is <strong>{{ driving_stats.overall_percentage|floatformat:1 }}%</strong>.
+    </p>
+
+    <section>
+        <h2>Your most driven operators</h2>
+        <ul class="bulleted">
+            {% for operator in personal_operator_rankings %}
+                <li><a href="{{ operator.get_vehicles_url }}">{{ operator }}</a>: {{ operator.logged_vehicle_count }}</li>
+            {% empty %}
+                <li>No vehicles driven yet.</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section>
+        <h2>Your most driven vehicle types</h2>
+        <ul class="bulleted">
+            {% for row in personal_type_rankings %}
+                <li>{{ row.vehicle__vehicle_type__name }}: {{ row.logged_vehicle_count }}</li>
+            {% empty %}
+                <li>No vehicle types driven yet.</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section>
+        <h2>Overall most driven operators</h2>
+        <ul class="bulleted">
+            {% for operator in overall_operator_rankings %}
+                <li><a href="{{ operator.get_vehicles_url }}">{{ operator }}</a>: {{ operator.logged_vehicle_count }}</li>
+            {% empty %}
+                <li>No driven operators yet.</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section>
+        <h2>Overall most driven vehicle types</h2>
+        <ul class="bulleted">
+            {% for row in overall_type_rankings %}
+                <li>{{ row.vehicle__vehicle_type__name }}: {{ row.logged_vehicle_count }}</li>
+            {% empty %}
+                <li>No driven vehicle types yet.</li>
+            {% endfor %}
+        </ul>
+    </section>
+{% endblock %}

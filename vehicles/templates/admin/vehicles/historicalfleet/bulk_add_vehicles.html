@@ -1,0 +1,46 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls %}
+
+{% block title %}{{ title }} {{ block.super }}{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <p>
+        <a href="{% url 'admin:vehicles_historicalfleet_change' fleet.pk %}">Back to historical fleet</a>
+    </p>
+
+    <p>
+        <a class="button" href="{{ template_download_url }}">Download XLSX template</a>
+        {% if has_existing_vehicles %}
+        <a class="button" href="{{ export_download_url }}">Download current historical fleet</a>
+        {% endif %}
+    </p>
+
+    <p class="help">
+        The workbook’s <strong>Vehicles</strong> sheet is what gets imported (same columns as the template).
+        See the <strong>Instructions</strong> sheet for column notes. You can upload <strong>.xlsx</strong> or UTF-8 <strong>.csv</strong>.
+    </p>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="form-row">
+            {{ form.workbook.errors }}
+            {{ form.workbook.label_tag }}
+            {{ form.workbook }}
+            {% if form.workbook.help_text %}<p class="help">{{ form.workbook.help_text }}</p>{% endif %}
+        </div>
+        <div class="form-row">
+            {{ form.bulk_text.errors }}
+            {{ form.bulk_text.label_tag }}
+            {{ form.bulk_text }}
+            {% if form.bulk_text.help_text %}<p class="help">{{ form.bulk_text.help_text }}</p>{% endif %}
+        </div>
+        <div class="submit-row">
+            <input type="submit" value="Import rows" class="default" name="_save">
+        </div>
+    </form>
+</div>
+{% endblock %}

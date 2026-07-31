@@ -1,0 +1,35 @@
+{% extends 'page.html' %}
+
+{% block title %}Leaderboard - BetterFleets{% endblock %}
+
+{% block content %}
+    <h1>Leaderboard</h1>
+    <p>Top contributors based on their score from approved edits and published reviews.</p>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>User</th>
+                <th>Score</th>
+                <th>Approved Edits</th>
+                <th>Published Reviews</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in top_users %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td><a href="{{ user.get_absolute_url }}">{{ user.get_display_name }}</a></td>
+                    <td><strong>{{ user.score }}</strong></td>
+                    <td>{{ user.approved_count }}</td>
+                    <td>{{ user.review_count }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="5">No users with scores yet.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

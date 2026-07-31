@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"name": "betterfleet",
+			"path": "."
+		}
+	],
+	"settings": {
+		"python.testing.unittestEnabled": true,
+		"python.testing.unittestArgs": [
+			"--keepdb"
+		],
+		"python-envs.defaultEnvManager": "ms-python.python:system"
+	},
+	"workbenchMode": "windsurf-agent-window"
+}

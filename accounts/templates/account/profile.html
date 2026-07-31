@@ -1,0 +1,423 @@
+{% extends 'page.html' %}
+{% load i18n %}
+
+{% block title %}Profile Settings - BetterFleet{% endblock %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <style>
+        .account-profile {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .account-profile__card {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+
+        .account-profile__section {
+            padding: 1.5rem;
+        }
+
+        .account-profile__section h2 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-color);
+            opacity: 0.75;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .account-profile__form-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .account-profile__form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .account-profile__form-group label {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .account-profile__form-group input,
+        .account-profile__form-group textarea {
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            background: var(--background-color);
+            color: var(--text-color);
+            font-size: 1rem;
+        }
+
+        .account-profile__form-group input:focus,
+        .account-profile__form-group textarea:focus {
+            outline: none;
+            border-color: var(--brand-color-darker);
+        }
+
+        .account-profile__form-group .help-text {
+            font-size: 0.85rem;
+            color: var(--secondary-text-color);
+        }
+
+        .account-profile__form-group .field-errors {
+            color: #dc2626;
+            font-size: 0.85rem;
+        }
+
+        .account-profile__avatar-section {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .account-profile__avatar-preview {
+            width: 6rem;
+            height: 6rem;
+            border-radius: 999px;
+            border: 3px solid var(--border-color);
+            object-fit: cover;
+            background: linear-gradient(135deg, #1d4ed8, #0f766e);
+            display: grid;
+            place-items: center;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .account-profile__avatar-info h3 {
+            margin: 0 0 0.5rem 0;
+        }
+
+        .account-profile__avatar-info p {
+            margin: 0 0 0.75rem 0;
+            color: var(--secondary-text-color);
+            font-size: 0.9rem;
+        }
+
+        .account-profile__checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 0;
+        }
+
+        .account-profile__checkbox-group input[type="checkbox"] {
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+
+        .account-profile__actions {
+            display: flex;
+            gap: 1rem;
+            padding: 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .account-profile__actions button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .account-profile__actions .btn-primary {
+            background: var(--brand-color-darker);
+            color: var(--button-foreground);
+        }
+
+        .account-profile__actions .btn-primary:hover {
+            background: var(--brand-color-darker-darker);
+        }
+
+        .account-profile__actions .btn-secondary {
+            background: var(--border-color);
+            color: var(--text-color);
+        }
+
+        .account-profile__actions .btn-secondary:hover {
+            background: var(--border-color-darker);
+        }
+
+        .account-profile__nav {
+            display: grid;
+            gap: 0.5rem;
+            padding: 1rem;
+        }
+
+        .account-profile__nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            color: var(--text-color);
+            transition: background 0.15s, border-color 0.15s;
+            border: 1px solid transparent;
+        }
+
+        .account-profile__nav-link:hover {
+            background: rgba(148, 163, 184, 0.1);
+            border-color: var(--border-color);
+        }
+
+        .account-profile__nav-link.active {
+            background: var(--brand-color);
+            color: var(--button-foreground);
+        }
+
+        .account-profile__nav-link__icon {
+            font-size: 1.25rem;
+        }
+
+        @media (min-width: 800px) {
+            .account-profile__content {
+                display: grid;
+                grid-template-columns: 250px 1fr;
+                gap: 1.5rem;
+                align-items: start;
+            }
+
+            .account-profile__nav {
+                position: sticky;
+                top: 1rem;
+            }
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <div class="account-profile">
+        <div class="account-profile__content">
+            <nav class="account-profile__nav account-profile__card">
+                <a href="{% url 'account_dashboard' %}" class="account-profile__nav-link">
+                    <span class="account-profile__nav-link__icon">🏠</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{% url 'account_profile' %}" class="account-profile__nav-link active">
+                    <span class="account-profile__nav-link__icon">👤</span>
+                    <span>Profile Settings</span>
+                </a>
+                <a href="{% url 'account_email' %}" class="account-profile__nav-link">
+                    <span class="account-profile__nav-link__icon">📧</span>
+                    <span>Email Addresses</span>
+                </a>
+                <a href="{% url 'account_change_password' %}" class="account-profile__nav-link">
+                    <span class="account-profile__nav-link__icon">🔒</span>
+                    <span>Change Password</span>
+                </a>
+                <a href="{% url 'socialaccount_connections' %}" class="account-profile__nav-link">
+                    <span class="account-profile__nav-link__icon">🔗</span>
+                    <span>Connected Accounts</span>
+                </a>
+                <a href="{% url 'account_sessions' %}" class="account-profile__nav-link">
+                    <span class="account-profile__nav-link__icon">💻</span>
+                    <span>Sessions</span>
+                </a>
+                <a href="{% url 'user_detail' user.id %}" class="account-profile__nav-link">
+                    <span class="account-profile__nav-link__icon">📊</span>
+                    <span>Public Profile</span>
+                </a>
+            </nav>
+
+            <div class="account-profile__main">
+                <form method="post" enctype="multipart/form-data" autocomplete="off" class="account-profile__card">
+                    <div class="account-profile__avatar-section">
+                        {% if user.get_profile_picture_url %}
+                            <img class="account-profile__avatar-preview" src="{{ user.get_profile_picture_url }}" alt="{{ user.get_display_name }}">
+                        {% else %}
+                            <div class="account-profile__avatar-preview">{{ user.get_display_name|first|upper }}</div>
+                        {% endif %}
+                        <div class="account-profile__avatar-info">
+                            <h3>Profile Picture</h3>
+                            <p>Upload a new profile picture to update your avatar.</p>
+                            <input type="file" name="profile_picture" accept="image/*" id="id_profile_picture">
+                        </div>
+                    </div>
+
+                    <div class="account-profile__section">
+                        <h2>Basic Information</h2>
+                        <div class="account-profile__form-grid">
+                            <div class="account-profile__form-group">
+                                <label for="id_username">Username</label>
+                                <input type="text" name="username" id="id_username" value="{{ form.username.value|default:user.username }}" maxlength="50">
+                                {% if form.username.help_text %}
+                                    <span class="account-profile__form-group help-text">{{ form.username.help_text }}</span>
+                                {% endif %}
+                                {% if form.username.errors %}
+                                    <div class="account-profile__form-group field-errors">
+                                        {% for error in form.username.errors %}
+                                            <span>{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="account-profile__form-group">
+                                <label for="id_display_name">Display Name</label>
+                                <input type="text" name="display_name" id="id_display_name" value="{{ form.display_name.value|default:user.display_name }}" maxlength="80">
+                                {% if form.display_name.help_text %}
+                                    <span class="account-profile__form-group help-text">{{ form.display_name.help_text }}</span>
+                                {% endif %}
+                                {% if form.display_name.errors %}
+                                    <div class="account-profile__form-group field-errors">
+                                        {% for error in form.display_name.errors %}
+                                            <span>{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="account-profile__form-group">
+                                <label for="id_first_name">First Name</label>
+                                <input type="text" name="first_name" id="id_first_name" value="{{ form.first_name.value|default:user.first_name }}" maxlength="150">
+                                {% if form.first_name.errors %}
+                                    <div class="account-profile__form-group field-errors">
+                                        {% for error in form.first_name.errors %}
+                                            <span>{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="account-profile__form-group">
+                                <label for="id_last_name">Last Name</label>
+                                <input type="text" name="last_name" id="id_last_name" value="{{ form.last_name.value|default:user.last_name }}" maxlength="150">
+                                {% if form.last_name.errors %}
+                                    <div class="account-profile__form-group field-errors">
+                                        {% for error in form.last_name.errors %}
+                                            <span>{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="account-profile__section">
+                        <h2>Social Links</h2>
+                        <div class="account-profile__form-grid">
+                            <div class="account-profile__form-group">
+                                <label for="id_flickr_username">Flickr Username</label>
+                                <input type="text" name="flickr_username" id="id_flickr_username" value="{{ form.flickr_username.value|default:user.flickr_username }}" maxlength="100">
+                                {% if form.flickr_username.help_text %}
+                                    <span class="account-profile__form-group help-text">{{ form.flickr_username.help_text }}</span>
+                                {% endif %}
+                                {% if form.flickr_username.errors %}
+                                    <div class="account-profile__form-group field-errors">
+                                        {% for error in form.flickr_username.errors %}
+                                            <span>{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="account-profile__form-group">
+                                <label for="id_discord_username">Discord Username</label>
+                                <input type="text" name="discord_username" id="id_discord_username" value="{{ form.discord_username.value|default:user.discord_username }}" maxlength="100">
+                                {% if form.discord_username.help_text %}
+                                    <span class="account-profile__form-group help-text">{{ form.discord_username.help_text }}</span>
+                                {% endif %}
+                                {% if form.discord_username.errors %}
+                                    <div class="account-profile__form-group field-errors">
+                                        {% for error in form.discord_username.errors %}
+                                            <span>{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="account-profile__form-group">
+                                <label for="id_discord_user_id">Discord User ID</label>
+                                <input type="text" name="discord_user_id" id="id_discord_user_id" value="{{ form.discord_user_id.value|default:user.discord_user_id }}" maxlength="32">
+                                {% if form.discord_user_id.help_text %}
+                                    <span class="account-profile__form-group help-text">{{ form.discord_user_id.help_text }}</span>
+                                {% endif %}
+                                {% if form.discord_user_id.errors %}
+                                    <div class="account-profile__form-group field-errors">
+                                        {% for error in form.discord_user_id.errors %}
+                                            <span>{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="account-profile__section">
+                        <h2>Privacy Settings</h2>
+                        <div class="account-profile__form-grid">
+                            <div class="account-profile__checkbox-group">
+                                <input type="checkbox" name="fleet_logging_public" id="id_fleet_logging_public" {% if form.fleet_logging_public.value or user.fleet_logging_public %}checked{% endif %}>
+                                <label for="id_fleet_logging_public">Make fleet ride logging public</label>
+                                {% if form.fleet_logging_public.help_text %}
+                                    <span class="account-profile__form-group help-text">{{ form.fleet_logging_public.help_text }}</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="account-profile__checkbox-group">
+                                <input type="checkbox" name="driving_logging_public" id="id_driving_logging_public" {% if form.driving_logging_public.value or user.driving_logging_public %}checked{% endif %}>
+                                <label for="id_driving_logging_public">Make driving logging public</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="account-profile__section">
+                        <h2>Advanced Mode</h2>
+                        <div class="account-profile__form-grid">
+                            <div class="account-profile__checkbox-group">
+                                <input type="checkbox" name="view_advanced" id="id_view_advanced" {% if form.view_advanced.value or user.view_advanced %}checked{% endif %}>
+                                <label for="id_view_advanced">View Advanced</label>
+                                <span class="account-profile__form-group help-text">Enable advanced editing controls throughout the site. When enabled, additional edit options and metadata fields will be available.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="account-profile__section">
+                        <h2>Profile Banner</h2>
+                        <div class="account-profile__form-group">
+                            <label for="id_profile_banner">Profile Banner Image</label>
+                            <input type="file" name="profile_banner" accept="image/*" id="id_profile_banner">
+                            {% if form.profile_banner.errors %}
+                                <div class="account-profile__form-group field-errors">
+                                    {% for error in form.profile_banner.errors %}
+                                        <span>{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="account-profile__actions">
+                        <button type="submit" class="btn-primary">Save Changes</button>
+                        <a href="{% url 'account_dashboard' %}" class="btn-secondary" style="text-decoration: none; display: inline-block; padding: 0.75rem 1.5rem;">Cancel</a>
+                    </div>
+
+                    {% csrf_token %}
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

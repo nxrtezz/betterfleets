@@ -1,0 +1,37 @@
+{% extends 'page.html' %}
+
+{% block title %}Blocks - {{ object }}{% endblock %}
+
+{% block canonical %}
+    <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{{ object.get_vehicles_url }}/blocks">
+{% endblock canonical %}
+
+{% block bodyclass %}{% endblock %}
+
+{% block content %}
+
+{% include 'includes/operator_tabs.html' with active_operator_tab='blocks' %}
+
+<p>Blocks stored for {{ object }}.</p>
+
+<form class="timetable-date" method="GET">
+    <input type="date" name="date" aria-label="Date" value="{{ blocks_date|default:today|date:'Y-m-d' }}">
+    <input type="submit" value="Go">
+</form>
+
+<h2>Blocks for {{ blocks_date|default:today|date:'l j F Y' }}</h2>
+
+<div id="blocks-tab-root"></div>
+<script>
+    window.BLOCKS_TAB_PROPS = {
+        operatorNoc: "{{ object.noc }}",
+        date: "{{ blocks_date|default:today|date:'Y-m-d' }}"
+    };
+</script>
+
+{% endblock content %}
+
+{% block foot %}
+{% load static %}
+<script src="{% static 'dist/js/app.js' %}"></script>
+{% endblock foot %}

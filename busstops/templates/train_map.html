@@ -1,0 +1,33 @@
+{% extends 'map.html' %}
+
+{% block title %}Train map – bustimes.org{% endblock %}
+
+{% block head %}
+    {{ block.super }}
+    <meta property="og:title" content="Train map – bustimes.org">
+{% endblock head %}
+
+{% block initial_view_state %}
+        INITIAL_VIEW_STATE = {
+            latitude: 54.7,
+            longitude: -3.8,
+            zoom: 6,
+        };
+{% endblock initial_view_state %}
+
+{% block header %}
+   <header class="site-header">
+        <a href="/" class="site-name">bustimes.org</a>
+        <ul>
+            <li><a href="/map">Map</a></li>
+            <li><a href="/map/trains" aria-current="page">Trains</a></li>
+        </ul>
+        <form method="GET" action="/search" class="search">
+            <label>
+                Search
+                <input name="q" placeholder="Search" type="search" value="{{ query }}" required>
+            </label>
+            <input type="submit" value="Search">
+        </form>
+    </header>
+{% endblock header %}

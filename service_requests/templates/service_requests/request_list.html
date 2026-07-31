@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="header">
+        <h1>Requests</h1>
+        <a href="{% url 'service_requests:create' %}" class="button">Submit Request</a>
+    </div>
+    
+    <div class="filters">
+        <form method="get" class="filter-form">
+            <div class="filter-group">
+                <label>Category:</label>
+                <select name="category" class="select">
+                    <option value="">All Categories</option>
+                    {% for value, label in categories %}
+                    <option value="{{ value }}" {% if current_category == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Status:</label>
+                <select name="status" class="select">
+                    <option value="">All Statuses</option>
+                    {% for value, label in statuses %}
+                    <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Search:</label>
+                <input type="text" name="search" class="input" value="{{ current_search }}" placeholder="Search requests...">
+            </div>
+            
+            <button type="submit" class="button">Filter</button>
+            <a href="{% url 'service_requests:list' %}" class="button button-secondary">Clear</a>
+        </form>
+    </div>
+    
+    <div class="request-list">
+        {% for request in requests %}
+        <div class="request-item">
+            <div class="request-header">
+                <h2><a href="{% url 'service_requests:detail' request.id %}">{{ request.title }}</a></h2>
+                <span class="badge badge-{{ request.status }}">{{ request.get_status_display }}</span>
+                <span class="badge badge-category">{{ request.get_category_display }}</span>
+            </div>
+            
+            <div class="request-meta">
+                <span>By {{ request.author.get_display_name }}</span>
+                <span>{{ request.created_at|date:"M d, Y" }}</span>
+                {% if request.updated_at != request.created_at %}
+                <span>Updated {{ request.updated_at|timesince }} ago</span>
+                {% endif %}
+            </div>
+            
+            <p class="request-description">{{ request.description|truncatewords:30 }}</p>
+            
+            {% if request.vehicle %}
+            <div class="request-linked">
+                <span>Vehicle: <a href="{{ request.vehicle.get_absolute_url }}">{{ request.vehicle }}</a></span>
+            </div>
+            {% endif %}
+            
+            {% if request.service %}
+            <div class="request-linked">
+                <span>Service: <a href="{{ request.service.get_absolute_url }}">{{ request.service }}</a></span>
+            </div>
+            {% endif %}
+            
+            {% if request.operator %}
+            <div class="request-linked">
+                <span>Operator: <a href="{{ request.operator.get_absolute_url }}">{{ request.operator }}</a></span>
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="empty-state">
+            <p>No requests found.</p>
+            <a href="{% url 'service_requests:create' %}" class="button">Submit the first request</a>
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% if is_paginated %}
+    <div class="pagination">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}" class="button">Previous</a>
+        {% endif %}
+        
+        <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}" class="button">Next</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

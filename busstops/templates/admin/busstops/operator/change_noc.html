@@ -1,0 +1,50 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <p>You are about to change the NOC (National Operator Code) for the following operator:</p>
+
+    <ul>
+        <li><strong>{{ operator.name }}</strong> (current NOC: <code>{{ operator.noc }}</code>)</li>
+    </ul>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="{{ action_checkbox_name }}" value="{{ operator.pk }}">
+        <input type="hidden" name="action" value="{{ action_name }}">
+        <input type="hidden" name="apply" value="1">
+
+        {{ form.non_field_errors }}
+        {% for field in form %}
+            <div class="form-row">
+                {{ field.errors }}
+                {{ field.label_tag }}
+                {{ field }}
+                {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+            </div>
+        {% endfor %}
+
+        <div class="submit-row">
+            <button type="submit" class="default">Change NOC</button>
+            <a href="{% url 'admin:busstops_operator_changelist' %}" class="button">Cancel</a>
+        </div>
+    </form>
+
+    <div class="module">
+        <h2>Warning</h2>
+        <p>Changing the NOC will update all foreign key references to this operator, including:</p>
+        <ul>
+            <li>Depots</li>
+            <li>Vehicle columns</li>
+            <li>Operator codes</li>
+            <li>Vehicles (operator, operated_by, historical_fleet)</li>
+            <li>Vehicle revisions</li>
+            <li>Pinned operators</li>
+        </ul>
+        <p>This action is performed within a database transaction and will be rolled back if any error occurs.</p>
+    </div>
+</div>
+{% endblock %}

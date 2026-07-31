@@ -1,0 +1,97 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <p>
+        <a href="{% url 'admin:busstops_preservationgroup_change' preservation_group.pk %}">Back to preservation group</a>
+    </p>
+
+    <p>
+        Quick add:
+        <a href="{% url 'admin:vehicles_vehicletype_add' %}" target="_blank" rel="noopener">Vehicle type</a>
+        |
+        <a href="{% url 'admin:vehicles_livery_add' %}" target="_blank" rel="noopener">Livery</a>
+    </p>
+
+    <p>
+        <a class="button" href="{{ template_download_url }}">Download XLSX template</a>
+        {% if export_download_url %}
+            <a class="button" href="{{ export_download_url }}">Download current fleet</a>
+        {% endif %}
+    </p>
+
+    <p>Mass add will create new vehicles or update existing vehicles and add them to this preservation group. Vehicles will be marked as preserved.</p>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="form-row">
+            {{ form.workbook.errors }}
+            {{ form.workbook.label_tag }}
+            {{ form.workbook }}
+            {% if form.workbook.help_text %}<p class="help">{{ form.workbook.help_text }}</p>{% endif %}
+        </div>
+        <div class="form-row">
+            {{ form.rows_text.errors }}
+            {{ form.rows_text.label_tag }}
+            {{ form.rows_text }}
+            {% if form.rows_text.help_text %}<p class="help">{{ form.rows_text.help_text }}</p>{% endif %}
+        </div>
+        <div class="submit-row">
+            <button type="submit" name="action" value="preview" class="default">Preview</button>
+            {% if can_commit %}
+                <button type="submit" name="action" value="commit">{{ commit_label }}</button>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if rows %}
+        <h2>Preview</h2>
+        <table class="adminlist">
+            <thead>
+                <tr>
+                    <th>Row</th>
+                    <th>Action</th>
+                    <th>Vehicle</th>
+                    <th>Identifier</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ row.row_number }}</td>
+                        <td>{{ row.action }}</td>
+                        <td>
+                            {% if row.vehicle %}
+                                <a href="{% url 'admin:vehicles_vehicle_change' row.vehicle.pk %}">{{ row.vehicle }}</a>
+                            {% else %}
+                                New vehicle
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% firstof row.raw.code row.raw.fleet_number row.raw.reg row.raw.registration %}
+                        </td>
+                        <td>
+                            {% if row.errors %}
+                                {% for error in row.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            {% else %}
+                                OK
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    {% if created or updated or errors %}
+        <p>Created: {{ created }} | Updated: {{ updated }} | Errors: {{ errors }}</p>
+    {% endif %}
+</div>
+{% endblock %}

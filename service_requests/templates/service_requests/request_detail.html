@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="header">
+        <h1>{{ request.title }}</h1>
+        <div class="header-actions">
+            {% if request.author == user %}
+            <a href="{% url 'service_requests:update' request.id %}" class="button">Edit</a>
+            {% endif %}
+            {% if user.is_staff %}
+            <form method="post" action="{% url 'service_requests:change_status' request.id %}" class="inline-form">
+                {% csrf_token %}
+                <select name="status" class="select">
+                    {% for value, label in request.STATUS_CHOICES %}
+                    <option value="{{ value }}" {% if request.status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="button">Update Status</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="request-detail">
+        <div class="request-info">
+            <div class="info-row">
+                <span class="label">Status:</span>
+                <span class="badge badge-{{ request.status }}">{{ request.get_status_display }}</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Category:</span>
+                <span class="badge badge-category">{{ request.get_category_display }}</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Author:</span>
+                <a href="{{ request.author.get_absolute_url }}">{{ request.author.get_display_name }}</a>
+            </div>
+            
+            <div class="info-row">
+                <span class="label">Created:</span>
+                <span>{{ request.created_at|date:"M d, Y H:i" }}</span>
+            </div>
+            
+            {% if request.updated_at != request.created_at %}
+            <div class="info-row">
+                <span class="label">Updated:</span>
+                <span>{{ request.updated_at|date:"M d, Y H:i" }}</span>
+            </div>
+            {% endif %}
+            
+            {% if request.resolved_at %}
+            <div class="info-row">
+                <span class="label">Resolved:</span>
+                <span>{{ request.resolved_at|date:"M d, Y H:i" }}</span>
+            </div>
+            {% endif %}
+            
+            {% if request.resolved_by %}
+            <div class="info-row">
+                <span class="label">Resolved by:</span>
+                <a href="{{ request.resolved_by.get_absolute_url }}">{{ request.resolved_by.get_display_name }}</a>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="request-content">
+            <h2>Description</h2>
+            <div class="description">{{ request.description|linebreaks }}</div>
+            
+            {% if request.vehicle %}
+            <h3>Linked Vehicle</h3>
+            <p><a href="{{ request.vehicle.get_absolute_url }}">{{ request.vehicle }}</a></p>
+            {% endif %}
+            
+            {% if request.service %}
+            <h3>Linked Service</h3>
+            <p><a href="{{ request.service.get_absolute_url }}">{{ request.service }}</a></p>
+            {% endif %}
+            
+            {% if request.operator %}
+            <h3>Linked Operator</h3>
+            <p><a href="{{ request.operator.get_absolute_url }}">{{ request.operator }}</a></p>
+            {% endif %}
+            
+            {% if request.vehicle_type %}
+            <h3>Linked Vehicle Type</h3>
+            <p>{{ request.vehicle_type }}</p>
+            {% endif %}
+            
+            {% if request.livery %}
+            <h3>Linked Livery</h3>
+            <p>{{ request.livery }}</p>
+            {% endif %}
+            
+            {% if request.fleet_number %}
+            <h3>Fleet Number</h3>
+            <p>{{ request.fleet_number }}</p>
+            {% endif %}
+            
+            {% if request.registration %}
+            <h3>Registration</h3>
+            <p>{{ request.registration }}</p>
+            {% endif %}
+            
+            {% if request.route %}
+            <h3>Route</h3>
+            <p>{{ request.route }}</p>
+            {% endif %}
+            
+            {% if request.expected_behaviour %}
+            <h3>Expected Behaviour</h3>
+            <div class="description">{{ request.expected_behaviour|linebreaks }}</div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="timeline-section">
+        <h2>Timeline</h2>
+        <div class="timeline">
+            {% for event in request.timeline.all %}
+            <div class="timeline-item">
+                <div class="timeline-date">{{ event.created_at|date:"M d, Y H:i" }}</div>
+                <div class="timeline-content">
+                    <strong>{{ event.action }}</strong>
+                    {% if event.user %}
+                    by <a href="{{ event.user.get_absolute_url }}">{{ event.user.get_display_name }}</a>
+                    {% endif %}
+                    {% if event.description %}
+                    <p>{{ event.description }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <p>No timeline events yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div class="comments-section">
+        <h2>Comments ({{ request.comments.count }})</h2>
+        
+        <div class="comments-list">
+            {% for comment in request.comments.all %}
+            <div class="comment">
+                <div class="comment-header">
+                    <a href="{{ comment.author.get_absolute_url }}">{{ comment.author.get_display_name }}</a>
+                    <span class="comment-date">{{ comment.created_at|date:"M d, Y H:i" }}</span>
+                </div>
+                <div class="comment-content">{{ comment.content|linebreaks }}</div>
+            </div>
+            {% empty %}
+            <p>No comments yet.</p>
+            {% endfor %}
+        </div>
+        
+        {% if user.is_authenticated %}
+        <form method="post" action="{% url 'service_requests:add_comment' request.id %}" class="comment-form">
+            {% csrf_token %}
+            {{ comment_form.content }}
+            <button type="submit" class="button">Add Comment</button>
+        </form>
+        {% else %}
+        <p><a href="{% url 'account_login' %}">Log in</a> to add a comment.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

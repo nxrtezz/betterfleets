@@ -1,0 +1,375 @@
+{% extends 'page.html' %}
+
+{% block title %}SORN/Untaxed Vehicles - {% if selected_operator %}{{ selected_operator }}{% else %}Select Operator{% endif %}{% endblock %}
+
+{% block head %}
+    <style>
+        .operator-select {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .operator-select select {
+            width: 100%;
+            max-width: 400px;
+            padding: 0.75rem;
+            font-size: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            background: var(--background-color);
+            color: var(--text-color);
+        }
+
+        .operator-select .input-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: flex-end;
+        }
+
+        .operator-select .input-group select {
+            flex: 1;
+            margin-top: 0;
+        }
+
+        .operator-select button {
+            padding: 0.75rem 1.5rem;
+            background: var(--button-background, #0b86d7);
+            color: var(--button-foreground, #ffffff);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            white-space: nowrap;
+        }
+
+        .operator-select .button-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .operator-select .button-group button {
+            flex: 1;
+        }
+
+        .import-dvla-section {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .import-dvla-section button {
+            padding: 0.75rem 1.5rem;
+            background: var(--button-background, #0b86d7);
+            color: var(--button-foreground, #ffffff);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .import-dvla-result {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f0f0f0;
+            border-radius: 0.5rem;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .vehicle-type-section {
+            margin-bottom: 3rem;
+        }
+
+        .vehicle-type-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .vehicle-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .vehicle-card {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .vehicle-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .vehicle-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .livery-icon {
+            width: 2.5rem;
+            height: 1.5rem;
+            border-radius: 0.25rem;
+            flex-shrink: 0;
+        }
+
+        .vehicle-info {
+            flex: 1;
+        }
+
+        .vehicle-fleet-reg {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .vehicle-type {
+            font-size: 0.875rem;
+            color: var(--text-color);
+            opacity: 0.7;
+        }
+
+        .vehicle-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .vehicle-actions button,
+        .vehicle-actions a {
+            padding: 0.5rem 0.75rem;
+            border: none;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: white;
+            transition: opacity 0.2s;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .vehicle-actions button:hover,
+        .vehicle-actions a:hover {
+            opacity: 0.9;
+        }
+
+        .btn-remove {
+            background: #dc2626;
+        }
+
+        .btn-vor {
+            background: #f97316;
+        }
+
+        .btn-flickr {
+            background: #3b82f6;
+        }
+
+        .no-vehicles {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-color);
+            opacity: 0.7;
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const operatorSelect = document.getElementById('operator-select');
+            const checkDvlaBtn = document.getElementById('check-dvla-btn');
+            
+            // Enable/disable Check DVLA button based on operator selection
+            operatorSelect.addEventListener('change', function() {
+                checkDvlaBtn.disabled = !this.value;
+            });
+            
+            // Enable button if operator is already selected
+            if (operatorSelect.value) {
+                checkDvlaBtn.disabled = false;
+            }
+            
+            // Handle Check DVLA button click
+            checkDvlaBtn.addEventListener('click', function() {
+                const operatorNoc = operatorSelect.value;
+                if (!operatorNoc) {
+                    alert('Please select an operator first');
+                    return;
+                }
+                
+                if (!confirm('Check DVLA data for this operator? This may take a moment.')) {
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('action', 'import_dvla');
+                formData.append('operator', operatorNoc);
+                
+                fetch(window.location.href, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: formData
+                }).then(response => response.text())
+                .then(html => {
+                    // Reload the page to show updated data
+                    location.reload();
+                }).catch(error => {
+                    alert('Failed to check DVLA: ' + error.message);
+                });
+            });
+            
+            document.querySelectorAll('.btn-remove').forEach(button => {
+                button.addEventListener('click', function() {
+                    const vehicleId = this.dataset.vehicleId;
+                    if (!confirm('Are you sure you want to mark this vehicle as withdrawn?')) {
+                        return;
+                    }
+                    const formData = new FormData();
+                    formData.append('withdrawn', 'on');
+                    formData.append('summary', 'Marked as withdrawn from SORN/Untaxed page');
+                    
+                    fetch(`/vehicles/${vehicleId}/edit`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        },
+                        body: formData
+                    }).then(response => {
+                        if (response.ok) {
+                            location.reload();
+                        } else {
+                            alert('Failed to mark vehicle as withdrawn');
+                        }
+                    });
+                });
+            });
+
+            document.querySelectorAll('.btn-vor').forEach(button => {
+                button.addEventListener('click', function() {
+                    const vehicleId = this.dataset.vehicleId;
+                    if (!confirm('Are you sure you want to mark this vehicle as VOR?')) {
+                        return;
+                    }
+                    const formData = new FormData();
+                    formData.append('vor', 'on');
+                    formData.append('summary', 'Marked as VOR from SORN/Untaxed page');
+                    
+                    fetch(`/vehicles/${vehicleId}/edit`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        },
+                        body: formData
+                    }).then(response => {
+                        if (response.ok) {
+                            location.reload();
+                        } else {
+                            alert('Failed to mark vehicle as VOR');
+                        }
+                    });
+                });
+            });
+        });
+    </script>
+{% endblock head %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+<h1>SORN/Untaxed Vehicles</h1>
+<p>Select an operator to view their SORN and untaxed vehicles, or import DVLA data.</p>
+
+<div class="operator-select">
+    <form method="get" id="operator-form">
+        <label for="operator-select" style="display: block; font-weight: 700; margin-bottom: 0.5rem;">Select Operator:</label>
+        <div class="input-group">
+            <select id="operator-select" name="operator">
+                <option value="">-- Select an operator --</option>
+                {% for operator in operators %}
+                    <option value="{{ operator.noc }}" {% if selected_operator and selected_operator.noc == operator.noc %}selected{% endif %}>
+                        {{ operator.name }} ({{ operator.noc }})
+                    </option>
+                {% endfor %}
+            </select>
+            <button type="submit">View Vehicles</button>
+            <button type="button" id="check-dvla-btn" disabled>Check DVLA</button>
+        </div>
+    </form>
+    {% if import_dvla_result %}
+        <div class="import-dvla-result">{{ import_dvla_result }}</div>
+    {% endif %}
+</div>
+
+{% if selected_operator %}
+    <div class="import-dvla-section">
+        <h2>{{ selected_operator.name }}</h2>
+    </div>
+
+    {% if vehicles_by_type %}
+        {% for type_name, vehicles in vehicles_by_type %}
+            <div class="vehicle-type-section">
+                <h2 class="vehicle-type-title">{{ type_name }}</h2>
+                <div class="vehicle-cards">
+                    {% for vehicle in vehicles %}
+                        <div class="vehicle-card">
+                            <div class="vehicle-header">
+                                {% if vehicle.livery and vehicle.livery.livery_type == 'svg' %}
+                                    <div class="livery-icon">{{ vehicle.livery.preview }}</div>
+                                {% elif vehicle.livery %}
+                                    <div class="livery-icon" style="background: {{ vehicle.get_livery }};"></div>
+                                {% elif vehicle.colours %}
+                                    <div class="livery-icon" style="background: {{ vehicle.get_livery }};"></div>
+                                {% else %}
+                                    <div class="livery-icon" style="background: #ccc;"></div>
+                                {% endif %}
+                                
+                                <div class="vehicle-info">
+                                    <div class="vehicle-fleet-reg">
+                                        {% firstof vehicle.fleet_code vehicle.fleet_number vehicle.code %} - {% if vehicle.reg %}{{ vehicle.get_reg }}{% else %}No reg{% endif %}
+                                    </div>
+                                    <div class="vehicle-type">{{ type_name }}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="vehicle-actions">
+                                <button type="button" class="btn-remove" data-vehicle-id="{{ vehicle.id }}">Remove</button>
+                                <button type="button" class="btn-vor" data-vehicle-id="{{ vehicle.id }}">Mark VOR</button>
+                                {% if vehicle.get_flickr_url %}
+                                    <a href="{{ vehicle.get_flickr_url }}" target="_blank" rel="noopener" class="btn-flickr">Flickr</a>
+                                {% else %}
+                                    <button class="btn-flickr" disabled style="opacity: 0.5; cursor: not-allowed;">Flickr</button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="no-vehicles">
+            <p>No SORN or untaxed vehicles found for {{ selected_operator.name }}.</p>
+        </div>
+    {% endif %}
+{% endif %}
+
+{% endblock content %}

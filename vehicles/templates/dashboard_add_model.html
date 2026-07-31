@@ -1,0 +1,110 @@
+{% extends 'page.html' %}
+
+{% block title %}Add {{ dashboard_model.title|lower }} - Dashboard - Better Fleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    {{ form.media }}
+    <style>
+        .dashboard-form-shell,
+        .dashboard-form-section,
+        .dashboard-form-success {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .dashboard-form-shell h1,
+        .dashboard-form-section h2 {
+            margin-top: 0;
+        }
+
+        .dashboard-form-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .dashboard-form-field label {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 0.35rem;
+        }
+
+        .dashboard-form-field input,
+        .dashboard-form-field select,
+        .dashboard-form-field textarea {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        .dashboard-form-help {
+            display: block;
+            margin-top: 0.35rem;
+            opacity: 0.8;
+        }
+
+        .errorlist {
+            margin: 0 0 0.5rem;
+        }
+
+        .dashboard-form-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            margin-top: 1.25rem;
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <section class="dashboard-form-shell">
+        <h1>Add {{ dashboard_model.title|lower }}</h1>
+        <p>This uses the existing Django admin fields, but keeps you inside the main site layout.</p>
+        <p><a href="{% url 'dashboard_home' %}">Back to dashboard</a>{% if dashboard_model.manage_url %} · <a href="{{ dashboard_model.manage_url }}">Manage {{ dashboard_model.plural_title|lower }}</a>{% endif %}</p>
+    </section>
+
+    {% if saved_object %}
+        <section class="dashboard-form-success">
+            <strong>Saved.</strong>
+            {% if saved_object.get_absolute_url %}
+                <a href="{{ saved_object.get_absolute_url }}">Open {{ saved_object }}</a>
+            {% else %}
+                {{ saved_object }}
+            {% endif %}
+        </section>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        {% if form.non_field_errors %}{{ form.non_field_errors }}{% endif %}
+
+        {% for section in form_sections %}
+            <section class="dashboard-form-section">
+                {% if section.title %}<h2>{{ section.title }}</h2>{% endif %}
+                {% if section.description %}<p>{{ section.description }}</p>{% endif %}
+
+                <div class="dashboard-form-grid">
+                    {% for field in section.fields %}
+                        <div class="dashboard-form-field">
+                            {{ field.errors }}
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% if field.help_text %}
+                                <small class="dashboard-form-help">{{ field.help_text|safe }}</small>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endfor %}
+
+        <div class="dashboard-form-actions">
+            <button class="button" type="submit">Save</button>
+            <a href="{% url 'dashboard_home' %}">Cancel</a>
+        </div>
+    </form>
+{% endblock content %}

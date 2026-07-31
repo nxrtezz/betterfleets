@@ -1,0 +1,25 @@
+{% load urlise %}
+
+{% if operator.url or nocs %}
+<div itemscope itemtype="http://schema.org/LocalBusiness">
+
+    <h2 itemprop="name">{{ operator.get_public_name_html }}</h2>
+
+    <dl class="contact-details">
+        {% if operator.url %}
+            <div>
+                <dt>Website</dt>
+                <dd itemprop="url">{{ operator.url|urlise }}</dd>
+            </div>
+        {% endif %}
+
+        {% if nocs %}
+            <div>
+                <dt>National operator code{{ nocs|length|pluralize }}</dt>
+                <dd>{{ nocs|join:", " }}</dd>
+            </div>
+        {% endif %}
+    </dl>
+
+</div>
+{% endif %}

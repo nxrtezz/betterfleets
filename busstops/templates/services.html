@@ -1,0 +1,106 @@
+<style>
+{% for colour in colours %}
+.colour-{{ colour.id }} {
+    background: {{ colour.background }};
+    border-color: {{ colour.foreground }};
+    color: {{ colour.foreground }};
+}
+{% endfor %}
+
+.services-container {
+    margin: 1.5rem 0;
+}
+
+.services-container h2 {
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+}
+
+.services {
+    column-width: 24em;
+    column-gap: 1em;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.services li {
+    break-inside: avoid;
+}
+
+.services li a {
+    white-space: normal;
+    align-items: center;
+    padding: .5em 0;
+    display: flex;
+    text-decoration: none;
+    color: var(--text-color);
+}
+
+.services li a:hover {
+    text-decoration: none;
+}
+
+.services li a:hover .description {
+    text-decoration: underline;
+}
+
+.services .names {
+    margin-right: 16px;
+    display: flex;
+}
+
+.services .name {
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    float: left;
+    text-align: center;
+    white-space: nowrap;
+    align-content: center;
+    padding: 6px;
+    font-size: 16px;
+    font-weight: normal;
+    line-height: 18px;
+}
+
+.services .name.is-short {
+    padding: 6px 8px;
+    font-size: 30px;
+    line-height: 36px;
+}
+
+.services .description {
+    color: var(--secondary-text-color);
+}
+
+.services small {
+    color: var(--text-color);
+    white-space: nowrap;
+    margin-left: 1em;
+    font-size: 0.85rem;
+}
+</style>
+<div class="services-container">
+{% for service in services %}
+{% ifchanged service.group %}
+    {% if not forloop.first %}
+        </ul>
+        <h2>{{ service.group }}</h2>
+    {% endif %}
+    <ul class="services">
+{% endifchanged %}
+    <li>
+        <a href="{{ service.get_absolute_url }}">
+            <span class="names">
+                <strong class="name is-short">
+                    {{ service.line_name }}
+                </strong>
+            </span>
+            <span class="description">
+                {{ service.description }}
+            </span>
+        </a>
+    </li>
+{% endfor %}
+</ul>
+</div>

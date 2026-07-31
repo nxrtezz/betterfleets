@@ -1,0 +1,38 @@
+{% extends 'page.html' %}
+{% load humanize %}
+
+{% block content %}
+
+<h1>Site usage stats</h1>
+
+<ul class="horizontal">
+    <li>{{ registered_users|intcomma }} registered users</li>
+    <li>{{ staff_users|intcomma }} staff users</li>
+</ul>
+
+<div class="table-wrapper">
+    <table class="compact">
+        <thead>
+            <tr>
+                <th scope="col">Window</th>
+                <th scope="col">Total</th>
+                <th scope="col">Logged in</th>
+                <th scope="col">Anonymous</th>
+                <th scope="col">Staff</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in activity %}
+                <tr>
+                    <th scope="row">{{ row.label }}</th>
+                    <td>{{ row.total|intcomma }}</td>
+                    <td>{{ row.authenticated|intcomma }}</td>
+                    <td>{{ row.anonymous|intcomma }}</td>
+                    <td>{{ row.staff|intcomma }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock content %}

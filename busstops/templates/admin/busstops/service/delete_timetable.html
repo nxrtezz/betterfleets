@@ -1,0 +1,31 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <p>
+        <a href="{% url 'admin:busstops_service_change' service.pk %}">Back to service</a>
+        |
+        <a href="{% url 'admin:busstops_service_mass_edit_timetable' service.pk %}">Back to timetable editor</a>
+    </p>
+
+    <div class="module">
+        <h2>Confirm deletion</h2>
+        <p>Are you sure you want to delete all timetable data for <strong>{{ service }}</strong>?</p>
+        <p>This will delete:</p>
+        <ul>
+            <li>All trips associated with this service</li>
+            <li>All routes associated with this service</li>
+            <li>All stop times for these trips</li>
+        </ul>
+        <p><strong>This action cannot be undone.</strong></p>
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="submit" value="Yes, I'm sure" class="default" style="background-color: #dc2626; color: white;">
+            <a href="{% url 'admin:busstops_service_mass_edit_timetable' service.pk %}" class="button">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

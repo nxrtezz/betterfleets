@@ -1,0 +1,149 @@
+<div class="theme-lab-preview {% if preview_mode == 'dark' %}dark-mode{% else %}light-mode{% endif %}" data-theme-lab-preview="{{ preview_mode }}">
+    <div class="theme-lab-preview__frame">
+        <section class="theme-lab-card">
+            <header>
+                <h2>{{ preview_title }}</h2>
+                <a href="#">Preview link</a>
+            </header>
+            <p>This preview uses the same shared theme variables as the rest of the site, so buttons, forms, links, tables, and profile blocks all react together.</p>
+            <p>
+                <a href="#" class="button">Primary action</a>
+                <button type="button" class="button">Secondary action</button>
+            </p>
+        </section>
+
+        <section class="theme-lab-card">
+            <h2>Search and forms</h2>
+            <form>
+                <p>
+                    <label>
+                        Search
+                        <input type="search" value="Alpha Travel">
+                    </label>
+                </p>
+                <div class="groupings">
+                    <div class="grouping">
+                        <label>
+                            Status
+                            <select>
+                                <option selected>Active</option>
+                                <option>Pending</option>
+                                <option>Archived</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="grouping">
+                        <label>
+                            Launch date
+                            <input type="date" value="2026-04-26">
+                        </label>
+                    </div>
+                </div>
+                <p>
+                    <label>
+                        Notes
+                        <textarea rows="3">Use this page to spot places where light and dark themes drift apart.</textarea>
+                    </label>
+                </p>
+            </form>
+        </section>
+
+        <section class="theme-lab-card">
+            <h2>Service summary</h2>
+            <div class="service-header">
+                <div class="names">
+                    <span class="name is-short">21</span>
+                    <span class="name">City Centre to Depot</span>
+                </div>
+                <div class="description">
+                    <p>A compact stand-in for the route, fleet, and operator cards we already render elsewhere.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="theme-lab-card">
+            <h2>Table and disclosure</h2>
+            <table class="theme-lab-table">
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Light</th>
+                        <th>Dark</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Links</td>
+                        <td><a href="#">Readable</a></td>
+                        <td><a href="#">Readable</a></td>
+                    </tr>
+                    <tr>
+                        <td>Buttons</td>
+                        <td><span class="button">Styled</span></td>
+                        <td><span class="button">Styled</span></td>
+                    </tr>
+                </tbody>
+            </table>
+            <details open>
+                <summary>What to check</summary>
+                <ul class="bulleted">
+                    <li>Contrast on text, outlines, and hover states</li>
+                    <li>Form controls inherit the right background and border tokens</li>
+                    <li>Cards and pills do not disappear in dark mode</li>
+                </ul>
+            </details>
+        </section>
+
+        <section class="organisation-profile">
+            <div class="organisation-profile__banner"></div>
+            <div class="organisation-profile__body">
+                <p class="organisation-profile__eyebrow">Organisation</p>
+                <div class="organisation-profile__meta">
+                    <h1>North Coast Transit</h1>
+                </div>
+                <p class="organisation-profile__slogan">Regional fleet showcase</p>
+                <p class="organisation-profile__description">Profile shells use mixed colors, pills, and card surfaces, so they are useful for quickly checking broader theme harmony.</p>
+                <ul class="organisation-profile__stats">
+                    <li>62 vehicles</li>
+                    <li>4 depots</li>
+                    <li>2 divisions</li>
+                </ul>
+                <ul class="organisation-profile__socials">
+                    <li><a href="#">Website</a></li>
+                    <li><a href="#">Photos</a></li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="division-profile">
+            <div class="division-profile__banner"></div>
+            <div class="division-profile__body">
+                <p class="division-profile__eyebrow">Division</p>
+                <div class="division-profile__meta">
+                    <h2>Coastal Operations</h2>
+                </div>
+                <p class="division-profile__description">The division card exercises softer surfaces, outlines, and badge-style links.</p>
+                <ul class="division-profile__links">
+                    <li><a href="#">Fleet</a></li>
+                    <li><a href="#">Depots</a></li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="fleet-liveries">
+            <h2>Fleet liveries</h2>
+            <ul>
+                <li>
+                    <span class="name is-short">A1</span>
+                    <span>Sunrise</span>
+                    <small>Brand-led card background</small>
+                </li>
+                <li>
+                    <span class="name is-short">B2</span>
+                    <span>Harbour</span>
+                    <small>Border and surface check</small>
+                </li>
+            </ul>
+        </section>
+    </div>
+</div>

@@ -1,0 +1,1463 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+/* Timetable Builder Styles */
+.timetable-builder {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem;
+  overflow-x: clip;
+}
+
+.builder-header {
+  margin-bottom: 2rem;
+}
+
+.builder-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.5rem 0;
+  font-size: 1.75rem;
+}
+
+.route-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  min-width: 3rem;
+  background: var(--brand-color);
+  color: #fff;
+}
+
+.subtitle {
+  color: var(--text-color);
+  opacity: 0.7;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.stop-cell {
+  background: var(--background-color) !important;
+}
+
+/* Layout */
+.builder-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* Config Panel */
+.config-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .builder-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-panel,
+  .config-panel {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .preview-panel {
+    position: relative;
+    top: 0;
+  }
+
+  .card-body {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .timetable-builder {
+    padding: 0.5rem;
+  }
+
+  .builder-layout {
+    gap: 1rem;
+  }
+
+  .card-body {
+    padding: 0.75rem;
+  }
+
+  .stops-list {
+    margin-left: -0.75rem;
+    margin-right: -0.75rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .timetable-builder {
+    padding: 0.5rem;
+  }
+
+  .builder-header h1 {
+    font-size: 1.25rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .route-badge {
+    font-size: 1rem;
+    padding: 0.2rem 0.5rem;
+    min-width: 2.5rem;
+  }
+
+  .subtitle {
+    font-size: 0.9rem;
+  }
+
+  .card-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .card-body {
+    padding: 0.875rem;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .form-row .form-group {
+    margin-bottom: 0.75rem;
+  }
+
+  .form-row.triple {
+    flex-direction: column;
+  }
+
+  .form-row.triple .form-group {
+    margin-bottom: 0.75rem;
+  }
+
+  .days-grid {
+    gap: 0.375rem;
+  }
+
+  .day-chip span {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .btn {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+  }
+
+  .btn-large {
+    padding: 0.75rem 1rem;
+    font-size: 0.9375rem;
+  }
+
+  .btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .stop-item {
+    gap: 0.5rem;
+    padding: 0.625rem 0;
+  }
+
+  .stop-header {
+    flex-wrap: wrap;
+  }
+
+  .stop-name {
+    font-size: 0.8125rem;
+    flex-basis: 100%;
+    margin-bottom: 0.125rem;
+  }
+
+  .first-stop-badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+  }
+
+  .stop-settings {
+    gap: 0.5rem;
+  }
+
+  .setting-item > label {
+    font-size: 0.7rem;
+  }
+
+  .input-with-unit {
+    padding: 0.2rem 0.375rem;
+  }
+
+  .input-with-unit input {
+    width: 2rem !important;
+    font-size: 0.8rem;
+  }
+
+  .input-with-unit span {
+    font-size: 0.65rem;
+  }
+
+  .timing-setting label {
+    font-size: 0.75rem;
+  }
+
+  .timing-setting input[type="checkbox"] {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+
+  .marker-dot {
+    width: 0.625rem;
+    height: 0.625rem;
+  }
+
+  .stops-list {
+    max-height: 300px;
+  }
+
+  .preview-body {
+    padding: 0.5rem;
+    max-height: 300px;
+  }
+
+  .preview-table th,
+  .preview-table td {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .preview-table .minor-row th {
+    padding-left: 0.75rem;
+  }
+
+  .inline-time-edit {
+    width: 4rem;
+    font-size: 0.75rem;
+  }
+
+  .preview-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .preview-header h3 {
+    font-size: 0.9rem;
+  }
+
+  .toggle-label {
+    font-size: 0.75rem;
+  }
+
+  .quick-actions .form-row {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 0.5rem;
+  }
+
+  .quick-actions .form-row .form-group {
+    margin-bottom: 0;
+    flex: 1;
+  }
+
+  .quick-actions .btn-secondary {
+    white-space: nowrap;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .step-number {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.75rem;
+  }
+
+  .card-header h3 {
+    font-size: 0.875rem;
+  }
+
+  .divider {
+    margin: 0.875rem 0;
+    font-size: 0.7rem;
+  }
+
+  .form-group label {
+    font-size: 0.75rem;
+  }
+
+  .form-group input[type="text"],
+  .form-group input[type="date"],
+  .form-group input[type="time"],
+  .form-group input[type="number"] {
+    padding: 0.5rem 0.625rem;
+    font-size: 0.8125rem;
+  }
+
+  .form-group small {
+    font-size: 0.7rem;
+  }
+
+  .preview-empty {
+    padding: 2rem 0.75rem;
+  }
+
+  .preview-empty svg {
+    width: 36px;
+    height: 36px;
+  }
+
+  .preview-empty p {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .day-chip span {
+    padding: 0.3rem 0.4rem;
+    font-size: 0.7rem;
+  }
+
+  .btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .quick-actions .form-row {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .quick-actions .form-row .form-group {
+    width: 100%;
+  }
+
+  .quick-actions .btn-secondary {
+    width: 100%;
+  }
+
+  .stop-name {
+    font-size: 0.75rem;
+  }
+
+  .stop-settings {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.375rem;
+  }
+
+  .setting-item {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .timing-setting {
+    margin-top: 0.125rem;
+  }
+}
+
+.config-card {
+  background: var(--background-color);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: var(--viewed-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.card-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  background: var(--brand-color);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.card-body {
+  padding: 1.25rem;
+  overflow-x: auto;
+}
+
+/* Form Elements */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.375rem;
+  color: var(--text-color);
+}
+
+.form-group input[type="text"],
+.form-group input[type="date"],
+.form-group input[type="time"],
+.form-group input[type="number"] {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  font-size: 0.9375rem;
+  background: var(--background-color);
+  color: var(--text-color);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--brand-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-color) 15%, transparent);
+}
+
+.form-group small {
+  display: block;
+  margin-top: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.form-row.triple .form-group {
+  flex: 1;
+}
+
+/* Days Grid */
+.days-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.day-chip {
+  cursor: pointer;
+}
+
+.day-chip input {
+  display: none;
+}
+
+.day-chip span {
+  display: inline-block;
+  padding: 0.5rem 0.875rem;
+  background: var(--viewed-color);
+  border: 1px solid var(--border-color);
+  border-radius: 2rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+.day-chip input:checked + span {
+  background: var(--brand-color);
+  border-color: var(--brand-color);
+  color: #fff;
+}
+
+.day-chip:hover span {
+  border-color: var(--brand-color);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-primary {
+  background: var(--brand-color);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--brand-color) 85%, black);
+}
+
+.btn-secondary {
+  background: var(--viewed-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: var(--border-color);
+}
+
+.btn-success {
+  background: var(--brand-color, #10b981);
+  color: #fff;
+}
+
+.btn-success:hover {
+  background: var(--brand-color-darker, #059669);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-large {
+  padding: 1rem 1.5rem;
+  font-size: 1.0625rem;
+}
+
+/* Divider */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  color: var(--text-color);
+  opacity: 0.6;
+  font-size: 0.8125rem;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-color);
+}
+
+/* Stops List */
+.stops-list {
+  margin-top: 1rem;
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.stop-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  max-width: 100%;
+  align-items: flex-start;
+}
+
+.stop-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 1.25rem;
+  flex-shrink: 0;
+  padding-top: 0.25rem;
+}
+
+.marker-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  background: var(--border-color);
+  border-radius: 50%;
+  border: 2px solid var(--background-color);
+  box-shadow: 0 0 0 2px var(--border-color);
+  flex-shrink: 0;
+}
+
+.marker-dot.timing-point-marker {
+  background: var(--brand-color);
+  box-shadow: 0 0 0 2px var(--brand-color);
+}
+
+.marker-line {
+  width: 2px;
+  flex: 1;
+  min-height: 2rem;
+  background: var(--border-color);
+  margin-top: 0.25rem;
+}
+
+.stop-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.stop-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.stop-name {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.first-stop-badge {
+  display: inline-block;
+  padding: 0.25rem 0.625rem;
+  background: color-mix(in srgb, var(--brand-color) 15%, transparent);
+  color: var(--brand-color);
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.stop-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.first-stop-settings {
+  opacity: 0.6;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.setting-item > label {
+  font-size: 0.75rem;
+  color: var(--text-color);
+  opacity: 0.7;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.input-with-unit {
+  display: flex;
+  align-items: center;
+  background: var(--viewed-color);
+  border: 1px solid var(--border-color);
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  gap: 0.25rem;
+}
+
+.input-with-unit input {
+  width: 2.5rem !important;
+  padding: 0.125rem !important;
+  border: none !important;
+  background: transparent !important;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.input-with-unit input:focus {
+  box-shadow: none !important;
+  outline: none;
+}
+
+.input-with-unit span {
+  font-size: 0.75rem;
+  color: var(--text-color);
+  opacity: 0.6;
+}
+
+.timing-setting label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  user-select: none;
+  margin: 0 !important;
+  opacity: 1 !important;
+}
+
+.timing-setting input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--brand-color);
+  cursor: pointer;
+}
+
+.timing-setting .checkmark {
+  display: none;
+}
+
+/* Preview Panel */
+.preview-panel {
+  position: relative;
+  min-width: 0;
+}
+
+@media (min-width: 1025px) {
+  .preview-panel {
+    position: relative;
+    align-self: start;
+    max-height: calc(100vh - 2rem);
+  }
+
+  .preview-card {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 6.5rem);
+  }
+
+  .preview-body {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+  }
+}
+
+.preview-card {
+  background: var(--background-color);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  margin-bottom: 1rem;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background: var(--viewed-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.preview-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.preview-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.toggle-label input {
+  accent-color: var(--brand-color);
+}
+
+.preview-body {
+  padding: 1rem;
+  max-height: 500px;
+  overflow: auto;
+}
+
+.preview-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  color: var(--text-color);
+  opacity: 0.6;
+  text-align: center;
+}
+
+.preview-empty svg {
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.preview-empty p {
+  margin: 0;
+}
+
+/* Preview Table */
+.preview-table-wrapper {
+  overflow-x: auto;
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.preview-table th,
+.preview-table td {
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.preview-table th {
+  font-weight: 600;
+  background: var(--viewed-color);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.preview-table .timing-row th {
+  font-weight: 600;
+}
+
+.preview-table .minor-row {
+  color: var(--text-color);
+  opacity: 1;
+  font-size: 0.8125rem;
+}
+
+.preview-table .minor-row th {
+  font-weight: 400;
+  padding-left: 1.5rem;
+}
+
+.time-cell {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.time-cell .arrival-time,
+.time-cell .departure-time {
+  display: block;
+  line-height: 1.15;
+  font: inherit;
+}
+
+.time-cell .departure-time {
+  margin-top: 0.15rem;
+}
+
+.time-cell:hover {
+  background: var(--viewed-color);
+}
+
+.inline-time-edit {
+  width: 5rem;
+  padding: 0.25rem;
+  border: 1px solid var(--brand-color);
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+/* Quick Actions */
+.quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.quick-actions .form-row {
+  align-items: flex-end;
+}
+</style>
+
+<div class="timetable-builder">
+  <!-- Header -->
+  <div class="builder-header">
+    <h1>
+      <span class="route-badge">{{ route.line_name|default:"?" }}</span>
+      Create Timetable
+    </h1>
+    <p class="subtitle">
+      {% if route.inbound_description %}
+        Inbound to {{ route.inbound_description }}
+      {% elif route.outbound_description %}
+        Outbound to {{ route.outbound_description }}
+      {% else %}
+        {{ route.description|default:"New timetable" }}
+      {% endif %}
+    </p>
+  </div>
+
+  {% if error %}
+  <div style="background: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+    <strong>Error:</strong> {{ error }}
+  </div>
+  {% endif %}
+
+  <form method="POST" id="timetable-form">
+    {% csrf_token %}
+    
+    <div class="builder-layout">
+      <!-- Left Panel: Configuration -->
+      <div class="config-panel">
+        
+        <!-- Step 1: Schedule Info -->
+        <div class="config-card">
+          <div class="card-header">
+            <span class="step-number">1</span>
+            <h3>Schedule Details</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label>Operating Days</label>
+              <div class="days-grid">
+                <label class="day-chip">
+                  <input type="checkbox" name="days[]" value="1">
+                  <span>Monday</span>
+                </label>
+                <label class="day-chip">
+                  <input type="checkbox" name="days[]" value="2">
+                  <span>Tuesday</span>
+                </label>
+                <label class="day-chip">
+                  <input type="checkbox" name="days[]" value="3">
+                  <span>Wednesday</span>
+                </label>
+                <label class="day-chip">
+                  <input type="checkbox" name="days[]" value="4">
+                  <span>Thursday</span>
+                </label>
+                <label class="day-chip">
+                  <input type="checkbox" name="days[]" value="5">
+                  <span>Friday</span>
+                </label>
+                <label class="day-chip">
+                  <input type="checkbox" name="days[]" value="6">
+                  <span>Saturday</span>
+                </label>
+                <label class="day-chip">
+                  <input type="checkbox" name="days[]" value="7">
+                  <span>Sunday</span>
+                </label>
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="start_date">Start Date</label>
+                <input type="date" name="start_date" id="start_date" value="">
+              </div>
+              <div class="form-group">
+                <label for="end_date">End Date</label>
+                <input type="date" name="end_date" id="end_date" value="">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Generate Departures -->
+        <div class="config-card">
+          <div class="card-header">
+            <span class="step-number">2</span>
+            <h3>Generate Departures</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-row triple">
+              <div class="form-group">
+                <label>First Departure</label>
+                <input type="time" id="autofill-start" value="07:00">
+              </div>
+              <div class="form-group">
+                <label>Last Departure</label>
+                <input type="time" id="autofill-end" value="19:00">
+              </div>
+              <div class="form-group">
+                <label>Every (mins)</label>
+                <input type="number" id="autofill-interval" min="1" value="30">
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary btn-block" onclick="autoFillTimes()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Generate Departure Times
+            </button>
+            
+            <div class="divider"><span>or enter manually</span></div>
+            
+            <div class="form-group">
+              <label>Manual Departure Times</label>
+              <input type="text" name="departure_times" class="departure-times" placeholder="07:00, 07:30, 08:00, 08:30...">
+              <small>Comma-separated times for the first stop</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Stop Offsets -->
+        <div class="config-card">
+          <div class="card-header">
+            <span class="step-number">3</span>
+            <h3>Journey Times</h3>
+          </div>
+          <div class="card-body">
+            <div class="quick-actions">
+              <div class="form-row">
+                <div class="form-group" style="flex: 1;margin-bottom: -37px;">
+                  <label>Set All Travel To</label>
+                  <input type="number" id="offset-fill" min="0" value="2" style="width: 80px;">
+                  <small>minutes</small>
+                </div>
+                <button type="button" style="margin-top: 25px;" class="btn btn-secondary" onclick="autoFillOffsets()">Apply</button>
+              </div>
+              <div class="form-row">
+                <div class="form-group" style="flex: 1;margin-bottom: -37px;margin-top: 15px;">
+                  <label>Set All Dwell To</label>
+                  <input type="number" id="dwell-fill" min="0" value="30" style="width: 80px;">
+                  <small>seconds</small>
+                </div>
+                <button type="button" style="margin-top: 25px;" class="btn btn-secondary" onclick="autoFillDwell()">Apply</button>
+              </div><br><br><br>
+              
+            </div>
+            
+            <div class="stops-list" id="stops-list">
+              <!-- Stops will be populated here -->
+              <p style="color: var(--text-color); opacity: 0.6;">No stops added yet. Add stops to configure journey times.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Preview -->
+      <div class="preview-panel">
+        <div class="preview-card">
+          <div class="preview-header">
+            <h3>Timetable Preview</h3>
+            <div class="preview-controls">
+              <label class="toggle-label">
+                <input type="checkbox" id="show-all-stops">
+                <span>Show all stops</span>
+              </label>
+            </div>
+          </div>
+          <div class="preview-body">
+            <div id="timetable-preview" class="preview-timetable">
+              <div class="preview-empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                <p>Generate departure times to see preview</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <input type="hidden" name="stop_times_json" id="stop-times-json">
+        
+        <button type="submit" class="btn btn-success btn-large btn-block">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Save Timetable
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+// Store the current timetable data
+let currentTimetableData = {};
+
+function timeToMinutes(timeStr) {
+  const parsed = parseTimetableTime(timeStr);
+  return parsed ? parsed.totalMinutes : 0;
+}
+
+function parseTimetableTime(timeStr) {
+  const match = String(timeStr || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 47 || m < 0 || m > 59) {
+    return null;
+  }
+
+  return {
+    totalMinutes: h * 60 + m,
+    display: `${String(h % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}` 
+  };
+}
+
+function normalizeManualTime(timeStr) {
+  const parsed = parseTimetableTime(timeStr);
+  return parsed ? parsed.display : '';
+}
+
+function timeToSeconds(timeStr) {
+  const [h, m] = timeStr.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return 0;
+  return (h * 3600) + (m * 60);
+}
+
+function secondsToTime(totalSeconds) {
+  const daySeconds = 24 * 60 * 60;
+  const roundedSeconds = Math.round(totalSeconds / 60) * 60;
+  const normalizedSeconds = ((roundedSeconds % daySeconds) + daySeconds) % daySeconds;
+  const h = Math.floor(normalizedSeconds / 3600);
+  const m = Math.floor((normalizedSeconds % 3600) / 60);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function addSecondsToTime(timeStr, seconds) {
+  return secondsToTime(timeToSeconds(timeStr) + seconds);
+}
+
+function validateTimes(timesArray) {
+  let previousMinutes = null;
+  for (let i = 1; i < timesArray.length; i++) {
+    let currentMinutes = timeToMinutes(timesArray[i]);
+    if (previousMinutes === null) {
+      previousMinutes = timeToMinutes(timesArray[i - 1]);
+    }
+
+    while (currentMinutes < previousMinutes) {
+      currentMinutes += 24 * 60;
+    }
+
+    const diff = currentMinutes - previousMinutes;
+    if (diff < 5) return false;
+    previousMinutes = currentMinutes;
+  }
+  return true;
+}
+
+function autoFillFromStops() {
+  const rows = document.querySelectorAll(".stop-item");
+  let prevOffset = null;
+  let prevTime = null;
+
+  rows.forEach((row, i) => {
+    const time_s = parseInt(row.dataset.times, 10);
+    const offsetInput = row.querySelector(".offset-minutes");
+
+    if (i === 0) {
+      prevOffset = 0;
+      prevTime = time_s;
+      return;
+    }
+
+    const raw = time_s - prevTime;
+    let offset = raw >= 30 ? Math.round(raw / 60) : 0;
+    if (offset === 0 && prevOffset === 0) offset = 1;
+    if (offsetInput) offsetInput.value = offset;
+
+    prevOffset = offset;
+    prevTime = time_s;
+  });
+  generateStopTimesJSON();
+}
+
+function autoFillOffsets() {
+  const offset = parseInt(document.getElementById("offset-fill").value, 10);
+  if (isNaN(offset) || offset < 0) {
+    alert("Please enter a valid offset value.");
+    return;
+  }
+  document.querySelectorAll('.offset-minutes').forEach(el => {
+    el.value = offset;
+  });
+  generateStopTimesJSON();
+}
+
+function autoFillDwell() {
+  const dwell = parseInt(document.getElementById("dwell-fill").value, 10);
+  if (isNaN(dwell) || dwell < 0) {
+    alert("Please enter a valid dwell time.");
+    return;
+  }
+  document.querySelectorAll('.dwell-seconds').forEach(el => {
+    el.value = dwell;
+  });
+  generateStopTimesJSON();
+}
+
+function generateStopTimesJSON(validateManual = false) {
+  const rows = document.querySelectorAll('.stop-item');
+  const timesInput = document.querySelector('.departure-times');
+  const output = {};
+  let previousTimes = [];
+
+  const firstStopTimes = timesInput.value.split(',').map(normalizeManualTime).filter(Boolean);
+
+  if (validateManual && !validateTimes(firstStopTimes)) {
+    alert("Frequency error: Manual departure times must be at least 5 minutes apart.");
+    return false;
+  }
+
+  rows.forEach((row, index) => {
+    const stopName = row.dataset.stopname;
+    const isTimingPoint = row.querySelector('.timing-point')?.checked ?? false;
+
+    let arrivalTimes = [];
+    let departureTimes = [];
+    if (index === 0) {
+      arrivalTimes = firstStopTimes;
+      departureTimes = firstStopTimes;
+      previousTimes = departureTimes;
+    } else {
+      const offsetInput = row.querySelector('.offset-minutes');
+      const dwellInput = row.querySelector('.dwell-seconds');
+      if (!offsetInput) return;
+
+      const offsetMins = parseInt(offsetInput.value || '0', 10);
+      const dwellSecs = parseInt(dwellInput?.value || '0', 10);
+      arrivalTimes = previousTimes.map(timeStr => addSecondsToTime(timeStr, offsetMins * 60));
+      departureTimes = arrivalTimes.map(timeStr => addSecondsToTime(timeStr, dwellSecs));
+      previousTimes = departureTimes;
+    }
+
+    output[stopName + '_idx_' + index] = {
+      stopname: stopName,
+      timing_point: isTimingPoint || index === 0,
+      times: departureTimes,
+      departure_times: departureTimes,
+      arrival_times: arrivalTimes,
+      order: index
+    };
+  });
+
+  document.getElementById('stop-times-json').value = JSON.stringify(output, null, 2);
+  currentTimetableData = output;
+  renderTimetablePreview(output);
+  return true;
+}
+
+function renderTimetablePreview(data) {
+  const container = document.getElementById('timetable-preview');
+  const entries = Object.entries(data).sort((a, b) => a[1].order - b[1].order);
+  const showAll = document.getElementById('show-all-stops')?.checked ?? false;
+
+  if (entries.length === 0 || !entries[0][1].times || entries[0][1].times.length === 0) {
+    container.innerHTML = `<div class="preview-empty"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><p>Generate departure times to see preview</p></div>`;
+    return;
+  }
+
+  let html = '<div class="preview-table-wrapper"><table class="preview-table"><tbody>';
+  entries.forEach(([key, stop]) => {
+    const isTimingPoint = stop.timing_point;
+    if (!showAll && !isTimingPoint) return;
+    html += `<tr class="${isTimingPoint ? 'timing-row' : 'minor-row'}">`;
+    html += `<th class="stop-cell">${stop.stopname}</th>`;
+    stop.times.forEach((time, timeIndex) => {
+      const arrival = (stop.arrival_times || stop.times)[timeIndex] || '';
+      const departure = (stop.departure_times || stop.times)[timeIndex] || '';
+      const display = arrival && departure && arrival !== departure
+        ? `<span class="arrival-time">${arrival}</span><span class="departure-time">${departure}</span>` 
+        : departure;
+      html += `<td class="time-cell" data-stop-key="${key}" data-time-index="${timeIndex}" data-departure="${departure}">${display}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+  container.querySelectorAll('.time-cell').forEach(cell => cell.addEventListener('click', handleCellClick));
+}
+
+function handleCellClick(e) {
+  const cell = e.target.closest('.time-cell');
+  if (!cell) return;
+  if (cell.querySelector('input')) return;
+  const currentValue = cell.dataset.departure || cell.textContent.trim();
+  const stopKey = cell.dataset.stopKey;
+  const timeIndex = parseInt(cell.dataset.timeIndex, 10);
+  const input = document.createElement('input');
+  input.type = 'time';
+  input.value = currentValue;
+  input.className = 'inline-time-edit';
+
+  input.addEventListener('blur', () => {
+    const newValue = input.value || currentValue;
+    cell.textContent = newValue;
+    cell.dataset.departure = newValue;
+    if (currentTimetableData[stopKey]) {
+      currentTimetableData[stopKey].times[timeIndex] = newValue;
+      currentTimetableData[stopKey].departure_times[timeIndex] = newValue;
+      currentTimetableData[stopKey].arrival_times[timeIndex] = newValue;
+      document.getElementById('stop-times-json').value = JSON.stringify(currentTimetableData, null, 2);
+    }
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { cell.textContent = currentValue; }
+  });
+
+  cell.textContent = '';
+  cell.appendChild(input);
+  input.focus();
+}
+
+function autoFillTimes() {
+  const start = document.getElementById("autofill-start").value;
+  const end = document.getElementById("autofill-end").value;
+  const interval = parseInt(document.getElementById("autofill-interval").value, 10);
+
+  if (interval < 5) { alert("Minimum frequency is 5 minutes."); return; }
+
+  const times = [];
+  let [h, m] = start.split(":").map(Number);
+  const [endH, endM] = end.split(":").map(Number);
+  while (h < endH || (h === endH && m <= endM)) {
+    times.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    m += interval;
+    if (m >= 60) { h += Math.floor(m / 60); m %= 60; }
+  }
+  document.querySelector('.departure-times').value = times.join(", ");
+  generateStopTimesJSON();
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  document.querySelectorAll('.offset-minutes, .dwell-seconds, .timing-point').forEach(el => {
+    el.addEventListener('input', generateStopTimesJSON);
+  });
+
+  document.querySelector('.departure-times').addEventListener('change', () => {
+    const input = document.querySelector('.departure-times');
+    input.value = input.value.split(',').map(normalizeManualTime).filter(Boolean).join(', ');
+    generateStopTimesJSON(true);
+  });
+
+  document.getElementById('show-all-stops')?.addEventListener('change', () => renderTimetablePreview(currentTimetableData));
+
+  document.getElementById('timetable-form').addEventListener('submit', function(event) {
+    const firstStopTimes = document.querySelector('.departure-times').value.split(',').map(normalizeManualTime).filter(Boolean);
+    if (!validateTimes(firstStopTimes)) {
+      event.preventDefault();
+      alert("Cannot save: Departure times must be at least 5 minutes apart.");
+    }
+  });
+
+  generateStopTimesJSON();
+  setupDesktopPreviewLock();
+});
+
+function setupDesktopPreviewLock() {
+  const panel = document.querySelector('.preview-panel');
+  const layout = document.querySelector('.builder-layout');
+  if (!panel || !layout) return;
+
+  const desktopQuery = window.matchMedia('(min-width: 1025px)');
+  const topOffset = 16;
+  let anchorTop = 0;
+  let anchorLeft = 0;
+  let anchorWidth = 0;
+  let isLocked = false;
+
+  function unlock() {
+    panel.style.position = '';
+    panel.style.top = '';
+    panel.style.left = '';
+    panel.style.width = '';
+    panel.style.zIndex = '';
+    panel.style.maxHeight = '';
+    isLocked = false;
+  }
+
+  function measure() {
+    const wasLocked = isLocked;
+    if (wasLocked) unlock();
+
+    const rect = panel.getBoundingClientRect();
+    anchorTop = rect.top + window.scrollY;
+    anchorLeft = rect.left;
+    anchorWidth = rect.width;
+
+    if (wasLocked) lock();
+  }
+
+  function lock() {
+    panel.style.position = 'fixed';
+    panel.style.top = `${topOffset}px`;
+    panel.style.left = `${anchorLeft}px`;
+    panel.style.width = `${anchorWidth}px`;
+    panel.style.zIndex = '20';
+    panel.style.maxHeight = `calc(100vh - ${topOffset * 2}px)`;
+    isLocked = true;
+  }
+
+  function update() {
+    if (!desktopQuery.matches) {
+      unlock();
+      return;
+    }
+
+    if (!anchorWidth) measure();
+
+    if (window.scrollY + topOffset >= anchorTop) {
+      if (!isLocked) lock();
+    } else if (isLocked) {
+      unlock();
+    }
+  }
+
+  measure();
+  update();
+  window.addEventListener('scroll', update, { passive: true });
+  window.addEventListener('resize', () => {
+    unlock();
+    measure();
+    update();
+  });
+}
+</script>
+{% endblock %}

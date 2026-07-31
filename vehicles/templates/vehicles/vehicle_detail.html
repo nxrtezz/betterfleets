@@ -1,0 +1,704 @@
+{% extends 'page.html' %}
+
+{% block title %}{{ title }}{% if vehicle.operator %} - {{ vehicle.operator }}{% endif %} - bustimes.org{% endblock %}
+
+{% block canonical %}
+    {% if not vehicle or request.GET.date or potential_duplicates %}
+        <meta name="robots" content="noindex,noarchive">
+    {% else %}
+        {{ block.super }}
+    {% endif %}
+{% endblock canonical %}
+
+{% block head %}
+    {% if vehicle %}
+        <meta property="og:title" content="{{ object }}">
+        <meta property="og:description" content="{% firstof object.vehicle_type object.operator %}{% if object.name %}
+
+{{ object.name }}{% endif %}">
+        {% with photos=vehicle.photo_set.all %}{% if photos %}
+            <meta name="twitter:card" content="summary_large_image">
+            <meta property="og:image" content="{{ photos.0.get_display_url }}">
+            <meta property="og:image:width" content="1200">
+            <meta property="og:image:height" content="630">
+        {% endif %}{% endwith %}
+    {% endif %}
+    <style>
+        /* ── Review form / card ─────────────────────────────────────── */
+        .review-form-card,
+        .review-card {
+            border: 1px solid var(--border-color);
+            border-radius: 0.9rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: var(--background-color);
+        }
+
+        .star-input {
+            display: grid;
+            gap: 0.45rem;
+            justify-items: start;
+        }
+
+        .star-input input[type="hidden"] {
+            display: none;
+        }
+
+        .star-input__control {
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+            font-size: 2rem;
+            line-height: 1;
+            letter-spacing: 0.12rem;
+        }
+
+        .star-input__base,
+        .star-input__fill {
+            display: block;
+            color: #cbd5e1;
+        }
+
+        .star-input__base::before,
+        .star-input__fill::before,
+        .star-display::before,
+        .star-display__fill::before {
+            content: "★★★★★";
+        }
+
+        .star-input__fill,
+        .star-display__fill {
+            position: absolute;
+            inset: 0 auto 0 0;
+            overflow: hidden;
+            white-space: nowrap;
+            color: #f59e0b;
+        }
+
+        .star-input__hint,
+        .star-input__help,
+        .review-card__meta {
+            color: var(--secondary-text-color);
+        }
+
+        .review-card__footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .review-report-form {
+            flex: 1 1 18rem;
+        }
+
+        .review-report-form textarea {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .star-input__hint {
+            font-size: 0.95rem;
+        }
+
+        .star-input__help {
+            margin: 0;
+            font-size: 0.9rem;
+        }
+
+        .star-input__control:focus-visible {
+            outline: 2px solid #f59e0b;
+            outline-offset: 0.3rem;
+            border-radius: 0.4rem;
+        }
+
+        .star-display {
+            position: relative;
+            display: inline-block;
+            font-size: 1.15rem;
+            letter-spacing: 0.08em;
+            color: #cbd5e1;
+        }
+
+        /* ── Vehicle hero card ────────────────────────────────────────── */
+        .vehicle-hero {
+            display: flex;
+            gap: 1.25rem;
+            margin: 1rem 0 1.5rem;
+            align-items: flex-start;
+        }
+
+        .vehicle-header-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.6rem;
+        }
+
+        .vehicle-hero__photo {
+            flex: 0 0 auto;
+            width: 220px;
+            max-width: 40%;
+            border-radius: 0.6rem;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            background: var(--brand-color);
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .vehicle-hero__photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .vehicle-hero__info {
+            flex: 1 1 0;
+            min-width: 0;
+        }
+
+        /* ── Registration plate ───────────────────────────────────────── */
+        .reg-plate {
+            display: inline-block;
+            background: #f5c518;
+            border: 2px solid #333;
+            border-radius: 4px;
+            padding: 4px 14px 2px;
+            font-family: "Charles Wright", monospace;
+            font-size: 1.65rem;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+            color: #000;
+            line-height: 1.2;
+            box-shadow: inset 0 -2px 0 rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.2);
+            position: relative;
+            margin-bottom: 0.6rem;
+        }
+        .reg-plate--withdrawn {
+            background: #ccc;
+            color: #666;
+            border-color: #999;
+            box-shadow: none;
+        }
+
+        /* ── Fleet number heading ─────────────────────────────────────── */
+        .vehicle-fleet-num {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin: 0 0 0.35rem;
+            line-height: 1.2;
+        }
+        .vehicle-fleet-num s {
+            opacity: 0.5;
+        }
+
+        /* ── Livery badge ─────────────────────────────────────────────── */
+        .livery-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.4rem 0 0.6rem;
+        }
+        .livery-badge__swatch {
+            width: 4rem;
+            height: 2.5rem;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        .livery-badge__swatch img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+        .livery-badge__label {
+            font-size: 0.85rem;
+            color: var(--text-color);
+            opacity: 0.8;
+        }
+
+        /* ── Compact details grid ─────────────────────────────────────── */
+        .contact-details.vehicle-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+            gap: 0.5rem 1rem;
+            margin: 0.75rem 0;
+        }
+        .contact-details.vehicle-details > div {
+            min-width: 0;
+        }
+        .contact-details.vehicle-details dt {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            opacity: 0.6;
+            margin-bottom: 0.1rem;
+            font-weight: 600;
+        }
+        .contact-details.vehicle-details dd {
+            margin: 0;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        /* Prevent generic .livery sizing from overriding the badge swatch */
+        .livery-badge__swatch.livery {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border: none;
+            vertical-align: unset;
+        }
+
+        @media (max-width: 480px) {
+            .vehicle-hero {
+                flex-direction: column;
+            }
+            .vehicle-hero__photo {
+                width: 100%;
+                max-width: 100%;
+            }
+            .reg-plate {
+                font-size: 1.35rem;
+            }
+        }
+    </style>
+{% endblock head %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+
+{% if vehicle %}
+    <div class="vehicle-hero">
+        {% with photos=vehicle.photo_set.all %}
+        {% if photos %}
+            <div class="vehicle-hero__photo">
+                <img src="{{ photos.0.get_display_url }}" alt="{{ vehicle }}" loading="lazy">
+            </div>
+        {% endif %}
+        {% endwith %}
+
+        <div class="vehicle-hero__info">
+            <div class="vehicle-header-row">
+                {% if vehicle.reg %}
+                    {% if vehicle.withdrawn %}
+                        <div class="reg-plate reg-plate--withdrawn">{{ vehicle.get_reg }}</div>
+                    {% else %}
+                        <div class="reg-plate">{{ vehicle.get_reg }}</div>
+                    {% endif %}
+                {% elif not vehicle.fleet_code and not vehicle.fleet_number %}
+                    <h1 style="margin: 0;">{% if vehicle.withdrawn %}<s>{{ vehicle }}</s>{% else %}{{ vehicle }}{% endif %}</h1>
+                {% endif %}
+
+                {% if vehicle.fleet_code or vehicle.fleet_number %}
+                    <div class="vehicle-fleet-num">
+                        {% if vehicle.withdrawn %}<s>{% endif %}
+                        {% firstof vehicle.fleet_code vehicle.fleet_number %}
+                        {% if vehicle.withdrawn %}</s>{% endif %}
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if vehicle.livery or vehicle.colours %}
+                <div class="livery{% if vehicle.livery_id %} livery-{{ vehicle.livery_id }}{% endif %}" style="background:{{ vehicle.get_livery }}"></div>
+            {% endif %}
+
+            {% include 'vehicle_info.html' %}
+        </div>
+    </div>
+
+    {% include 'previous_operators.html' %}
+
+    {% if request.user.is_authenticated %}
+    <div id="suggest-photo-form" style="display: none; margin: 1rem 0; padding: 1rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--background-color);">
+        <h3 style="margin-top: 0;">Suggest a photo</h3>
+        <form action="{{ request.path }}" method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="suggest_photo" value="1">
+            
+            <p>
+                <label style="font-weight: bold;">Vehicle:</label><br>
+                <input type="text" value="{{ vehicle.get_reg }}{% if vehicle.fleet_number or vehicle.fleet_code %} ({{ vehicle.fleet_number|default:vehicle.fleet_code }}){% endif %}" readonly style="width: 100%; max-width: 300px;">
+            </p>
+            
+            <p>
+                <label style="font-weight: bold;">Photo:</label><br>
+                <input type="file" name="photo_image" accept="image/*" style="margin-bottom: 0.5rem;">
+                <small>or</small><br>
+                <input type="url" name="photo_url" placeholder="Image URL" style="width: 100%; max-width: 300px;">
+            </p>
+            
+            <p>
+                <label style="font-weight: bold;">Summary:</label><br>
+                <input type="text" name="summary" placeholder="Describe your photo suggestion" required style="width: 100%; max-width: 300px;">
+            </p>
+            
+            <button type="submit" class="button">Submit suggestion</button>
+            <button type="button" onclick="document.getElementById('suggest-photo-form').style.display='none';" style="margin-left: 0.5rem;">Cancel</button>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if vehicle.has_sorn_vor_suggestion %}
+        <div class="message">
+            <p>This vehicle is marked as <strong>SORN</strong> by DVLA and may be VOR.</p>
+        </div>
+    {% endif %}
+
+    {% if potential_duplicates %}
+        <div class="message">
+        <p>Possible duplicate of</p>
+        <ul class="has-smalls">
+            {% for vehicle in potential_duplicates %}
+                <li><a href="{{ vehicle.get_absolute_url }}"><span>
+                    {% if vehicle.withdrawn %}
+                        <s>{{ vehicle }}</s>
+                    {% else %}
+                        {{ vehicle }}
+                    {% endif %}</span>
+                    {% if vehicle.operator %}
+                        <small>{{ vehicle.operator }}</small>
+                    {% endif %}
+                </a></li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if tracking %}
+        <p><a href="{{ tracking }}" class="button">Track this bus</a></p>
+    {% endif %}
+    {% if can_log_vehicle %}
+        <form action="{{ request.path }}{% if request.GET.date %}?date={{ request.GET.date|urlencode }}{% endif %}" method="POST" style="display: inline;">
+            {% csrf_token %}
+            <input type="hidden" name="toggle_ride_log" value="{% if vehicle_logged %}0{% else %}1{% endif %}">
+            <button type="submit" class="button">{% if vehicle_logged %}Unlog{% else %}Log{% endif %} vehicle</button>
+        </form>
+    {% endif %}
+    {% if can_photo_log %}
+        <form action="{{ request.path }}{% if request.GET.date %}?date={{ request.GET.date|urlencode }}{% endif %}" method="POST" style="display: inline;">
+            {% csrf_token %}
+            <input type="hidden" name="log_photo" value="1">
+            <button type="submit" class="button">{% if vehicle_photographed %}Log photo ({{ photo_log_quantity }}){% else %}Log photo{% endif %}</button>
+        </form>
+    {% endif %}
+    {% if can_drive_log %}
+        <form action="{{ request.path }}{% if request.GET.date %}?date={{ request.GET.date|urlencode }}{% endif %}" method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="toggle_driving_log" value="{% if vehicle_driven %}0{% else %}1{% endif %}">
+            <button type="submit" class="button">{% if vehicle_driven %}Unlog{% else %}Log{% endif %} as driven</button>
+        </form>
+    {% endif %}
+{% else %}
+    <h1>{{ object }}</h1>
+
+    {% if garages %}
+        <p>{% for garage in garages %}{{ garage }}{% if not forloop.last %}/{% endif %}{% endfor %}</p>
+    {% endif %}
+
+    <ul class="tabs">
+        {% if object.id %}<li><a href="{{ object.get_absolute_url }}">Timetable</a></li>{% endif %}
+        <li>Vehicles</li>
+    </ul>
+{% endif %}
+
+{% load static %}
+
+<div id="journeys" hx-history="false">
+
+{% if date %}
+<script src="{% static 'js/htmx.min.js' %}"></script>
+
+    <form class="timetable-date" autocomplete="off" hx-trigger="change" hx-get="{{ request.path }}" hx-select="#journeys" hx-target="#journeys" hx-indicator="#journeys" hx-swap="outerHTML" hx-push-url="true">
+        {% if dates %}
+            <select name="date" aria-label="Date">
+                {% for option in dates %}
+                    <option{% if option == date %} selected{% endif %} value="{{ option.isoformat }}">{{ option|date:"l j F Y" }}</option>
+                {% endfor %}
+            </select>
+    {% else %}
+            <input type="date" name="date" aria-label="Date" value="{{ date.isoformat }}">
+        {% endif %}
+        <noscript><input type="submit" value="Go"></noscript>
+    </form>
+{% endif %}
+
+{% if journeys %}
+    <div class="table-wrapper">
+    <table>
+    <thead>
+        <tr>
+            {% if object.line_names|length > 1 %}<th scope="col"></th>{% endif %}
+             <th scope="col">{% if not vehicle %}Vehicle{% else %}Route{% endif %}</th>
+            <th scope="col" colspan="2">Trip</th>
+            <th scope="col">To</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for journey in journeys %}
+        <tr id="journey-{{ journey.id }}">
+            {% if object.line_names|length > 1 %}
+                <td>
+                    {{ journey.route_name }}
+                </td>
+            {% endif %}
+            <td class="link">
+                {% if not vehicle %}
+                    {% if journey.vehicle %}
+                        <a href="{{ journey.vehicle.get_absolute_url }}?date={{ date.isoformat }}" rel="nofollow">{{ journey.vehicle }}</a>
+                    {% endif %}
+                {% elif journey.service or journey.route_name %}
+                    <a href="{{ journey.get_service_link }}" rel="nofollow">{{ journey.line_name }}</a>
+                {% else %}
+                    {{ journey.line_name }}
+                {% endif %}
+            </td>
+            <td class="tabular">{% if journey.code|length < 20 %}{{ journey.code }}{% endif %}</td>
+            {% if journey.trip_id %}
+                <td class="link tabular">
+                    <a href="{% if journey.locations is not False %}#journeys/{{ journey.id }}{% else %}{{ journey.trip.get_absolute_url }}{% endif %}">{{ journey.datetime|time:"H:i" }}</a>
+                </td>
+            {% else %}
+                <td class="tabular">{{ journey.datetime|time:"H:i" }}</td>
+            {% endif %}
+            <td>{% firstof journey.destination journey.direction %}</td>
+            {% if journey.locations is not False %}
+                <td class="link"><a href="#journeys/{{ journey.id }}">Map</a></td>
+            {% endif %}
+            {% if perms.vehicles.change_vehiclejourney %}
+                <td class="link">
+                    <a href="{% url 'admin:vehicles_vehiclejourney_change' journey.pk %}">✎</a>
+                </td>
+            {% endif %}
+            {% if journey.trip.block %}
+                <td class="link">
+                    <a href="{{ journey.get_trip_block_url }}">{{ journey.trip.block }}</a>
+                </td>
+            {% endif %}
+        </tr>
+    {% endfor %}
+    {% for trip in predictions %}
+        <tr class="prediction">
+            <td>{{ trip.line_name }}</td>
+            <td></td>
+            <td class="link tabular"><a href="{{ trip.get_absolute_url }}">{{ trip }}</a></td>
+            <td>{{ trip.destination_name }}</td>
+        </tr>
+    {% endfor %}
+    </tbody></table></div>
+{% endif %}
+
+{% if garage %}
+    <p>{{ garage }}</p>
+{% endif %}
+
+</div>
+
+{% if review_form or reviews or review_blocked %}
+    <section>
+        <h2>Reviews</h2>
+        {% if review_blocked %}
+            <p>You are blocked from submitting reviews.</p>
+        {% endif %}
+        {% if review_form %}
+            <form action="{{ request.path }}" method="POST" class="review-form-card">
+                {% csrf_token %}
+                {% if review_form.non_field_errors %}{{ review_form.non_field_errors }}{% endif %}
+                <p>
+                    <strong>Rating</strong><br>
+                    <span class="star-input" data-rating-picker>
+                        {{ review_form.rating }}
+                        <span
+                            class="star-input__control"
+                            data-rating-control
+                            role="slider"
+                            tabindex="0"
+                            aria-label="Review rating"
+                            aria-valuemin="0.5"
+                            aria-valuemax="5"
+                            aria-valuenow="{{ review_form.rating.value|default:'5.0' }}"
+                        >
+                            <span class="star-input__base" aria-hidden="true"></span>
+                            <span class="star-input__fill" data-rating-fill aria-hidden="true"></span>
+                        </span>
+                        <span class="star-input__hint" data-rating-label></span>
+                    </span>
+                    {% if review_form.rating.errors %}{{ review_form.rating.errors }}{% endif %}
+                </p>
+                <p>
+                    {{ review_form.message.label_tag }}<br>
+                    {{ review_form.message }}
+                    {% if review_form.message.errors %}{{ review_form.message.errors }}{% endif %}
+                </p>
+                <p class="star-input__help">Click the left or right side of a star to choose half or full stars.</p>
+                <input type="submit" value="Save review">
+            </form>
+        {% endif %}
+
+        {% if review_count %}
+            <p>{{ average_rating|floatformat:1 }} average from {{ review_count }} review{{ review_count|pluralize }}</p>
+            {% for review in reviews %}
+                <article class="review-card">
+                    <p>
+                        <strong><a href="{{ review.user.get_absolute_url }}">{{ review.user }}</a></strong>
+                        -
+                        <span class="star-display" aria-hidden="true">
+                            <span class="star-display__fill" style="width:{{ review.get_rating_percentage }}%"></span>
+                        </span>
+                        -
+                        {{ review.rating }}/5
+                    </p>
+                    <p class="review-card__meta">{{ review.updated_at|date:"j F Y" }}</p>
+                    <p>{{ review.message|linebreaksbr }}</p>
+                    {% if request.user.is_authenticated %}
+                        <div class="review-card__footer">
+                            <form action="{{ request.path }}" method="POST" class="review-report-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="report_review_id" value="{{ review.id }}">
+                                <textarea name="reason" rows="3" placeholder="Optional: tell us why this review should be checked."></textarea>
+                                <button type="submit" class="button">Report review</button>
+                            </form>
+                            {% if perms.vehicles.delete_review %}
+                                <form action="{{ request.path }}" method="POST">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="delete_review_id" value="{{ review.id }}">
+                                    <button type="submit" class="button">Delete review</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        {% else %}
+            <p>No reviews yet.</p>
+        {% endif %}
+    </section>
+{% endif %}
+
+{% if photo_form %}
+
+    {% with photos=vehicle.photo_set.all %}
+    {% if photos|length > 1 %}
+        <section style="margin: 1rem 0;">
+            <h2 style="font-size: 1rem; margin-bottom: 0.75rem; opacity: 0.7;">More photos</h2>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                {% for photo in photos %}{% if not forloop.first %}
+                    <img src="{{ photo.get_display_url }}" style="width: 180px; height: 95px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color);" alt="">
+                {% endif %}{% endfor %}
+            </div>
+        </section>
+    {% endif %}
+    {% endwith %}
+
+    <form action="{{ request.path }}" method="POST" enctype="multipart/form-data" style="margin: 1rem 0;">
+        {{ photo_form.as_p }}
+        {% csrf_token %}
+        <input type="submit">
+    </form>
+
+{% endif %}
+
+
+<div id="history"></div>
+
+{% if vehicle and request.user.is_superuser %}
+    <p><a href="{% url 'latest_journey_debug' vehicle.pk %}">Debug</a></p>
+{% endif %}
+
+{% if next or previous %}
+    <nav>
+        {% if previous %}
+            <p class="previous"><a href="{{ previous.get_absolute_url }}">&larr; {{ previous }}</a></p>
+        {% endif %}
+
+        {% if next %}
+            <p class="next"><a href="{{ next.get_absolute_url }}">{{ next }} &rarr;</a></p>
+        {% endif %}
+    </nav>
+{% endif %}
+
+{% endblock content %}
+
+{% block foot %}
+    {% if review_form %}
+        <script>
+            (() => {
+                const picker = document.querySelector("[data-rating-picker]");
+                if (!picker) return;
+
+                const input = picker.querySelector('input[name="rating"]');
+                const control = picker.querySelector("[data-rating-control]");
+                const fill = picker.querySelector("[data-rating-fill]");
+                const label = picker.querySelector("[data-rating-label]");
+
+                const clampRating = (value) => Math.max(0.5, Math.min(5, value));
+
+                const formatRating = (value) => `${value.toFixed(1)} / 5`;
+
+                const setRating = (value) => {
+                    const rating = clampRating(Math.round(value * 2) / 2);
+                    input.value = rating.toFixed(1);
+                    fill.style.width = `${(rating / 5) * 100}%`;
+                    control.setAttribute("aria-valuenow", input.value);
+                    label.textContent = formatRating(rating);
+                };
+
+                const pointerToRating = (event) => {
+                    const rect = control.getBoundingClientRect();
+                    const relativeX = Math.max(0, Math.min(event.clientX - rect.left, rect.width));
+                    const rawStars = (relativeX / rect.width) * 5;
+                    const starIndex = Math.max(0, Math.min(4, Math.floor(rawStars)));
+                    const offsetWithinStar = rawStars - starIndex;
+                    return starIndex + (offsetWithinStar < 0.5 ? 0.5 : 1);
+                };
+
+                control.addEventListener("click", (event) => {
+                    setRating(pointerToRating(event));
+                });
+
+                control.addEventListener("keydown", (event) => {
+                    const currentRating = Number.parseFloat(input.value || "5.0");
+                    if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+                        event.preventDefault();
+                        setRating(currentRating - 0.5);
+                    } else if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+                        event.preventDefault();
+                        setRating(currentRating + 0.5);
+                    } else if (event.key === "Home") {
+                        event.preventDefault();
+                        setRating(0.5);
+                    } else if (event.key === "End") {
+                        event.preventDefault();
+                        setRating(5);
+                    }
+                });
+
+                setRating(Number.parseFloat(input.value || "5.0"));
+            })();
+        </script>
+    {% endif %}
+    <link rel="stylesheet" href="/liveries.{{ liveries_css_version }}.css">
+
+    {% if vehicle.livery %}
+    <style>{% for css in vehicle.livery.get_styles %}{{ css|safe }}{% endfor %}</style>
+    {% endif %}
+
+    {% if journeys or date %}
+        <script>
+            {% if vehicle %}VEHICLE_ID{% else %}SERVICE_ID{% endif %} = {{ object.id }};
+            LIVERIES_CSS_URL = "/liveries.{{ liveries_css_version }}.css";
+        </script>
+        <link rel="stylesheet" href="{% static 'dist/js/app.css' %}">
+        <script async src="{% static 'dist/js/app.js' %}"></script>
+
+    {% endif %}
+{% endblock foot %}

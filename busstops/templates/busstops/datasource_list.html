@@ -1,0 +1,81 @@
+{% extends 'page.html' %}
+
+{% block title %}Timetable sources{% endblock %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block bodyclass %}{% endblock %}
+
+{% block content %}
+
+<style>
+    table {
+        table-layout: fixed;
+        width: 100%;
+        min-width: 1000px;
+    }
+    .routes {
+        width: 60px;
+    }
+
+    td {
+        overflow: hidden;
+    }
+    .search-form {
+        margin-bottom: 1rem;
+    }
+    .search-form input {
+        padding: 0.5rem;
+        min-width: 300px;
+    }
+    .search-form button {
+        padding: 0.5rem 1rem;
+    }
+</style>
+
+<h1>Timetable data sources</h1>
+
+<p>Compare to the <a href="https://www.travelinedata.org.uk/traveline-open-data/data-reporting/">Traveline data reporting page</a></p>
+
+<form method="get" class="search-form">
+    <input type="search" name="q" value="{{ query }}" placeholder="Search by name or URL (e.g., TNDS, OLD)">
+    <button type="submit">Search</button>
+    {% if query %}
+        <a href="/sources/">Clear</a>
+    {% endif %}
+</form>
+
+<table>
+    <thead>
+        <th scope="col">dataset</th>
+        <th scope="col">url</th>
+        <th scope="col" class="routes">routes</th>
+        <th scope="col">updated</th>
+    </thead>
+    <tbody>
+    {% for object in object_list %}
+        <tr>
+            <td class="link nowrap"><a href="/sources/{{ object.id }}">{{ object }}</a></td>
+            <td class="nowrap">
+                {% if ".bus-data.dft." in object.url %}
+                    👑
+                    {{ object.get_nice_url|urlize }}
+                {% else %}
+                    {% if ".transportforireland." in object.url %}
+                        🇮🇪
+                    {% endif %}
+                    {{ object.url|urlize }}
+                {% endif %}
+            </td>
+            <td class="link"><a href="/sources/{{ object.id }}">{{ object.routes }}</a></td>
+            <td>{{ object.datetime }}</td>
+        </tr>
+    {% empty %}
+        <tr>
+            <td colspan="4">No data sources found matching "{{ query }}"</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+{% endblock content %}

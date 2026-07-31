@@ -1,0 +1,73 @@
+{% extends 'page.html' %}
+{% load static %}
+
+{% block title %}Fleet History - {{ object }} - bustimes.org{% endblock %}
+
+{% block canonical %}
+    <link rel="canonical" href="https://bustimes.org{% url 'fleet_history_calendar' object.slug %}">
+{% endblock canonical %}
+
+{% block head %}
+    <link rel="stylesheet" href="/liveries.{{ liveries_css_version }}.css">
+    {% include 'includes/theme_styles.html' with page_theme=page_theme %}
+{% endblock head %}
+
+{% block content %}
+
+<h1>{{ object.name }}{% if object.preserved %} <i>(preserved)</i>{% endif %}</h1>
+
+<ul class="tabs">
+    <li><a href="{% url 'operator_vehicles' object.slug %}">Fleet</a></li>
+    <li><a href="{% url 'operator_vehicles' object.slug %}?tab=depots">Depot map</a></li>
+    <li><a href="{% url 'operator_map' object.slug %}">Map</a></li>
+    <li>Fleet History</li>
+</ul>
+
+{% if no_data %}
+    <p>No historical fleet data available yet. Add historical vehicles with joined/left fleet dates to see the calendar.</p>
+{% else %}
+    <p>Select a month to view the fleet as it was at that time:</p>
+    
+    <div class="fleet-history-calendar">
+        {% for month_data in calendar_months %}
+            <a href="{% url 'fleet_history_month' object.slug month_data.year month_data.month %}" class="calendar-month">
+                <div class="calendar-month__name">{{ month_data.month_name }} {{ month_data.year }}</div>
+                <div class="calendar-month__count">{{ month_data.vehicle_count }} vehicle{{ month_data.vehicle_count|pluralize }}</div>
+            </a>
+        {% endfor %}
+    </div>
+    
+    <style>
+        .fleet-history-calendar {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .calendar-month {
+            display: block;
+            padding: 1.25rem;
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            text-decoration: none;
+            color: var(--text-color);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .calendar-month:hover {
+            border-color: var(--accent-color);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .calendar-month__name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .calendar-month__count {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+    </style>
+{% endif %}
+
+{% endblock content %}

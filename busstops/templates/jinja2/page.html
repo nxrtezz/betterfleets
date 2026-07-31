@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}{% if object %}{{ object }} - {% endif %}betterfleets{% endblock %}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#ffff9e" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)">
+<meta name="format-detection" content="telephone=no">
+<script>
+(function () {
+    var storageKey = "site-theme";
+    var root = document.documentElement;
+    var mediaQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+    var listeningForSystemTheme = false;
+    var themes = {
+        "solent-blue": {
+            light: {
+                "brand-color": "#8fdfff",
+                "brand-color-darker": "#0bb7ef",
+                "brand-color-darker-darker": "#0b86d7",
+                "border-color": "#66cbed",
+                "border-color-darker": "#0b86d7",
+                "background-color": "#f4fbff",
+                "text-color": "#0a2236",
+                "link-color": "#0a63a8",
+                "active-link-color": "#04111d",
+                "header-text-color": "#04111d",
+                "button-background": "#0b86d7",
+                "button-foreground": "#ffffff",
+                "summary-marker-color": "#0b86d7"
+            },
+            dark: {
+                "brand-color": "#0b86d7",
+                "brand-color-darker": "#08639f",
+                "brand-color-darker-darker": "#053a61",
+                "border-color": "#0d4e78",
+                "border-color-darker": "#8fdfff",
+                "background-color": "#08131d",
+                "text-color": "#e8f7ff",
+                "link-color": "#8fdfff",
+                "active-link-color": "#ffffff",
+                "header-text-color": "#f6fdff",
+                "button-background": "#11a7e6",
+                "button-foreground": "#03111a",
+                "summary-marker-color": "#8fdfff"
+            }
+        },
+        "ultraviolet": {
+            light: {
+                "brand-color": "#a65cd1",
+                "brand-color-darker": "#8c43bd",
+                "brand-color-darker-darker": "#5f2f97",
+                "border-color": "#c7b3d8",
+                "border-color-darker": "#7d54ad",
+                "background-color": "#f8f4ff",
+                "text-color": "#1e1638",
+                "link-color": "#7f35b7",
+                "active-link-color": "#120a2d",
+                "header-text-color": "#fdfbff",
+                "button-background": "#7a3fb0",
+                "button-foreground": "#ffffff",
+                "summary-marker-color": "#8c43bd"
+            },
+            dark: {
+                "brand-color": "#6d44c3",
+                "brand-color-darker": "#55339d",
+                "brand-color-darker-darker": "#2e1f75",
+                "border-color": "#4c3a82",
+                "border-color-darker": "#b98ce0",
+                "background-color": "#0f0d1b",
+                "text-color": "#f4ecff",
+                "link-color": "#c792ff",
+                "active-link-color": "#ffffff",
+                "header-text-color": "#f8f5ff",
+                "button-background": "#a65cd1",
+                "button-foreground": "#160d38",
+                "summary-marker-color": "#adadad"
+            }
+        },
+        "olympia": {
+            light: {
+                "brand-color": "#5768a0",
+                "brand-color-darker": "#a9b8e3",
+                "brand-color-darker-darker": "#e0effa",
+                "border-color": "#a9b8e3",
+                "border-color-darker": "#5768a0",
+                "background-color": "#e0effa",
+                "text-color": "#5768a0",
+                "link-color": "#5768a0",
+                "active-link-color": "#e0effa",
+                "header-text-color": "#e0effa",
+                "button-background": "#a9b8e3",
+                "button-foreground": "#5768a0",
+                "summary-marker-color": "#e0effa"
+            },
+            dark: {
+                "brand-color": "#a9b8e3",
+                "brand-color-darker": "#e0effa",
+                "brand-color-darker-darker": "#e0effa",
+                "border-color": "#a9b8e3",
+                "border-color-darker": "#e0effa",
+                "background-color": "#5768a0",
+                "text-color": "#e0effa",
+                "link-color": "#a9b8e3",
+                "active-link-color": "#5768a0",
+                "header-text-color": "#5768a0",
+                "button-background": "#e0effa",
+                "button-foreground": "#5768a0",
+                "summary-marker-color": "#e0effa"
+            }
+        }
+    };
+    var themeFields = [
+        "brand-color",
+        "brand-color-darker",
+        "brand-color-darker-darker",
+        "border-color",
+        "border-color-darker",
+        "background-color",
+        "text-color",
+        "link-color",
+        "active-link-color",
+        "header-text-color",
+        "button-background",
+        "button-foreground",
+        "summary-marker-color"
+    ];
+
+    function getStoredMode() {
+        try {
+            var stored = localStorage.getItem(storageKey);
+            if (stored === "light" || stored === "dark" || stored === "solent-blue" || stored === "ultraviolet" || stored === "olympia") {
+                return stored;
+            }
+        } catch (error) {
+        }
+        return "system";
+    }
+
+    function resolveMode(mode) {
+        return mode === "dark" || (mode !== "light" && mediaQuery && mediaQuery.matches)
+            ? "dark"
+            : "light";
+    }
+
+    function clearThemeVars() {
+        themeFields.forEach(function (field) {
+            root.style.removeProperty("--" + field);
+        });
+    }
+
+    function applyThemeVars(mode, resolved) {
+        clearThemeVars();
+        if (!themes[mode]) {
+            return;
+        }
+
+        var values = themes[mode][resolved];
+        themeFields.forEach(function (field) {
+            if (values[field]) {
+                root.style.setProperty("--" + field, values[field]);
+            }
+        });
+    }
+
+    function applyTheme(mode, persist) {
+        if (mode !== "light" && mode !== "dark" && mode !== "solent-blue" && mode !== "ultraviolet" && mode !== "olympia") {
+            mode = "system";
+        }
+
+        if (persist) {
+            try {
+                if (mode === "system") {
+                    localStorage.removeItem(storageKey);
+                } else {
+                    localStorage.setItem(storageKey, mode);
+                }
+            } catch (error) {
+            }
+        }
+
+        var resolved = resolveMode(mode);
+        root.dataset.siteTheme = mode;
+        root.dataset.resolvedTheme = resolved;
+        root.classList.toggle("dark-mode", resolved === "dark");
+        root.classList.toggle("light-mode", resolved === "light");
+        applyThemeVars(mode, resolved);
+    }
+
+    function listenForSystemThemeChanges() {
+        if (!mediaQuery || listeningForSystemTheme) {
+            return;
+        }
+
+        var handleChange = function () {
+            if (getStoredMode() === "system") {
+                applyTheme("system", false);
+            }
+        };
+
+        if (mediaQuery.addEventListener) {
+            mediaQuery.addEventListener("change", handleChange);
+        } else if (mediaQuery.addListener) {
+            mediaQuery.addListener(handleChange);
+        }
+
+        listeningForSystemTheme = true;
+    }
+
+    window.siteTheme = {
+        apply: applyTheme,
+        getStoredMode: getStoredMode,
+        start: function () {
+            applyTheme(getStoredMode(), false);
+            listenForSystemThemeChanges();
+        }
+    };
+
+    window.siteTheme.start();
+})();
+</script>
+{% block canonical %}
+    <link rel="canonical" href="{{ object.get_absolute_url() }}">
+{% endblock canonical %}
+<link rel="icon" sizes="48x48" type="image/png" href="/favicon.ico">
+<link rel="icon" sizes="any" type="image/svg+xml" href="{{ static('svg/favicon.png') }}">
+<link rel="manifest" href="{{ static('manifest.webmanifest') }}">
+<link rel="stylesheet" href="{{ static('dist/css/style.css') }}">
+<script>
+window.MAP_DEFAULT_STYLE = "";
+window.MAP_STYLE_URL = "";
+window.MAP_STYLE_DARK_URL = "";
+window.STADIA_MAPS_API_KEY = "";
+</script>
+
+{% block head %}{% endblock %}
+
+{% block fuse %}
+{% if ad %}
+<script src="{{ static('consent.js') }}"></script>
+<script>if(window.top===window.self&&window.location.host==="bustimes.org"&&typeof Array.prototype.includes!=="undefined"){s=document.getElementsByTagName('script')[0];var sc=document.createElement('script');sc.async=true;sc.src='https://cdn.adfirst.media/hb/bustimes.js?v'+Math.floor(new Date().getTime()/600000);s.parentNode.insertBefore(sc,s);}</script>
+{% endif %}
+{% endblock fuse %}
+
+<!-- Umami analytics script disabled - domain no longer exists -->
+<!-- <script async src="https://umami.bustimes.org.uk/script.js" data-website-id="62fea6ac-a287-4ede-962b-5cf0029a8a7b" data-exclude-hash="true"></script> -->
+<script>
+(function () {
+    var title = document.title || "";
+    title = title.replace(/bustimes\.org/gi, "betterfleets");
+    title = title.replace(/Better Fleets/gi, "betterfleets");
+    if (title) {
+        document.title = title;
+    }
+})();
+</script>
+
+</head>
+<body class="{% block bodyclass %}wide{% endblock %}{% if ad is false %} no-ads{% endif %}">
+
+<a href="#content" class="skip">Skip to main content</a>
+{% block header %}
+<header class="site-header">
+    <div>
+        <a href="/" class="site-name">Better Fleets</a>
+        <ul>
+            <li><a href="/vehicles">Fleet</a></li>
+            <li><a href="/blog">Blog</a></li>
+            <li><a href="/users">Users</a></li>
+            {% if request.user.is_authenticated %}
+                <li><a href="/users/{{ request.user.id }}">Your account</a></li>
+            {% else %}
+                <li><a href="/register?next={{ request.path }}">Sign up / log in</a></li>
+            {% endif %}
+        </ul>
+        <form method="GET" action="/search" class="search">
+            <label>
+                Search
+                <input name="q" placeholder="Search" type="search" value="" required>
+            </label>
+            <input type="submit" value="Search">
+        </form>
+    </div>
+</header>
+{% endblock header %}
+<main>
+    {% block breadcrumb %}{% include 'breadcrumb.html' %}{% endblock %}
+    <div id="content">
+        {% block content %}{% endblock %}
+    </div>
+</main>
+
+{% block footer %}
+<footer class="site-footer">
+    <div class="site-footer__inner">
+        {% if request.user.is_authenticated %}
+            <div class="site-footer__meta">
+                <form action="{{ url('account_logout') }}" method="POST" class="site-footer__account">
+                    <ul class="site-footer__links">
+                        <li><a href="{{ url('user_detail', args=[request.user.id]) }}">{{ request.user.get_display_name() }}</a></li>
+                        {% if request.user.trusted %}
+                            <li><a href="/vehicles/edits?status=pending">Pending edits</a></li>
+                        {% endif %}
+                        <li><a href="/requests">Requests</a></li>
+                        {% if request.user.is_superuser %}
+                            <li><a href="/fleet/import">Fleet import</a></li>
+                        {% endif %}
+                    </ul>
+                </form>
+            </div>
+        {% endif %}
+        <div class="site-footer__meta">
+            <ul class="site-footer__links">
+                <li><a href="/blog">Blog</a></li>
+                <li><a href="/contact">Contact</a></li>
+                <li><a href="/data">Data sources</a></li>
+                <li><a href="/status">Status</a></li>
+                <li><a href="/privacy">Privacy policy</a></li>
+                <li><a href="/rules">Rules & FAQ</a></li>
+                <li><a href="https://discord.gg/QfmMuYH88Q">Discord</a></li>
+                {% if ad %}<li><a href="javascript:window.__tcfapi('displayConsentUi',2,function(){})">Privacy settings</a></li>{% endif %}
+                <li>
+                    <label class="theme-switcher" for="site-theme-select">
+                        <span class="theme-switcher__label">Theme</span>
+                        <select id="site-theme-select" name="site-theme">
+                            <option value="system">System</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                            <option value="solent-blue">Solent Blue</option>
+                            <option value="ultraviolet">Ultraviolet</option>
+                            <option value="olympia">Olympia</option>
+                        </select>
+                    </label>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <p class="site-footer__license">
+        Better Fleets &copy; 2026 by Nightfall is licensed under
+        <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>.
+    </p>
+</footer>
+{% endblock footer %}
+
+<script>
+// Clerk Authentication
+(function() {
+    const clerkAuthContainer = document.getElementById('clerk-auth-container');
+    if (!clerkAuthContainer) return;
+
+    // Fetch Clerk config
+    fetch('/clerk/config/')
+        .then(response => response.json())
+        .then(data => {
+            if (data.publishableKey) {
+                // Load Clerk SDK
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js';
+                script.crossOrigin = 'anonymous';
+                script.onload = function() {
+                    if (window.Clerk) {
+                        const clerk = new window.Clerk(data.publishableKey);
+                        
+                        clerk.load().then(() => {
+                            if (clerk.user) {
+                                // Show user button when signed in
+                                clerk.mountUserButton(clerkAuthContainer);
+                            } else {
+                                // Show sign-in/sign-up buttons when signed out
+                                clerk.mountSignIn(clerkAuthContainer);
+                            }
+                        });
+                    }
+                };
+                document.head.appendChild(script);
+            }
+        })
+        .catch(error => console.error('Failed to load Clerk config:', error));
+})();
+</script>
+
+<script>
+(function () {
+    var select = document.getElementById("site-theme-select");
+    if (!select || !window.siteTheme) {
+        return;
+    }
+
+    select.value = window.siteTheme.getStoredMode();
+    select.addEventListener("change", function (event) {
+        window.siteTheme.apply(event.target.value, true);
+    });
+})();
+</script>
+
+{% block foot %}{% endblock %}
+
+</body>
+</html>

@@ -1,0 +1,33 @@
+{% extends 'page.html' %}
+
+{% block title %}Preservation Groups - betterfleets{% endblock %}
+
+{% block meta_description %}
+    <meta name="description" content="Browse preservation groups and the preserved vehicles they care for.">
+{% endblock meta_description %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+    <h1>Preservation Groups</h1>
+    <p>Standalone preservation groups and societies with preserved vehicles listed on Better Fleets.</p>
+
+    {% if groups %}
+        <div class="panes">
+            {% for group in groups %}
+                <article class="pane">
+                    {% if group.logo %}
+                        <p><img src="{{ group.logo.url }}" alt="" style="max-width:min(12rem, 80%);max-height:7rem;object-fit:contain;"></p>
+                    {% endif %}
+                    <h2><a href="{{ group.get_absolute_url }}">{{ group.name }}</a></h2>
+                    {% if group.description %}<p>{{ group.description|truncatewords:32 }}</p>{% endif %}
+                    <p>{{ group.vehicle_count }} preserved vehicle{{ group.vehicle_count|pluralize }}</p>
+                </article>
+            {% endfor %}
+        </div>
+
+        {% include 'pagination.html' with page=groups %}
+    {% else %}
+        <p>No preservation groups are listed yet.</p>
+    {% endif %}
+{% endblock content %}

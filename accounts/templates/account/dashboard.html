@@ -1,0 +1,340 @@
+{% extends 'page.html' %}
+{% load i18n %}
+
+{% block title %}Account Dashboard - BetterFleet{% endblock %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <style>
+        .account-dashboard {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .account-dashboard__card {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+
+        .account-dashboard__profile-header {
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .account-dashboard__avatar {
+            width: 4rem;
+            height: 4rem;
+            border-radius: 999px;
+            border: 3px solid var(--border-color);
+            object-fit: cover;
+            background: linear-gradient(135deg, #1d4ed8, #0f766e);
+            display: grid;
+            place-items: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .account-dashboard__profile-info h1 {
+            margin: 0 0 0.25rem 0;
+            font-size: 1.25rem;
+        }
+
+        .account-dashboard__profile-info p {
+            margin: 0;
+            color: var(--secondary-text-color);
+            font-size: 0.9rem;
+        }
+
+        .account-dashboard__nav {
+            display: grid;
+            gap: 0.5rem;
+            padding: 1rem;
+        }
+
+        .account-dashboard__nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            color: var(--text-color);
+            transition: background 0.15s, border-color 0.15s;
+            border: 1px solid transparent;
+        }
+
+        .account-dashboard__nav-link:hover {
+            background: rgba(148, 163, 184, 0.1);
+            border-color: var(--border-color);
+        }
+
+        .account-dashboard__nav-link.active {
+            background: var(--brand-color);
+            color: var(--button-foreground);
+        }
+
+        .account-dashboard__nav-link__icon {
+            font-size: 1.25rem;
+        }
+
+        .account-dashboard__section {
+            padding: 1.5rem;
+        }
+
+        .account-dashboard__section h2 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-color);
+            opacity: 0.75;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .account-dashboard__quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .account-dashboard__quick-action {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            text-decoration: none;
+            color: var(--text-color);
+            transition: border-color 0.15s, background 0.15s;
+        }
+
+        .account-dashboard__quick-action:hover {
+            border-color: var(--brand-color-darker);
+            background: rgba(148, 163, 184, 0.05);
+        }
+
+        .account-dashboard__quick-action__icon {
+            font-size: 1.5rem;
+        }
+
+        .account-dashboard__quick-action__text {
+            flex: 1;
+        }
+
+        .account-dashboard__quick-action__title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .account-dashboard__quick-action__description {
+            font-size: 0.85rem;
+            color: var(--secondary-text-color);
+        }
+
+        .account-dashboard__stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .account-dashboard__stat {
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+
+        .account-dashboard__stat__value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--brand-color-darker);
+        }
+
+        .account-dashboard__stat__label {
+            font-size: 0.85rem;
+            color: var(--secondary-text-color);
+            margin-top: 0.25rem;
+        }
+
+        .account-dashboard__badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .account-dashboard__badge--success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .account-dashboard__badge--warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .account-dashboard__badge--danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        @media (min-width: 800px) {
+            .account-dashboard__content {
+                display: grid;
+                grid-template-columns: 250px 1fr;
+                gap: 1.5rem;
+                align-items: start;
+            }
+
+            .account-dashboard__nav {
+                position: sticky;
+                top: 1rem;
+            }
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <div class="account-dashboard">
+        <div class="account-dashboard__card">
+            <div class="account-dashboard__profile-header">
+                {% if user.get_profile_picture_url %}
+                    <img class="account-dashboard__avatar" src="{{ user.get_profile_picture_url }}" alt="{{ user.get_display_name }}">
+                {% else %}
+                    <div class="account-dashboard__avatar">{{ user.get_display_name|first|upper }}</div>
+                {% endif %}
+                <div class="account-dashboard__profile-info">
+                    <h1>{{ user.get_display_name }}</h1>
+                    <p>@{{ user.get_username_display }}</p>
+                    <p>{{ user.email }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="account-dashboard__content">
+            <nav class="account-dashboard__nav account-dashboard__card">
+                <a href="{% url 'account_dashboard' %}" class="account-dashboard__nav-link active">
+                    <span class="account-dashboard__nav-link__icon">🏠</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{% url 'account_profile' %}" class="account-dashboard__nav-link">
+                    <span class="account-dashboard__nav-link__icon">👤</span>
+                    <span>Profile Settings</span>
+                </a>
+                <a href="{% url 'account_email' %}" class="account-dashboard__nav-link">
+                    <span class="account-dashboard__nav-link__icon">📧</span>
+                    <span>Email Addresses</span>
+                </a>
+                <a href="{% url 'account_change_password' %}" class="account-dashboard__nav-link">
+                    <span class="account-dashboard__nav-link__icon">🔒</span>
+                    <span>Change Password</span>
+                </a>
+                <a href="{% url 'socialaccount_connections' %}" class="account-dashboard__nav-link">
+                    <span class="account-dashboard__nav-link__icon">🔗</span>
+                    <span>Connected Accounts</span>
+                </a>
+                <a href="{% url 'mfa_index' %}" class="account-dashboard__nav-link">
+                    <span class="account-dashboard__nav-link__icon">🔑</span>
+                    <span>Two-Factor Authentication</span>
+                </a>
+                <a href="{% url 'account_sessions' %}" class="account-dashboard__nav-link">
+                    <span class="account-dashboard__nav-link__icon">💻</span>
+                    <span>Sessions</span>
+                </a>
+                <a href="{% url 'user_detail' user.id %}" class="account-dashboard__nav-link">
+                    <span class="account-dashboard__nav-link__icon">📊</span>
+                    <span>Public Profile</span>
+                </a>
+            </nav>
+
+            <div class="account-dashboard__main">
+                <div class="account-dashboard__card account-dashboard__section">
+                    <h2>Account Overview</h2>
+                    <div class="account-dashboard__stat-grid">
+                        <div class="account-dashboard__stat">
+                            <div class="account-dashboard__stat__value">{{ user.date_joined|date:"M Y" }}</div>
+                            <div class="account-dashboard__stat__label">Member Since</div>
+                        </div>
+                        <div class="account-dashboard__stat">
+                            <div class="account-dashboard__stat__value">{{ user.total_count }}</div>
+                            <div class="account-dashboard__stat__label">Edits Made</div>
+                        </div>
+                        <div class="account-dashboard__stat">
+                            <div class="account-dashboard__stat__value">{{ user.review_count }}</div>
+                            <div class="account-dashboard__stat__label">Reviews</div>
+                        </div>
+                        {% if user.score is not None %}
+                        <div class="account-dashboard__stat">
+                            <div class="account-dashboard__stat__value">{{ user.score }}/100</div>
+                            <div class="account-dashboard__stat__label">Score</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="account-dashboard__card account-dashboard__section">
+                    <h2>Quick Actions</h2>
+                    <div class="account-dashboard__quick-actions">
+                        <a href="{% url 'account_profile' %}" class="account-dashboard__quick-action">
+                            <span class="account-dashboard__quick-action__icon">✏️</span>
+                            <div class="account-dashboard__quick-action__text">
+                                <div class="account-dashboard__quick-action__title">Edit Profile</div>
+                                <div class="account-dashboard__quick-action__description">Update your profile information</div>
+                            </div>
+                        </a>
+                        <a href="{% url 'account_email' %}" class="account-dashboard__quick-action">
+                            <span class="account-dashboard__quick-action__icon">📧</span>
+                            <div class="account-dashboard__quick-action__text">
+                                <div class="account-dashboard__quick-action__title">Manage Email</div>
+                                <div class="account-dashboard__quick-action__description">Add or change email addresses</div>
+                            </div>
+                        </a>
+                        <a href="{% url 'account_change_password' %}" class="account-dashboard__quick-action">
+                            <span class="account-dashboard__quick-action__icon">🔒</span>
+                            <div class="account-dashboard__quick-action__text">
+                                <div class="account-dashboard__quick-action__title">Change Password</div>
+                                <div class="account-dashboard__quick-action__description">Update your password</div>
+                            </div>
+                        </a>
+                        <a href="{% url 'socialaccount_connections' %}" class="account-dashboard__quick-action">
+                            <span class="account-dashboard__quick-action__icon">🔗</span>
+                            <div class="account-dashboard__quick-action__text">
+                                <div class="account-dashboard__quick-action__title">Connected Accounts</div>
+                                <div class="account-dashboard__quick-action__description">Manage social logins</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="account-dashboard__card account-dashboard__section">
+                    <h2>Account Status</h2>
+                    <p>
+                        <strong>Email:</strong> {{ user.email }}
+                    </p>
+                    <p><strong>Account Type:</strong> {% if user.is_superuser %}Superuser{% elif user.operatoruser_set.exists %}{% for op_user in user.operatoruser_set.all %}{% if op_user.operator.group %}{{ op_user.operator.group.name }}{% elif op_user.staff %}Staff Member{% else %}{{ op_user.operator.name }}{% endif %}{% endfor %}{% elif user.is_staff %}Staff Member{% elif user.trusted %}Trusted User{% else %}Standard{% endif %}</p>
+                    {% if user.trusted %}
+                    <p><strong>Status:</strong> <span class="account-dashboard__badge account-dashboard__badge--success">Trusted Contributor</span></p>
+                    {% endif %}
+                    <p><strong>Last Login:</strong> {{ user.last_login|date:"d M Y, H:i" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

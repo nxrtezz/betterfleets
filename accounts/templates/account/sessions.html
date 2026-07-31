@@ -1,0 +1,285 @@
+{% extends 'page.html' %}
+{% load i18n %}
+
+{% block title %}Sessions - BetterFleet{% endblock %}
+
+{% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <style>
+        .account-sessions {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .account-sessions__card {
+            background: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+
+        .account-sessions__section {
+            padding: 1.5rem;
+        }
+
+        .account-sessions__section h2 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-color);
+            opacity: 0.75;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .account-sessions__list {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .account-sessions__item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            background: var(--background-color);
+        }
+
+        .account-sessions__item__info {
+            flex: 1;
+        }
+
+        .account-sessions__item__device {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .account-sessions__item__details {
+            font-size: 0.85rem;
+            color: var(--secondary-text-color);
+        }
+
+        .account-sessions__item__actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .account-sessions__item__actions button {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            background: var(--background-color);
+            color: var(--text-color);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .account-sessions__item__actions button:hover {
+            background: rgba(148, 163, 184, 0.1);
+            border-color: var(--border-color-darker);
+        }
+
+        .account-sessions__item__actions button.btn-danger {
+            color: #dc2626;
+            border-color: #fecaca;
+        }
+
+        .account-sessions__item__actions button.btn-danger:hover {
+            background: #fef2f2;
+            border-color: #dc2626;
+        }
+
+        .account-sessions__badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .account-sessions__badge--current {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .account-sessions__actions {
+            display: flex;
+            gap: 1rem;
+            padding: 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .account-sessions__actions button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .account-sessions__actions .btn-danger {
+            background: #dc2626;
+            color: white;
+        }
+
+        .account-sessions__actions .btn-danger:hover {
+            background: #b91c1c;
+        }
+
+        .account-sessions__nav {
+            display: grid;
+            gap: 0.5rem;
+            padding: 1rem;
+        }
+
+        .account-sessions__nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            color: var(--text-color);
+            transition: background 0.15s, border-color 0.15s;
+            border: 1px solid transparent;
+        }
+
+        .account-sessions__nav-link:hover {
+            background: rgba(148, 163, 184, 0.1);
+            border-color: var(--border-color);
+        }
+
+        .account-sessions__nav-link.active {
+            background: var(--brand-color);
+            color: var(--button-foreground);
+        }
+
+        .account-sessions__nav-link__icon {
+            font-size: 1.25rem;
+        }
+
+        .account-sessions__info {
+            padding: 1rem;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .account-sessions__info p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: var(--text-color);
+        }
+
+        @media (min-width: 800px) {
+            .account-sessions__content {
+                display: grid;
+                grid-template-columns: 250px 1fr;
+                gap: 1.5rem;
+                align-items: start;
+            }
+
+            .account-sessions__nav {
+                position: sticky;
+                top: 1rem;
+            }
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <div class="account-sessions">
+        <div class="account-sessions__content">
+            <nav class="account-sessions__nav account-sessions__card">
+                <a href="{% url 'account_dashboard' %}" class="account-sessions__nav-link">
+                    <span class="account-sessions__nav-link__icon">🏠</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{% url 'account_profile' %}" class="account-sessions__nav-link">
+                    <span class="account-sessions__nav-link__icon">👤</span>
+                    <span>Profile Settings</span>
+                </a>
+                <a href="{% url 'account_email' %}" class="account-sessions__nav-link">
+                    <span class="account-sessions__nav-link__icon">📧</span>
+                    <span>Email Addresses</span>
+                </a>
+                <a href="{% url 'account_change_password' %}" class="account-sessions__nav-link">
+                    <span class="account-sessions__nav-link__icon">🔒</span>
+                    <span>Change Password</span>
+                </a>
+                <a href="{% url 'socialaccount_connections' %}" class="account-sessions__nav-link">
+                    <span class="account-sessions__nav-link__icon">🔗</span>
+                    <span>Connected Accounts</span>
+                </a>
+                <a href="{% url 'account_sessions' %}" class="account-sessions__nav-link active">
+                    <span class="account-sessions__nav-link__icon">💻</span>
+                    <span>Sessions</span>
+                </a>
+                <a href="{% url 'user_detail' user.id %}" class="account-sessions__nav-link">
+                    <span class="account-sessions__nav-link__icon">📊</span>
+                    <span>Public Profile</span>
+                </a>
+            </nav>
+
+            <div class="account-sessions__main">
+                <div class="account-sessions__card account-sessions__section">
+                    <h2>Active Sessions</h2>
+                    <div class="account-sessions__info">
+                        <p>These are the devices and browsers currently logged into your account. You can revoke sessions you no longer recognize.</p>
+                    </div>
+                    <div class="account-sessions__list">
+                        <div class="account-sessions__item">
+                            <div class="account-sessions__item__info">
+                                <div class="account-sessions__item__device">
+                                    Current Session
+                                    <span class="account-sessions__badge account-sessions__badge--current">Current</span>
+                                </div>
+                                <div class="account-sessions__item__details">
+                                    {{ request.META.HTTP_USER_AGENT|default:"Unknown browser" }}<br>
+                                    IP: {{ request.META.REMOTE_ADDR }}<br>
+                                    Last active: Now
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="account-sessions__card account-sessions__section">
+                    <h2>Session Management</h2>
+                    <p>You can sign out from all other devices to secure your account.</p>
+                    <form method="post" action="{% url 'account_logout' %}">
+                        <div class="account-sessions__actions">
+                            <button type="submit" class="btn-danger">Sign Out From All Devices</button>
+                        </div>
+                        {% csrf_token %}
+                    </form>
+                </div>
+
+                <div class="account-sessions__card account-sessions__section">
+                    <h2>Security Tips</h2>
+                    <ul style="margin: 0; padding-left: 1.25rem;">
+                        <li>Regularly review your active sessions</li>
+                        <li>Sign out from devices you don't recognize</li>
+                        <li>Use a strong, unique password</li>
+                        <li>Enable two-factor authentication when available</li>
+                        <li>Keep your email address verified</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

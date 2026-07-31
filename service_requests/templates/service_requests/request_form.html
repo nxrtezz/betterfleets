@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="header">
+        <h1>{% if form.instance.pk %}Edit Request{% else %}Submit Request{% endif %}</h1>
+        <a href="{% url 'service_requests:list' %}" class="button button-secondary">Back to Requests</a>
+    </div>
+    
+    <form method="post" class="request-form">
+        {% csrf_token %}
+        
+        <div class="form-field">
+            <label for="{{ form.title.id_for_label }}">Title *</label>
+            {{ form.title }}
+            {% if form.title.errors %}
+            <div class="error">{{ form.title.errors }}</div>
+            {% endif %}
+        </div>
+        
+        <div class="form-field">
+            <label for="{{ form.category.id_for_label }}">Category *</label>
+            {{ form.category }}
+            {% if form.category.errors %}
+            <div class="error">{{ form.category.errors }}</div>
+            {% endif %}
+            <small class="help-text">Choose the category that best describes your request</small>
+        </div>
+        
+        <div class="form-field">
+            <label for="{{ form.description.id_for_label }}">Description *</label>
+            {{ form.description }}
+            {% if form.description.errors %}
+            <div class="error">{{ form.description.errors }}</div>
+            {% endif %}
+        </div>
+        
+        <div id="category-specific-fields">
+            <div class="form-field vehicle-field" style="display: none;">
+                <label for="{{ form.vehicle.id_for_label }}">Vehicle</label>
+                {{ form.vehicle }}
+            </div>
+            
+            <div class="form-field service-field" style="display: none;">
+                <label for="{{ form.service.id_for_label }}">Service</label>
+                {{ form.service }}
+            </div>
+            
+            <div class="form-field operator-field" style="display: none;">
+                <label for="{{ form.operator.id_for_label }}">Operator</label>
+                {{ form.operator }}
+            </div>
+            
+            <div class="form-field vehicle-type-field" style="display: none;">
+                <label for="{{ form.vehicle_type.id_for_label }}">Vehicle Type</label>
+                {{ form.vehicle_type }}
+            </div>
+            
+            <div class="form-field livery-field" style="display: none;">
+                <label for="{{ form.livery.id_for_label }}">Livery</label>
+                {{ form.livery }}
+            </div>
+            
+            <div class="form-field vehicle-details-field" style="display: none;">
+                <label for="{{ form.fleet_number.id_for_label }}">Fleet Number</label>
+                {{ form.fleet_number }}
+            </div>
+            
+            <div class="form-field vehicle-details-field" style="display: none;">
+                <label for="{{ form.registration.id_for_label }}">Registration</label>
+                {{ form.registration }}
+            </div>
+            
+            <div class="form-field service-details-field" style="display: none;">
+                <label for="{{ form.route.id_for_label }}">Route</label>
+                {{ form.route }}
+            </div>
+            
+            <div class="form-field feature-field" style="display: none;">
+                <label for="{{ form.expected_behaviour.id_for_label }}">Expected Behaviour</label>
+                {{ form.expected_behaviour }}
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="button">{% if form.instance.pk %}Update Request{% else %}Submit Request{% endif %}</button>
+            <a href="{% url 'service_requests:list' %}" class="button button-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const categorySelect = document.getElementById('{{ form.category.id_for_label }}');
+    const fields = {
+        vehicle: document.querySelector('.vehicle-field'),
+        service: document.querySelector('.service-field'),
+        operator: document.querySelector('.operator-field'),
+        vehicle_type: document.querySelector('.vehicle-type-field'),
+        livery: document.querySelector('.livery-field'),
+        vehicle_details: document.querySelectorAll('.vehicle-details-field'),
+        service_details: document.querySelector('.service-details-field'),
+        feature: document.querySelector('.feature-field')
+    };
+    
+    function showFieldsForCategory(category) {
+        // Hide all fields first
+        Object.values(fields).forEach(field => {
+            if (field instanceof NodeList) {
+                field.forEach(f => f.style.display = 'none');
+            } else {
+                field.style.display = 'none';
+            }
+        });
+        
+        // Show relevant fields based on category
+        switch(category) {
+            case 'vehicle':
+                if (fields.vehicle) fields.vehicle.style.display = 'block';
+                fields.vehicle_details.forEach(f => f.style.display = 'block');
+                break;
+            case 'service':
+                if (fields.service) fields.service.style.display = 'block';
+                if (fields.service_details) fields.service_details.style.display = 'block';
+                break;
+            case 'operator':
+                if (fields.operator) fields.operator.style.display = 'block';
+                break;
+            case 'vehicle_type':
+                if (fields.vehicle_type) fields.vehicle_type.style.display = 'block';
+                break;
+            case 'livery':
+                if (fields.livery) fields.livery.style.display = 'block';
+                break;
+            case 'site_feature':
+                if (fields.feature) fields.feature.style.display = 'block';
+                break;
+        }
+    }
+    
+    // Show fields for initial category
+    if (categorySelect) {
+        showFieldsForCategory(categorySelect.value);
+        categorySelect.addEventListener('change', function() {
+            showFieldsForCategory(this.value);
+        });
+    }
+});
+</script>
+{% endblock %}

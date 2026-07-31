@@ -1,0 +1,144 @@
+{% extends 'page.html' %}
+
+{% block title %}Vehicles – bustimes.org{% endblock %}
+
+{% block canonical %}
+    <link rel="canonical" href="https://bustimes.org/vehicles">
+{% endblock canonical %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+
+<script>
+    if (window.location.hash) {
+        window.location.href = '/map' + window.location.hash;
+    }
+</script>
+
+<h1>Vehicles</h1>
+
+<p>It’s not the main point of bustimes.org, but we do have some unofficial fleet lists and things – a by-product of the <a href="/map">live bus tracking map</a>, with additional information provided by our wonderful users.</p>
+
+<p>There’s also <a href="/api/vehicles/">a vehicle information API</a>.</p>
+
+<h2>Operators</h2>
+
+<div class="filters">
+    <form method="get" action="" class="filter-form">
+        <div class="filter-group">
+            <label for="search">Search operators:</label>
+            <input type="text" id="search" name="search" value="{{ search_query }}" placeholder="Search operator name...">
+        </div>
+        <div class="filter-group">
+            <label for="vehicle_mode">Vehicle mode:</label>
+            <select id="vehicle_mode" name="vehicle_mode">
+                <option value="">All modes</option>
+                {% for mode in vehicle_modes %}
+                    <option value="{{ mode }}" {% if vehicle_mode_filter == mode %}selected{% endif %}>{{ mode }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="filter-button">Filter</button>
+        {% if search_query or vehicle_mode_filter %}
+            <a href="/vehicles" class="clear-filters">Clear filters</a>
+        {% endif %}
+    </form>
+</div>
+
+<style>
+    .filters {
+        margin: 20px 0;
+        padding: 20px;
+        background: #f5f5f5;
+        border-radius: 8px;
+    }
+    .filter-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: flex-end;
+    }
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    .filter-group label {
+        font-weight: 600;
+        font-size: 0.9em;
+    }
+    .filter-group input,
+    .filter-group select {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        min-width: 200px;
+    }
+    .filter-button {
+        padding: 8px 20px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .filter-button:hover {
+        background: #0056b3;
+    }
+    .clear-filters {
+        padding: 8px 20px;
+        background: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .clear-filters:hover {
+        background: #545b62;
+    }
+</style>
+
+<h3>Recently added</h3>
+
+<ul class="long">
+    {% for operator in new_operators %}
+        <li{% if not operator.has_vehicles %} class="empty-operator"{% endif %}><a href="{{ operator.get_vehicles_url }}">{{ operator }}</a></li>
+    {% endfor %}
+</ul>
+
+<h3>Not tracking</h3>
+
+<table>
+    <thead><th scope="col"></th><th scope="col">Last seen</th></thead>
+    <tbody>
+    {% for operator in status %}
+        <tr{% if not operator.has_vehicles %} class="empty-operator"{% endif %}>
+            <td class="link"><a href="{{ operator.get_vehicles_url }}">{{ operator }}</a></td>
+            <td>{{ operator.last_seen }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<h3>All</h3>
+
+<ul class="long">
+    {% for operator in operators %}
+        <li{% if not operator.has_vehicles %} class="empty-operator"{% endif %}><a href="{{ operator.get_vehicles_url }}">{{ operator }}</a></li>
+    {% endfor %}
+</ul>
+
+<style>
+    .empty-operator a {
+        text-decoration: line-through;
+        opacity: 0.6;
+    }
+</style>
+
+{% endblock content %}

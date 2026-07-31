@@ -1,0 +1,28 @@
+{% extends 'page.html' %}
+{% load i18n %}
+
+{% block head_title %}{% endblock head_title %}
+
+{% block extra_head %}
+{% endblock extra_head %}
+
+{% block content %}
+    {% if messages %}
+        <div class="messages">
+            <strong>{% trans "Messages:" %}</strong>
+            {% for message in messages %}
+                <div class="message">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% block body %}
+        {% url 'mfa_index' as mfa_url_ %}
+        {% if mfa_url_ %}
+            <a href="{{ mfa_url_ }}">{% trans "Two-Factor Authentication" %}</a>
+        {% endif %}
+    {% endblock body %}
+{% endblock content %}
+
+{% block extra_body %}
+{% endblock extra_body %}

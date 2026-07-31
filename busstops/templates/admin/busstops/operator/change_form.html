@@ -1,0 +1,10 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+    {% if change and original %}
+        <li>
+            <a href="{% url 'admin:vehicles_vehicle_add' %}?operator={{ original.pk|urlencode }}" class="addlink">Add vehicle</a>
+        </li>
+    {% endif %}
+    {{ block.super }}
+{% endblock object-tools-items %}

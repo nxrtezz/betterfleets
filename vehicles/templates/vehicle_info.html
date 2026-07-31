@@ -1,0 +1,176 @@
+{% if vehicle.preserved %}
+    <p>This vehicle is preserved and is not part of the active fleet list.</p>
+{% endif %}
+
+{% if vehicle.preservation_group %}
+    <p>Preserved by <a href="{{ vehicle.preservation_group.get_absolute_url }}">{{ vehicle.preservation_group }}</a></p>
+{% elif vehicle.preserved_by_user %}
+    <p>Preserved by <a href="{{ vehicle.preserved_by_user.get_absolute_url }}">{{ vehicle.preserved_by_user.get_display_name }}</a></p>
+{% endif %}
+
+{% if vehicle.notes %}
+    <p>{{ vehicle.notes }}</p>
+{% endif %}
+
+<dl class="contact-details vehicle-details">
+    {% with statuses=vehicle.get_statuses %}
+        {% if statuses %}
+            <div>
+                <dt>Status</dt>
+                <dd>{{ statuses|join:", " }}</dd>
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% if vehicle.livery or vehicle.colours %}
+        <div>
+            <dt>Livery</dt>
+            <dd>
+                {% if vehicle.livery and vehicle.livery.livery_type == 'svg' and vehicle.livery.svg %}
+                    <div class="livery">{{ vehicle.livery.preview }}</div>
+                {% elif vehicle.colours or vehicle.livery_id %}
+                    <div class="livery{% if vehicle.livery_id %} livery-{{ vehicle.livery_id }}{% endif %}" style="background:{{ vehicle.get_livery }};"></div>
+                {% endif %}
+                {% if vehicle.livery %}{{ vehicle.livery.name }}{% endif %}
+            </dd>
+        </div>
+    {% endif %}
+
+    {% if vehicle.branding %}
+        <div>
+            <dt>Branding</dt>
+            <dd>{{ vehicle.branding }}</dd>
+        </div>
+    {% endif %}
+
+    {% if vehicle.rear_advert %}
+        <div>
+            <dt>Rear advert</dt>
+            <dd>{{ vehicle.rear_advert }}</dd>
+        </div>
+    {% endif %}
+
+    {% if vehicle.vehicle_type %}
+        <div>
+            <dt>Type</dt>
+            <dd>
+                {{ vehicle.vehicle_type }}
+                {% if vehicle.vehicle_type.manufacturer_id %}
+                    by <a href="{{ vehicle.vehicle_type.manufacturer.get_absolute_url }}">{{ vehicle.vehicle_type.manufacturer }}</a>
+                {% endif %}
+            </dd>
+        </div>
+    {% endif %}
+
+    {% if vehicle.year_of_manufacture %}
+        <div>
+            <dt>Year of manufacture</dt>
+            <dd>{{ vehicle.year_of_manufacture }}</dd>
+        </div>
+    {% endif %}
+
+    {% if vehicle.operated_by %}
+        <div>
+            <dt>Operated by</dt>
+            <dd><a href="{{ vehicle.operated_by.get_absolute_url }}">{{ vehicle.operated_by }}</a></dd>
+        </div>
+    {% endif %}
+
+    {% if vehicle.joined_fleet %}
+        <div>
+            <dt>New to fleet</dt>
+            <dd>{{ vehicle.get_joined_fleet_display }}</dd>
+        </div>
+    {% endif %}
+
+    {% if vehicle.name %}
+        <div>
+            <dt>Name</dt>
+            <dd>
+                {% if name_page %}
+                    <a href="{{ name_page.get_absolute_url }}">{{ vehicle.name }}</a>
+                {% else %}
+                    {{ vehicle.name }}
+                {% endif %}
+            </dd>
+        </div>
+    {% endif %}
+
+    {% for key, value in vehicle.data_get %}
+        {% if value %}
+            <div>
+                <dt>{{ key }}</dt>
+                <dd>{{ value }}</dd>
+            </div>
+        {% endif %}
+    {% endfor %}
+
+    {% if vehicle.get_standard_features %}
+        <div>
+            <dt>Features</dt>
+            <dd>{{ vehicle.get_standard_features|join:", " }}</dd>
+        </div>
+    {% endif %}
+
+    {% if vehicle.get_accessibility_features %}
+        <div>
+            <dt>Accessibility</dt>
+            <dd>{{ vehicle.get_accessibility_features|join:", " }}</dd>
+        </div>
+    {% endif %}
+
+    {% if vehicle.dvla_euro_status %}
+        <div>
+            <dt>Euro status</dt>
+            <dd>{{ vehicle.dvla_euro_status }}</dd>
+        </div>
+    {% endif %}
+
+    {% if vehicle.dvla_mot_status and vehicle.dvla_mot_status != 'No details held by DVLA' %}
+        <div>
+            <dt>MOT status</dt>
+            <dd>{{ vehicle.dvla_mot_status }}</dd>
+        </div>
+    {% endif %}
+
+    {% if request.user.is_authenticated %}
+        <div>
+            <dt>Your photo count</dt>
+            <dd>{{ photo_log_quantity }}</dd>
+        </div>
+    {% endif %}
+
+    {% if total_photo_count %}
+        <div>
+            <dt>Total photo count</dt>
+            <dd>{{ total_photo_count }}</dd>
+        </div>
+    {% endif %}
+</dl>
+
+{% with flickr_link=vehicle.get_flickr_link %}
+    <ul class="horizontal">
+        {% if vehicle.is_editable %}
+            <li><a href="{{ vehicle.get_edit_url }}">Edit</a></li>
+        {% endif %}
+        {% if request.user.is_authenticated %}
+            <li><a href="#" onclick="document.getElementById('suggest-photo-form').style.display='block'; return false;">Suggest photo</a></li>
+        {% endif %}
+        {% if vehicle.is_editable and request.user.view_advanced %}
+            <li><a href="{% url 'admin:vehicles_vehicle_change' vehicle.pk %}">Advanced Edit</a></li>
+        {% endif %}
+        {% if vehicle.is_editable and request.user.trusted %}
+            <li><a href="{% url 'vehicle_compare' vehicle.id %}">Compare</a></li>
+        {% endif %}
+
+        <li><a href="/vehicles/edits?show=all&q=&operator=&vehicle={{ vehicle.id }}&user=&status=approved">History</a></li>
+
+        {% if flickr_link %}
+            <li>{{ flickr_link }}</li>
+        {% endif %}
+
+        {% if perms.vehicles.change_vehicle %}
+            <li><a href="{% url 'admin:vehicles_vehicle_change' vehicle.pk %}">✎</a></li>
+        {% endif %}
+    </ul>
+{% endwith %}

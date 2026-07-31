@@ -1,0 +1,149 @@
+{% extends 'page.html' %}
+
+{% block title %}{{ object.name }} - Preservation Group - betterfleets{% endblock %}
+
+{% block meta_description %}
+    <meta name="description" content="{{ object.name }} preservation group{% if object.description %}: {{ object.description|striptags|truncatechars:140 }}{% endif %}">
+{% endblock meta_description %}
+
+{% block head %}
+    <style>
+        .preservation-profile {
+            background: var(--card-background, var(--background-color));
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .preservation-profile__banner {
+            min-height: 12rem;
+            background: linear-gradient(135deg, var(--brand-color), var(--brand-color-darker));
+            background-size: cover;
+            background-position: center;
+        }
+
+        .preservation-profile__body {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+            padding: 1.25rem;
+        }
+
+        .preservation-profile__logo {
+            background: var(--background-color);
+            border: 4px solid var(--background-color);
+            border-radius: 0.75rem;
+            max-width: min(36vw, 12rem);
+            max-height: 8rem;
+            object-fit: contain;
+        }
+
+        .preservation-profile__meta h1 {
+            margin-top: 0;
+        }
+        {{ livery_styles|safe }}
+    </style>
+{% endblock head %}
+
+{% block content %}
+    <section class="preservation-profile">
+        <div class="preservation-profile__banner"{% if object.banner %} style="background-image:url('{{ object.banner.url }}')"{% endif %}></div>
+        <div class="preservation-profile__body">
+            {% if object.logo %}
+                <img src="{{ object.logo.url }}" alt="" class="preservation-profile__logo">
+            {% endif %}
+            <div class="preservation-profile__meta">
+                <h1>{{ object.name }}</h1>
+                {% if object.description %}<p>{{ object.description|linebreaksbr }}</p>{% endif %}
+                <ul class="horizontal">
+                    <li>{{ object.vehicle_count }} preserved vehicle{{ object.vehicle_count|pluralize }}</li>
+                    {% if object.founded_date %}<li>Founded {{ object.founded_date|date:"j F Y" }}</li>{% endif %}
+                    {% if object.website %}<li><a href="{{ object.website }}" rel="nofollow">Website</a></li>{% endif %}
+                </ul>
+                {% include 'includes/social_icons.html' with social_links=social_links %}
+            </div>
+        </div>
+    </section>
+
+    <h2>Preserved Vehicles</h2>
+    {% if vehicles %}
+        <div class="table-wrapper">
+            <table class="fleet compact">
+                <thead>
+                    <tr>
+                        {% if show_completion %}<th scope="col">Ridden</th>{% endif %}
+                        {% if show_completion %}<th scope="col">📷</th>{% endif %}
+                        <th scope="col" colspan="2"></th>
+                        <th scope="col">Livery</th>
+                        {% if branding_column %}<th scope="col">Branding</th>{% endif %}
+                        {% if ratings_column %}<th scope="col">Rating</th>{% endif %}
+                        <th scope="col">Type</th>
+                        {% if name_column %}<th scope="col" class="trivia">Name</th>{% endif %}
+                        {% if notes_column %}<th scope="col" class="trivia">Notes</th>{% endif %}
+                        {% if garage_column %}<th scope="col" class="trivia">Garage</th>{% endif %}
+                        {% for col in columns %}<th scope="col" class="trivia">{{ col.name }}</th>{% endfor %}
+                        {% if features_column %}<th scope="col" class="trivia">Special features</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vehicle in vehicles %}
+                        <tr id="{{ vehicle.slug }}"{% if vehicle.row_class %} class="{{ vehicle.row_class }}"{% endif %}>
+                            {% if show_completion %}
+                                <td aria-label="{% if vehicle.has_logged %}Logged{% elif vehicle.completion_excluded %}Excluded from completion{% else %}Not logged{% endif %}">
+                                    {% if vehicle.has_logged %}✓{% elif vehicle.completion_excluded %}-{% else %}✗{% endif %}
+                                </td>
+                            {% endif %}
+                            {% if show_completion %}
+                                <td aria-label="{% if vehicle.has_photographed %}Photographed{% else %}Not photographed{% endif %}">
+                                    {% if vehicle.has_photographed %}{{ vehicle.photo_quantity }}{% else %}✗{% endif %}
+                                </td>
+                            {% endif %}
+                            <td class="tabular"{% if not vehicle.reg %} colspan="2"{% endif %}>
+                                <a href="{{ vehicle.get_fleet_code_url }}"{% if vehicle.vehicle_type.style == "train" and vehicle.fleet_code %} target="_blank" rel="noopener"{% endif %}>
+                                    {% if vehicle.fleet_code or vehicle.fleet_number %}
+                                        {% firstof vehicle.fleet_code vehicle.fleet_number %}
+                                    {% elif not vehicle.reg %}
+                                        {{ vehicle.code }}
+                                    {% endif %}
+                                </a>
+                            </td>
+                            {% if vehicle.reg %}
+                            <td>
+                                <a href="{{ vehicle.get_absolute_url }}" class="reg">
+                                    {% if vehicle.preserved %}<em>{{ vehicle.get_reg }}</em>{% else %}{{ vehicle.get_reg }}{% endif %}
+                                </a>
+                            </td>
+                            {% endif %}
+                            <td{% if vehicle.colours or vehicle.livery_id %} class="livery-cell"{% endif %}{% if branding_column %}{% if not vehicle.livery_name or not vehicle.branding %} colspan="2"{% endif %}{% endif %}>
+                                {% if vehicle.colours or vehicle.livery_id %}<div class="livery{% if vehicle.livery_id %} livery-{{ vehicle.livery_id }}{% else %}" style="background:{{ vehicle.get_livery }}{% endif %}"></div>{% endif %}
+                                {% if vehicle.livery_name %}{{ vehicle.livery_name }}{% else %}{{ vehicle.branding }}{% endif %}
+                            </td>
+                            {% if vehicle.livery_name and vehicle.branding %}
+                                <td>
+                                    {% if vehicle.branding %}{{ vehicle.branding }}{% endif %}
+                                </td>
+                            {% endif %}
+                            {% if ratings_column %}
+                                <td>
+                                    {% if vehicle.review_count %}
+                                        {{ vehicle.average_rating|floatformat:1 }}★
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            <td>{% if vehicle.is_spare_ticket_machine %}{{ vehicle.notes }}{% else %}{{ vehicle.vehicle_type_name|default:"" }}{% endif %}</td>
+                            {% if name_column %}<td class="trivia">{{ vehicle.name }}</td>{% endif %}
+                            {% if notes_column %}<td class="trivia">{% if not vehicle.is_spare_ticket_machine %}{{ vehicle.notes }}{% endif %}</td>{% endif %}
+                            {% if garage_column %}<td class="trivia">{{ vehicle.garage_name|default:'' }}</td>{% endif %}
+                            {% for value in vehicle.column_values %}<td class="trivia">{{ value }}</td>{% endfor %}
+                            {% if features_column %}<td class="trivia">{{ vehicle.feature_names }}</td>{% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include 'pagination.html' with page=vehicles %}
+    {% else %}
+        <p>No preserved vehicles are linked to this group yet.</p>
+    {% endif %}
+{% endblock content %}

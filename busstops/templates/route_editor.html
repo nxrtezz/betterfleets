@@ -1,0 +1,28 @@
+{% extends 'page.html' %}
+
+{% load static %}
+
+{% block title %}Route editor - Better Fleets{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" href="{% static 'dist/js/app.css' %}">
+{% endblock head %}
+
+{% block content %}
+    <h1>Route editor</h1>
+    <p>Search for a service, then edit the stop-to-stop route geometry on an isolated page.</p>
+    <div id="route-editor-root">
+        <div class="route-editor-loading">
+            Loading route editor…
+        </div>
+        <noscript class="sorry">Sorry, the route editor requires JavaScript.</noscript>
+    </div>
+    {{ selected_service_id|json_script:"route-editor-data" }}
+{% endblock content %}
+
+{% block foot %}
+    <script>
+        window.LIVERIES_CSS_URL = "/liveries.{{ liveries_css_version }}.css";
+    </script>
+    <script src="{% static 'dist/js/app.js' %}"></script>
+{% endblock foot %}

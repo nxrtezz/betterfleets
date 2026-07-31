@@ -1,0 +1,57 @@
+{% extends 'page.html' %}
+
+{% block title %}Request a new vehicle{% if operator %} - {{ operator }}{% endif %} - Better Fleets{% endblock %}
+
+{% block head %}
+<style>
+.request-shell { display:grid; gap:1.25rem; }
+.request-card { background:var(--background-color); border:1px solid var(--border-color); border-radius:1rem; padding:1.25rem; }
+.request-tabs { display:flex; flex-wrap:wrap; gap:.65rem; padding:0; list-style:none; margin:0; }
+.request-tabs a, .request-tabs span { display:inline-flex; padding:.45rem .85rem; border-radius:999px; border:1px solid var(--border-color); text-decoration:none; color:var(--text-color); }
+.request-tabs a:hover { background:var(--brand-color-darker); }
+.request-form { display:grid; gap:1rem; }
+.request-form label { display:grid; gap:.35rem; font-weight:600; color:var(--text-color); }
+.request-form input, .request-form select, .request-form textarea { width:100%; max-width:100%; background:var(--background-color); color:var(--text-color); border:1px solid var(--border-color); }
+.request-list { list-style:none; padding:0; margin:0; display:grid; gap:.75rem; }
+.request-list li { border:1px solid var(--border-color); border-radius:.85rem; padding:1rem; background:var(--background-color); }
+.status-chip { display:inline-flex; padding:.2rem .6rem; border-radius:999px; background:var(--brand-color-darker); color:var(--button-foreground); }
+
+@media (min-width: 48em) {
+  .request-shell { grid-template-columns:minmax(0,1.15fr) minmax(18rem,.85fr); }
+}
+</style>
+{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+<div class="request-shell">
+    <section class="request-card">
+        <h1>Request a new vehicle</h1>
+        {% if request_log %}
+            <div class="request-card" style="background:var(--brand-color-darker); border-color:var(--brand-color); color:var(--button-foreground);">
+                <h2>Request submitted successfully!</h2>
+                <p>Your request has been sent for approval using the regular review queue.</p>
+            </div>
+        {% else %}
+            <p>
+                {% if operator %}
+                    Use this form to ask for a new vehicle to be added to {{ operator }}.
+                {% else %}
+                    Use this form to ask for a new vehicle to be added.
+                {% endif %}
+            </p>
+            <form action="{% if operator %}{% url 'request_new_vehicle' operator.slug %}{% else %}{% url 'request_vehicle' %}{% endif %}" method="POST" class="request-form">
+                <div class="edit-vehicle">
+                    {{ form.as_p }}
+                </div>
+                {% csrf_token %}
+                <div>
+                    <button type="submit" class="button">Request vehicle</button>
+                </div>
+            </form>
+            {{ form.media }}
+        {% endif %}
+    </section>
+</div>
+{% endblock content %}

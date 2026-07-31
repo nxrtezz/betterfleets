@@ -1,0 +1,403 @@
+{% extends 'page.html' %}
+
+{% block title %}Simulation Configuration - Better Fleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block head %}
+    <style>
+        .simulation-container {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .service-selector {
+            padding: 1.25rem;
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+        }
+
+        .service-selector h2 {
+            margin-top: 0;
+        }
+
+        .service-selector select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            background: var(--background-color);
+            color: var(--text-color);
+        }
+
+        .config-section {
+            padding: 1.25rem;
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+        }
+
+        .config-section h2 {
+            margin-top: 0;
+        }
+
+        .config-section .status {
+            margin: 1rem 0;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            background: rgba(148, 163, 184, 0.1);
+        }
+
+        .config-section label {
+            display: block;
+            margin-bottom: 0.25rem;
+            font-weight: 500;
+        }
+
+        .config-section input[type="text"],
+        .config-section input[type="number"] {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            background: var(--background-color);
+            color: var(--text-color);
+            margin-bottom: 1rem;
+        }
+
+        .config-section input[type="checkbox"] {
+            margin-right: 0.5rem;
+        }
+
+        .config-section button {
+            padding: 0.5rem 1rem;
+            background: #1d4ed8;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+        }
+
+        .config-section button:hover {
+            background: #1e40af;
+        }
+
+        .config-section button:disabled {
+            background: rgba(148, 163, 184, 0.3);
+            cursor: not-allowed;
+        }
+
+        .info-section {
+            padding: 1.25rem;
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            background: var(--background-color);
+        }
+
+        .info-section h2 {
+            margin-top: 0;
+        }
+
+        .info-section table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .info-section th,
+        .info-section td {
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            text-align: left;
+        }
+
+        .info-section th {
+            background: rgba(148, 163, 184, 0.1);
+        }
+
+        .info-section ul {
+            list-style-type: disc;
+            padding-left: 1.5rem;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+    {% csrf_token %}
+    <h1>Simulation Configuration</h1>
+    <p>Configure simulation tracking for services that don't have live GPS data.</p>
+
+    <div class="simulation-container">
+        <section class="service-selector">
+            <h2>Select a Service</h2>
+            <p>Choose a service to configure simulation tracking:</p>
+            <input type="search" id="service-search" placeholder="Search services..." style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--background-color); color: var(--text-color); margin-bottom: 0.75rem;">
+            <select id="service-select">
+                <option value="">-- Select a service --</option>
+                {% for service in services %}
+                    <option value="{{ service.id }}">{{ service.line_name }}</option>
+                {% endfor %}
+            </select>
+            <button id="load-service-btn" style="margin-top: 0.75rem;">Load Service</button>
+            <div id="load-status" class="status" style="margin-top: 0.75rem;"></div>
+        </section>
+
+        <section id="service-details" class="config-section hidden">
+            <h2 id="service-name"></h2>
+            <p id="service-operator"></p>
+
+            <div class="info-section" style="margin-top: 1rem;">
+                <h3>Vehicle Requirements</h3>
+                <p><strong>Required vehicles:</strong> <span id="required-vehicles">-</span></p>
+                <p><strong>Peak times:</strong></p>
+                <ul id="peak-times"></ul>
+            </div>
+
+            <div style="margin-top: 1rem;">
+                <h3>Configuration</h3>
+                <div style="margin-bottom: 1rem;">
+                    <label>
+                        <input type="checkbox" id="enabled-toggle">
+                        Enable simulation for this service
+                    </label>
+                </div>
+
+                <div>
+                    <label for="vehicle-count">Number of vehicles:</label>
+                    <input type="number" id="vehicle-count" min="1" value="1">
+                </div>
+
+                <div>
+                    <label for="destination-inbound">Inbound destination name:</label>
+                    <input type="text" id="destination-inbound" placeholder="e.g., City Centre">
+                </div>
+
+                <div>
+                    <label for="destination-outbound">Outbound destination name:</label>
+                    <input type="text" id="destination-outbound" placeholder="e.g., Railway Station">
+                </div>
+
+                <button id="save-config">Save Configuration</button>
+                <div id="save-status" class="status"></div>
+            </div>
+
+            <div class="info-section" style="margin-top: 1rem;">
+                <h3>Trip Schedule</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th>Direction</th>
+                            <th>Headsign</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trips-table">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const serviceSearch = document.getElementById('service-search');
+        const serviceSelect = document.getElementById('service-select');
+        const serviceDetails = document.getElementById('service-details');
+        const serviceName = document.getElementById('service-name');
+        const serviceOperator = document.getElementById('service-operator');
+        const requiredVehicles = document.getElementById('required-vehicles');
+        const peakTimes = document.getElementById('peak-times');
+        const tripsTable = document.getElementById('trips-table');
+        const enabledToggle = document.getElementById('enabled-toggle');
+        const vehicleCount = document.getElementById('vehicle-count');
+        const destinationInbound = document.getElementById('destination-inbound');
+        const destinationOutbound = document.getElementById('destination-outbound');
+        const saveConfig = document.getElementById('save-config');
+        const saveStatus = document.getElementById('save-status');
+
+        let currentServiceId = null;
+        let existingConfig = null;
+
+        // Filter services based on search
+        serviceSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const options = serviceSelect.querySelectorAll('option');
+            
+            options.forEach(option => {
+                if (option.value === '') {
+                    option.style.display = '';
+                    return;
+                }
+                
+                const text = option.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    option.style.display = '';
+                } else {
+                    option.style.display = 'none';
+                }
+            });
+        });
+
+        document.getElementById('load-service-btn').addEventListener('click', function() {
+            const serviceId = serviceSelect.value;
+            if (!serviceId) {
+                const loadStatus = document.getElementById('load-status');
+                loadStatus.textContent = 'Please select a service first';
+                loadStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+                return;
+            }
+
+            currentServiceId = serviceId;
+            loadServiceData(serviceId);
+        });
+
+        function loadServiceData(serviceId) {
+            const formData = new FormData();
+            formData.append('service_id', serviceId);
+
+            const loadStatus = document.getElementById('load-status');
+            loadStatus.textContent = 'Loading service data...';
+            loadStatus.style.background = 'rgba(59, 130, 246, 0.1)';
+
+            fetch('/simulation/service-data', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    saveStatus.textContent = data.error;
+                    saveStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+                    return;
+                }
+
+                // Display service info
+                serviceName.textContent = data.service.line_name;
+                serviceOperator.textContent = data.service.operator;
+
+                // Display vehicle requirements
+                requiredVehicles.textContent = data.required_vehicles;
+                vehicleCount.value = data.required_vehicles || 1;
+
+                // Display peak times
+                peakTimes.innerHTML = '';
+                if (data.peak_times.length === 0) {
+                    peakTimes.innerHTML = '<li>No peak times (no trips today)</li>';
+                } else {
+                    data.peak_times.forEach(peak => {
+                        const li = document.createElement('li');
+                        const start = new Date(peak.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        const end = new Date(peak.end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        li.textContent = `${start} - ${end} (${peak.vehicles} vehicles)`;
+                        peakTimes.appendChild(li);
+                    });
+                }
+
+                // Display trips
+                tripsTable.innerHTML = '';
+                if (data.trips.length === 0) {
+                    tripsTable.innerHTML = '<tr><td colspan="4">No trips today</td></tr>';
+                } else {
+                    data.trips.forEach(trip => {
+                        const row = document.createElement('tr');
+                        const start = new Date(trip.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        const end = new Date(trip.end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        row.innerHTML = `
+                            <td>${start}</td>
+                            <td>${end}</td>
+                            <td>${trip.inbound ? 'Inbound' : 'Outbound'}</td>
+                            <td>${trip.headsign || '-'}</td>
+                        `;
+                        tripsTable.appendChild(row);
+                    });
+                }
+
+                // Load existing config
+                existingConfig = data.existing_config;
+                if (existingConfig) {
+                    enabledToggle.checked = existingConfig.enabled;
+                    vehicleCount.value = existingConfig.vehicle_count || 1;
+                    destinationInbound.value = existingConfig.destination_inbound || '';
+                    destinationOutbound.value = existingConfig.destination_outbound || '';
+                } else {
+                    enabledToggle.checked = false;
+                    destinationInbound.value = '';
+                    destinationOutbound.value = '';
+                }
+
+                serviceDetails.classList.remove('hidden');
+                loadStatus.textContent = '';
+            })
+            .catch(error => {
+                console.error('Error loading service data:', error);
+                loadStatus.textContent = 'Error loading service data';
+                loadStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+            });
+        }
+
+        saveConfig.addEventListener('click', function() {
+            if (!currentServiceId) {
+                saveStatus.textContent = 'Please select a service first';
+                saveStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('service_id', currentServiceId);
+            formData.append('enabled', enabledToggle.checked);
+            formData.append('vehicle_count', vehicleCount.value);
+            formData.append('destination_inbound', destinationInbound.value);
+            formData.append('destination_outbound', destinationOutbound.value);
+
+            saveStatus.textContent = 'Saving configuration...';
+            saveStatus.style.background = 'rgba(59, 130, 246, 0.1)';
+
+            fetch('/simulation/save-config', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    saveStatus.textContent = data.error;
+                    saveStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+                } else {
+                    saveStatus.textContent = 'Configuration saved successfully!';
+                    saveStatus.style.background = 'rgba(34, 197, 94, 0.1)';
+                }
+            })
+            .catch(error => {
+                console.error('Error saving config:', error);
+                saveStatus.textContent = 'Error saving configuration';
+                saveStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+            });
+        });
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    });
+    </script>
+{% endblock %}

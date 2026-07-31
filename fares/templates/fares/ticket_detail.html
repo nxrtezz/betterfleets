@@ -1,0 +1,97 @@
+{% extends 'page.html' %}
+
+{% block bodyclass %}{% endblock %}
+
+{% block content %}
+
+    <style>
+        .ticket-page {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .ticket-card {
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 0.9rem 1rem;
+        }
+
+        .ticket-card h2,
+        .ticket-card h3 {
+            margin-top: 0;
+            margin-bottom: 0.45rem;
+        }
+
+        .ticket-card p,
+        .ticket-card li {
+            margin: 0.2rem 0;
+        }
+
+        .ticket-card + .ticket-card {
+            margin-top: 0;
+        }
+
+        .ticket-meta {
+            color: var(--secondary-text-color);
+        }
+
+        .ticket-line {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem 0.8rem;
+            align-items: baseline;
+        }
+
+        .ticket-list {
+            margin: 0;
+            padding-left: 1.25rem;
+        }
+    </style>
+
+    <div class="ticket-page">
+        <header class="ticket-card">
+            <h1>{{ ticket_title }}</h1>
+            {% if object.description %}
+                <p>{{ object.description }}</p>
+            {% endif %}
+            <p class="ticket-meta"><a href="{{ object.operator.get_detail_url }}?tab=tickets">{{ object.operator }}</a></p>
+        </header>
+
+        {% for ticket in tickets %}
+            <section class="ticket-card">
+                <h2>{{ ticket.name }}</h2>
+                <div class="ticket-line">
+                    {% if ticket.adult_price_display %}
+                        <strong>{{ ticket.adult_price_display }} adult</strong>
+                    {% endif %}
+                    {% if ticket.child_price_display %}
+                        <strong>{{ ticket.child_price_display }} child</strong>
+                    {% endif %}
+                    {% if ticket.zone %}
+                        <span>Zone {{ ticket.zone }}</span>
+                    {% endif %}
+                    {% if ticket.days_valid_for is not None %}
+                        <span>
+                            {{ ticket.days_valid_for }} day{% if ticket.days_valid_for != 1 %}s{% endif %}
+                        </span>
+                    {% endif %}
+                </div>
+                {% if ticket.description %}
+                    <p class="ticket-meta">{{ ticket.description }}</p>
+                {% endif %}
+            </section>
+        {% endfor %}
+
+        {% if linked_services %}
+            <section class="ticket-card">
+                <h3>Accepted on these routes</h3>
+                <ul class="ticket-list">
+                    {% for service in linked_services %}
+                        <li><a href="{{ service.get_absolute_url }}#tickets">{{ service }}</a></li>
+                    {% endfor %}
+                </ul>
+            </section>
+        {% endif %}
+    </div>
+
+{% endblock content %}
