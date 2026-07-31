@@ -352,20 +352,6 @@
                     </form>
                 </div>
 
-                <div class="account-email__card account-email__section">
-                    <h2>Email Verification</h2>
-                    <p>
-                        {% if user.emailaddress_set.exists %}
-                            {% if user.emailaddress_set.filter(verified=True).exists %}
-                                Your primary email is verified. You can add additional email addresses above.
-                            {% else %}
-                                You have unverified email addresses. Please verify them to ensure account security.
-                            {% endif %}
-                        {% else %}
-                            Add an email address to get started with email verification.
-                        {% endif %}
-                    </p>
-                </div>
             </div>
         </div>
     </div>
