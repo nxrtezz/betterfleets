@@ -3360,6 +3360,16 @@ class OperatorAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.mass_edit_buses_template_view),
                 name="busstops_operator_mass_edit_buses_template",
             ),
+            path(
+                "<path:object_id>/export-basic.xlsx",
+                self.admin_site.admin_view(self.export_basic_fleet_view),
+                name="busstops_operator_export_basic",
+            ),
+            path(
+                "<path:object_id>/export-advanced.xlsx",
+                self.admin_site.admin_view(self.export_advanced_fleet_view),
+                name="busstops_operator_export_advanced",
+            ),
         ]
         return custom_urls + urls
 
@@ -4858,6 +4868,51 @@ vehicle.garage.name if vehicle.garage else "",
             obj.is_manual = True
             obj.manual_updated_at = timezone.now()
         super().save_model(request, obj, form, change)
+
+    def export_basic_fleet_view(self, request, object_id):
+        from fleet.exporters.xlsx import build_basic_fleet_workbook, workbook_bytes
+        from vehicles.models import Vehicle
+        from vehicles.views import current_vehicle_filters
+        
+        operator = self.get_object(request, object_id)
+        if operator is None:
+            raise PermissionDenied
+        
+        vehicles = operator.vehicle_set.filter(**current_vehicle_filters()).select_related("vehicle_type", "livery").prefetch_related("features")
+        if "withdrawn" not in request.GET:
+            vehicles = vehicles.filter(**current_vehicle_filters(withdrawn=False))
+        
+        workbook = build_basic_fleet_workbook(operator, vehicles, advanced=False)
+        response = HttpResponse(
+            workbook_bytes(workbook),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{operator.slug}-fleet-basic.xlsx"'
+        return response
+
+    def export_advanced_fleet_view(self, request, object_id):
+        from fleet.exporters.xlsx import build_basic_fleet_workbook, workbook_bytes
+        from vehicles.models import Vehicle
+        from vehicles.views import current_vehicle_filters
+        
+        if not request.user.advanced_mode:
+            raise PermissionDenied
+        
+        operator = self.get_object(request, object_id)
+        if operator is None:
+            raise PermissionDenied
+        
+        vehicles = operator.vehicle_set.filter(**current_vehicle_filters()).select_related("vehicle_type", "livery").prefetch_related("features")
+        if "withdrawn" not in request.GET:
+            vehicles = vehicles.filter(**current_vehicle_filters(withdrawn=False))
+        
+        workbook = build_basic_fleet_workbook(operator, vehicles, advanced=True)
+        response = HttpResponse(
+            workbook_bytes(workbook),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{operator.slug}-fleet-advanced.xlsx"'
+        return response
 
 
 class ServiceCodeInline(admin.TabularInline):

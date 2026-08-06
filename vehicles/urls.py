@@ -57,6 +57,26 @@ urlpatterns = [
         name="operator_vehicles",
     ),
     path(
+        "operators/<slug:slug>/vehicles/export/basic",
+        views.export_fleet_basic,
+        name="operator_vehicles_export_basic",
+    ),
+    path(
+        "operators/<slug:slug>/vehicles/export/advanced",
+        views.export_fleet_advanced,
+        name="operator_vehicles_export_advanced",
+    ),
+    path(
+        "groups/<group_slug>/vehicles/export/basic",
+        views.export_fleet_basic,
+        name="group_vehicles_export_basic",
+    ),
+    path(
+        "groups/<group_slug>/vehicles/export/advanced",
+        views.export_fleet_advanced,
+        name="group_vehicles_export_advanced",
+    ),
+    path(
         "operators/<slug:slug>/vehicles/clear-logs",
         views.clear_operator_logs,
         name="clear_operator_logs",

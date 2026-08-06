@@ -26,6 +26,7 @@ from busstops.fleet_imports import (
     rows_text_from_upload,
 )
 from fleet.completion import bulk_log_vehicles_for_user
+from fleet.exporters.xlsx import build_basic_fleet_workbook, workbook_bytes
 from busstops.models import Manufacturer, Operator
 from . import models
 from bustimes.admin import log_change
@@ -544,6 +545,8 @@ class VehicleAdmin(admin.ModelAdmin):
         "unpreserve",
         "lock",
         "unlock",
+        "export_basic_fleet",
+        "export_advanced_fleet",
     )
     inlines = [VehicleCodeInline]
     readonly_fields = ["latest_journey_data"]
@@ -1127,6 +1130,68 @@ class VehicleAdmin(admin.ModelAdmin):
     def last_seen(self, obj):
         if obj.latest_journey:
             return obj.latest_journey.datetime
+
+    @admin.action(description="Export selected vehicles (Basic format)")
+    def export_basic_fleet(self, request, queryset):
+        # Group by operator for basic export
+        from collections import defaultdict
+        operators = defaultdict(list)
+        for vehicle in queryset.select_related("operator"):
+            if vehicle.operator:
+                operators[vehicle.operator].append(vehicle)
+        
+        if len(operators) == 1:
+            # Single operator export
+            operator = list(operators.keys())[0]
+            vehicles = operators[operator]
+            workbook = build_basic_fleet_workbook(operator, vehicles, advanced=False)
+            filename = f"{operator.slug}-fleet-basic.xlsx"
+        else:
+            # Multiple operators - export as basic without operator header
+            workbook = build_basic_fleet_workbook(None, queryset, advanced=False)
+            filename = "fleet-basic.xlsx"
+        
+        response = HttpResponse(
+            workbook_bytes(workbook),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+    @admin.action(description="Export selected vehicles (Advanced format)")
+    def export_advanced_fleet(self, request, queryset):
+        if not request.user.advanced_mode:
+            self.message_user(
+                request,
+                "Advanced mode must be enabled in your user settings to use advanced export.",
+                messages.WARNING,
+            )
+            return
+        
+        # Group by operator for advanced export
+        from collections import defaultdict
+        operators = defaultdict(list)
+        for vehicle in queryset.select_related("operator"):
+            if vehicle.operator:
+                operators[vehicle.operator].append(vehicle)
+        
+        if len(operators) == 1:
+            # Single operator export
+            operator = list(operators.keys())[0]
+            vehicles = operators[operator]
+            workbook = build_basic_fleet_workbook(operator, vehicles, advanced=True)
+            filename = f"{operator.slug}-fleet-advanced.xlsx"
+        else:
+            # Multiple operators - export as advanced without operator header
+            workbook = build_basic_fleet_workbook(None, queryset, advanced=True)
+            filename = "fleet-advanced.xlsx"
+        
+        response = HttpResponse(
+            workbook_bytes(workbook),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
     def get_changelist_form(self, request, **kwargs):
         kwargs.setdefault("form", VehicleAdminForm)

@@ -238,6 +238,16 @@
         {% endif %}
     </div>
     
+    {% if request.user.is_authenticated %}
+    <div style="margin: 1rem 0; padding: 1rem; background: var(--background-color); border: 1px solid var(--border-color); border-radius: 0.5rem;">
+        <strong>Export fleet:</strong>
+        <a href="{% if parent %}{% url 'group_vehicles_export_basic' parent.slug %}{% else %}{% url 'operator_vehicles_export_basic' object.slug %}{% endif %}" class="button" style="padding: 0.5rem 1rem; margin-left: 0.5rem;">Basic Export</a>
+        {% if request.user.advanced_mode %}
+        <a href="{% if parent %}{% url 'group_vehicles_export_advanced' parent.slug %}{% else %}{% url 'operator_vehicles_export_advanced' object.slug %}{% endif %}" class="button" style="padding: 0.5rem 1rem; margin-left: 0.5rem;">Advanced Export</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    
     {% if not historical %}
     <div class="fleet-filters" style="margin: 1rem 0; padding: 1rem; background: var(--background-color); border: 1px solid var(--border-color); border-radius: 0.5rem;">
         <form method="get" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;">

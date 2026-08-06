@@ -12,6 +12,7 @@ import xmltodict
 import requests
 from collections import defaultdict
 from fleet.models import PinnedOperator
+from fleet.exporters.xlsx import build_basic_fleet_workbook, workbook_bytes
 from fleet.completion import (
     annotate_logged_state,
     annotate_photographed_state,
@@ -1338,6 +1339,73 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
         return render(request, "operator_vehicles_historical.html", context)
 
     return render(request, "operator_vehicles.html", context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def export_fleet_basic(request, slug=None, group_slug=None):
+    """Export fleet in basic human-readable format"""
+    if group_slug:
+        group = get_object_or_404(OperatorGroup, slug=group_slug)
+        vehicles = Vehicle.objects.filter(
+            operator__group=group,
+            operator__ceased_operations_on__isnull=True,
+            **current_fleet_filter(),
+        ).select_related("operator", "vehicle_type", "livery").prefetch_related("features")
+        operator = None  # For group exports, we'll use first operator's info
+        filename = f"{group.slug}-fleet-basic.xlsx"
+    else:
+        operator = get_object_or_404(Operator.objects.select_related("organisation", "group", "government_authority"), slug=slug.lower())
+        vehicles = operator.vehicle_set.filter(**current_fleet_filter()).select_related("operator", "vehicle_type", "livery").prefetch_related("features")
+        filename = f"{operator.slug}-fleet-basic.xlsx"
+    
+    if "withdrawn" not in request.GET:
+        vehicles = vehicles.filter(**current_fleet_filter(withdrawn=False))
+    
+    workbook = build_basic_fleet_workbook(operator, vehicles, advanced=False)
+    response = HttpResponse(
+        workbook_bytes(workbook),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
+@require_http_methods(["GET"])
+def export_fleet_advanced(request, slug=None, group_slug=None):
+    """Export fleet in advanced format with additional fields"""
+    if not request.user.is_authenticated:
+        raise PermissionDenied
+    
+    # Check if user has advanced mode enabled
+    if not request.user.advanced_mode:
+        raise PermissionDenied
+    
+    if group_slug:
+        group = get_object_or_404(OperatorGroup, slug=group_slug)
+        vehicles = Vehicle.objects.filter(
+            operator__group=group,
+            operator__ceased_operations_on__isnull=True,
+            **current_fleet_filter(),
+        ).select_related("operator", "vehicle_type", "livery").prefetch_related("features")
+        operator = None
+        filename = f"{group.slug}-fleet-advanced.xlsx"
+    else:
+        operator = get_object_or_404(Operator.objects.select_related("organisation", "group", "government_authority"), slug=slug.lower())
+        vehicles = operator.vehicle_set.filter(**current_fleet_filter()).select_related("operator", "vehicle_type", "livery").prefetch_related("features")
+        filename = f"{operator.slug}-fleet-advanced.xlsx"
+    
+    if "withdrawn" not in request.GET:
+        vehicles = vehicles.filter(**current_fleet_filter(withdrawn=False))
+    
+    workbook = build_basic_fleet_workbook(operator, vehicles, advanced=True)
+    response = HttpResponse(
+        workbook_bytes(workbook),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
 
 
 @require_http_methods(["GET"])
