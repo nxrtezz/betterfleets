@@ -524,6 +524,9 @@ class StopTime(models.Model):
     id = models.BigAutoField(primary_key=True)
     trip = models.ForeignKey(Trip, models.CASCADE)
     stop_code = models.CharField(max_length=255, blank=True)
+    # A publisher-supplied label for this call. The stop relation remains the
+    # authoritative location/ATCO reference.
+    display_name = models.CharField(max_length=255, blank=True)
     stop = models.ForeignKey(
         "busstops.StopPoint", models.DO_NOTHING, null=True, blank=True
     )

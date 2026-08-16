@@ -5363,7 +5363,9 @@ class ServiceAdmin(GISModelAdmin):
             stop_map = {}
             for stop_time in trip.stoptime_set.all():
                 stop_code = stop_time.stop_id or stop_time.stop_code
-                stop_name = stop_time.stop.common_name if stop_time.stop_id else stop_time.stop_code
+                stop_name = stop_time.display_name or (
+                    stop_time.stop.common_name if stop_time.stop_id else stop_time.stop_code
+                )
                 if stop_code and stop_code not in seen_stop_codes[direction]:
                     seen_stop_codes[direction].add(stop_code)
                     ordered_stops[direction].append({"code": stop_code, "name": stop_name})
@@ -5456,12 +5458,17 @@ class ServiceAdmin(GISModelAdmin):
             worksheet.cell(
                 row=self.simple_timetable_header_row, column=2, value="stop_atco_code"
             )
-            worksheet.column_dimensions["B"].hidden = True
 
             for row_number, stop in enumerate(
                 direction_stops, start=self.simple_timetable_data_row
             ):
-                worksheet.cell(row=row_number, column=1, value=stop["name"])
+                name_cell = worksheet.cell(row=row_number, column=1, value=stop["name"])
+                if any(
+                    trip["stops"].get(stop["code"])
+                    and trip["stops"][stop["code"]].timing_status == "PTP"
+                    for trip in direction_trips
+                ):
+                    name_cell.font = timing_point_font
                 worksheet.cell(row=row_number, column=2, value=stop["code"])
 
             for column_number, trip in enumerate(direction_trips, start=3):
@@ -5514,8 +5521,6 @@ class ServiceAdmin(GISModelAdmin):
                             stop_time.departure or stop_time.arrival
                         ),
                     )
-                    if stop_time.timing_status == "PTP":
-                        cell.font = timing_point_font
 
             worksheet.freeze_panes = f"C{self.simple_timetable_data_row}"
 
@@ -5529,7 +5534,7 @@ class ServiceAdmin(GISModelAdmin):
         instructions.append(
             [
                 "Stop names",
-                "Column A is the visible stop list. Column B is hidden and stores stop codes used on import.",
+                "Column A is the visible stop list and is always used in the published timetable. Column B contains the ATCO stop code used for validation and location.",
             ]
         )
         instructions.append(
@@ -5541,7 +5546,7 @@ class ServiceAdmin(GISModelAdmin):
         instructions.append(
             [
                 "Timing points",
-                "Bold time cells are imported as timing points. Non-bold time cells are imported as non-timing points.",
+                "Bold stop names in column A are imported as timing points. Non-bold stop names are imported as non-timing points.",
             ]
         )
         instructions.append(
@@ -5622,7 +5627,11 @@ class ServiceAdmin(GISModelAdmin):
                     time_value = self._simple_timetable_time_string(cell.value)
                     if not time_value:
                         continue
-                    trip_rows.append((stop_name, stop_code, time_value, bool(cell.font.bold)))
+                    is_timing_point = bool(
+                        worksheet.cell(row=row_number, column=1).font.bold
+                        or cell.font.bold
+                    )
+                    trip_rows.append((stop_name, stop_code, time_value, is_timing_point))
 
                 if not trip_rows and not any(
                     [trip_id, route_id, calendar_id, inbound, headsign, import_key]
@@ -5835,7 +5844,8 @@ class ServiceAdmin(GISModelAdmin):
         instructions.append(["operator_noc", "Optional operator NOC/slug for the trip."])
         instructions.append(["garage_code", "Optional garage id, code, external id, or name."])
         instructions.append(["vehicle_type_code", "Optional timetable vehicle type id, code, or description."])
-        instructions.append(["line_name/stop_name", "Informational export columns. They are ignored on import."])
+        instructions.append(["line_name", "Informational export column. It is ignored on import."])
+        instructions.append(["stop_name", "Optional published stop label. It is retained on import."])
         return workbook
 
     def _service_timetable_export_rows(self, service):
@@ -5873,7 +5883,8 @@ class ServiceAdmin(GISModelAdmin):
                         "inbound": "true" if trip.inbound else "false",
                         "sequence": stop_time.sequence if stop_time.sequence is not None else "",
                         "stop_atco_code": stop_time.stop_id or stop_time.stop_code,
-                        "stop_name": stop_time.stop.common_name if stop_time.stop_id else "",
+                        "stop_name": stop_time.display_name
+                        or (stop_time.stop.common_name if stop_time.stop_id else ""),
                         "arrival": self._format_timetable_time(stop_time.arrival),
                         "departure": self._format_timetable_time(stop_time.departure),
                         "pick_up": "true" if stop_time.pick_up else "false",
@@ -6270,6 +6281,7 @@ class ServiceAdmin(GISModelAdmin):
                         "pick_up": pick_up,
                         "set_down": set_down,
                         "timing_status": row.get("timing_status", ""),
+                        "display_name": row.get("stop_name", ""),
                     }
                 )
 
@@ -6330,6 +6342,7 @@ class ServiceAdmin(GISModelAdmin):
                                 trip=trip,
                                 stop=stop_row["stop"],
                                 stop_code=stop_row["stop"].atco_code,
+                                display_name=stop_row["display_name"],
                                 arrival=stop_row["arrival"],
                                 departure=stop_row["departure"],
                                 sequence=stop_row["sequence"],

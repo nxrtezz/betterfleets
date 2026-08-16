@@ -1,3 +1,4 @@
+import copy
 import datetime
 import graphlib
 from dataclasses import dataclass
@@ -714,7 +715,10 @@ class Grouping:
             self.trips.sort(key=lambda t: -len(t.times))
         else:
             self.rows = [
-                Row(Stop(stop_times[key].stop_id, stop_times[key].stop_code))
+                Row(
+                    Stop(stop_times[key].stop_id, stop_times[key].stop_code),
+                    display_name=stop_times[key].display_name,
+                )
                 for key in result
             ]
             for row in self.rows:
@@ -856,7 +860,11 @@ class Grouping:
                 assert instruction[2:] == key
 
                 if instruction[0] == "+":
-                    row = Row(Stop(stoptime.stop_id, stoptime.stop_code), [""] * x)
+                    row = Row(
+                        Stop(stoptime.stop_id, stoptime.stop_code),
+                        [""] * x,
+                        display_name=stoptime.display_name,
+                    )
                     row.timing_status = stoptime.timing_status
                     if not existing_row:
                         rows.append(row)
@@ -986,7 +994,14 @@ class Grouping:
 
     def apply_stops(self, stops):
         for row in self.rows:
-            row.stop = stops.get(row.stop.atco_code, row.stop)
+            stop = stops.get(row.stop.atco_code, row.stop)
+            if row.display_name and hasattr(stop, "get_qualified_name"):
+                # The same StopPoint can appear more than once in a table with
+                # different publisher labels, so do not put this transient
+                # presentation value on the shared instance.
+                stop = copy.copy(stop)
+                stop._timetable_display_name = row.display_name
+            row.stop = stop
         self.rows = [row for row in self.rows if not row.permanently_suspended()]
         min_height = self.min_height()
         rowspan = self.rowspan()
@@ -1019,9 +1034,10 @@ class ColumnFoot:
 
 
 class Row:
-    def __init__(self, stop, times=None):
+    def __init__(self, stop, times=None, display_name=""):
         self.stop = stop
         self.times = times or []
+        self.display_name = display_name
 
     @cached_property
     def has_waittimes(self) -> bool:

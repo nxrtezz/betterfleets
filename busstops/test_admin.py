@@ -430,6 +430,41 @@ class BusStopsAdminTests(TestCase):
         self.assertEqual(preview.status_code, 200)
         self.assertContains(preview, str(self.trip_timetable.pk))
 
+    def test_simple_timetable_uses_stop_labels_and_bold_names(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.get(
+            f"/admin/busstops/service/{self.service_timetable.pk}/mass-edit-timetable/simple-template.xlsx"
+        )
+        workbook = load_workbook(BytesIO(response.content))
+        worksheet = workbook["Outbound"]
+        worksheet["A9"] = "Bus Station (stand A)"
+        worksheet["A9"].font = Font(bold=True)
+        worksheet["C9"] = "08:05"
+        worksheet["A10"] = "Terminus"
+        worksheet["A10"].font = Font(bold=False)
+        worksheet["C10"] = "08:15"
+
+        output = BytesIO()
+        workbook.save(output)
+        upload = SimpleUploadedFile(
+            "simple-timetable.xlsx",
+            output.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response = self.client.post(
+            f"/admin/busstops/service/{self.service_timetable.pk}/mass-edit-timetable/",
+            {"workbook": upload, "action": "commit"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        stop_times = list(self.trip_timetable.stoptime_set.order_by("sequence"))
+        self.assertEqual(stop_times[0].display_name, "Bus Station (stand A)")
+        self.assertEqual(stop_times[0].timing_status, "PTP")
+        self.assertEqual(stop_times[1].display_name, "Terminus")
+        self.assertEqual(stop_times[1].timing_status, "OTH")
+        public_timetable = self.client.get(self.service_timetable.get_absolute_url())
+        self.assertContains(public_timetable, "Bus Station (stand A)")
+
     def test_service_timetable_preview_accepts_uploaded_workbook(self):
         self.client.force_login(self.staff_user)
         workbook = self.make_timetable_upload(
