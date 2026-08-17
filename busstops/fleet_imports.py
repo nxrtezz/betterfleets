@@ -36,6 +36,11 @@ HEADER_ALIASES = {
     "historical_fleet_operator_code": "historical_fleet",
     "historical_year": "year",
     "fleet_year": "year",
+    # Advanced field aliases
+    "engine": "advanced_engine",
+    "seating_capacity": "advanced_seating_capacity",
+    "seating-capacity": "advanced_seating_capacity",
+    "gearbox": "advanced_gearbox",
 }
 
 
@@ -115,10 +120,24 @@ def rows_text_from_workbook(uploaded_file):
     if not any(headers):
         return ""
 
+    # Check if this is a basic/advanced fleet export format (with operator info header)
+    # Basic format has "NOC" in first cell of row 1
+    if len(rows) >= 4 and headers[0].upper() == "NOC":
+        # This is a basic/advanced export format
+        # Skip rows 1-3 (operator info), row 4 is the actual header
+        if len(rows) >= 4:
+            headers = [str(value).strip() if value is not None else "" for value in rows[3]]
+            data_rows = rows[4:]  # Skip the header row too
+        else:
+            data_rows = []
+    else:
+        # Standard format - first row is headers
+        data_rows = rows[1:]
+
     output = StringIO()
     writer = csv.writer(output, delimiter="\t", lineterminator="\n")
     writer.writerow(headers)
-    for row in rows[1:]:
+    for row in data_rows:
         values = ["" if value is None else str(value).strip() for value in row[: len(headers)]]
         if any(values):
             writer.writerow(values)
@@ -601,6 +620,24 @@ def parse_mass_rows(
                     row["pending_garage_name"] = mapped.get("garage", "").strip()
             except ValueError as exc:
                 row["errors"].append(str(exc))
+        
+        # Handle advanced fields (engine, seating-capacity, gearbox)
+        advanced_fields = {}
+        if mapped.get("advanced_engine"):
+            advanced_fields["engine"] = mapped.get("advanced_engine")
+        if mapped.get("advanced_seating_capacity"):
+            advanced_fields["seating-capacity"] = mapped.get("advanced_seating_capacity")
+        if mapped.get("advanced_gearbox"):
+            advanced_fields["gearbox"] = mapped.get("advanced_gearbox")
+        
+        if advanced_fields:
+            # Merge with existing advanced data if any
+            existing_advanced = row["values"].get("advanced", {})
+            if isinstance(existing_advanced, dict):
+                existing_advanced.update(advanced_fields)
+                row["values"]["advanced"] = existing_advanced
+            else:
+                row["values"]["advanced"] = advanced_fields
 
         if mapped.get("features"):
             row["has_features"] = True

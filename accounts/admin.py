@@ -46,6 +46,7 @@ class UserAdmin(admin.ModelAdmin):
         "is_active",
         "score",
         "trusted",
+        "advanced_mode",
     ]
     list_display_links = ["id", "username"]
     inlines = [OperatorUserInline, APIKeyInline]

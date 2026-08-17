@@ -104,6 +104,7 @@ class User(AbstractUser):
     score = models.IntegerField(blank=True, null=True)
     is_driver = models.BooleanField(default=False)
     view_advanced = models.BooleanField(default=False, help_text="Enable advanced editing controls")
+    advanced_mode = models.BooleanField(default=False, help_text="Enable advanced fleet export features")
     objects = CustomUserManager()
 
     USERNAME_FIELD = "email"  # this was a bad idea

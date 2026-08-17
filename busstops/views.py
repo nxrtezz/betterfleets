@@ -3899,7 +3899,7 @@ def service_timetable_csv(request, service_id):
         for row in grouping.rows:
             if type(row.stop) is StopPoint:
                 stop = [
-                    row.stop.get_qualified_name(),
+                    row.display_name or row.stop.get_qualified_name(),
                     row.stop.naptan_code,
                     row.stop.atco_code,
                 ]

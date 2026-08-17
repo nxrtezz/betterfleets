@@ -656,6 +656,8 @@ class StopPoint(models.Model):
         return ""
 
     def get_qualified_name(self, short=True):
+        if display_name := getattr(self, "_timetable_display_name", ""):
+            return display_name
         name = self.get_unqualified_name()
         if self.locality:
             locality_name = self.locality.name.replace(" Town Centre", "").replace(
