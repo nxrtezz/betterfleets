@@ -17,6 +17,9 @@ services:
     restart: on-failure
     volumes:
       - .:/app:cached
+    depends_on:
+      - postgres
+      - redis
 
   postgres:
     image: postgis/postgis
