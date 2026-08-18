@@ -78,8 +78,8 @@ class SiteUsageTrackingMiddleware:
         entries = get_site_usage_entries().copy()
         entries[identifier] = {
             "last_seen": now_ts,
-            "authenticated": request.user.is_authenticated,
-            "staff": request.user.is_staff,
+            "authenticated": bool(request.user.is_authenticated),
+            "staff": bool(request.user.is_staff),
         }
         cache = _get_site_usage_cache()
         if cache is None:
