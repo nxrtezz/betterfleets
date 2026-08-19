@@ -83,6 +83,8 @@ class Command(BaseCommand):
                     user_agent=user_agent,
                 )
                 updates.append(build_dvla_update(vehicle, payload, checked_at=checked_at))
+                # Add delay between requests to avoid rate limiting
+                time.sleep(2)
             except Exception as exc:
                 error_msg = str(exc).lower()
                 if "too many requests" in error_msg:
@@ -101,6 +103,7 @@ class Command(BaseCommand):
                             user_agent=user_agent,
                         )
                         updates.append(build_dvla_update(vehicle, payload, checked_at=checked_at))
+                        time.sleep(2)
                     except Exception as retry_exc:
                         failures.append((vehicle, str(retry_exc)))
                 else:
