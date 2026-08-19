@@ -1,4 +1,5 @@
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
@@ -40,6 +41,12 @@ class Command(BaseCommand):
             action="store_true",
             help="Apply the previewed DVLA data without an interactive confirmation prompt.",
         )
+        parser.add_argument(
+            "--workers",
+            type=int,
+            default=2,
+            help="Number of parallel workers for DVLA lookups. Default: 2.",
+        )
 
     def handle(self, *args, **options):
         api_key = options["api_key"] or getattr(settings, "DVLA_VEHICLE_ENQUIRY_API_KEY", "")
@@ -47,6 +54,7 @@ class Command(BaseCommand):
             raise CommandError("Provide --api_key or set DVLA_VEHICLE_ENQUIRY_API_KEY.")
 
         scope_label, vehicles = self._resolve_scope(options)
+        workers = options["workers"]
 
         checked_at = timezone.now()
         url = getattr(settings, "DVLA_VEHICLE_ENQUIRY_URL", DEFAULT_DVLA_URL)
@@ -65,7 +73,7 @@ class Command(BaseCommand):
 
         updates = []
         failures = []
-        
+
         lookup_progress = tqdm(
             total=len(vehicles),
             desc="DVLA lookups",
@@ -73,42 +81,37 @@ class Command(BaseCommand):
             file=self.stdout,
             disable=not vehicles,
         )
-        
-        for vehicle in vehicles:
-            try:
-                payload = fetch_dvla_record(
-                    vehicle.reg,
-                    api_key=api_key,
-                    url=url,
-                    user_agent=user_agent,
-                )
-                updates.append(build_dvla_update(vehicle, payload, checked_at=checked_at))
-                # Add delay between requests to avoid rate limiting
-                time.sleep(2)
-            except Exception as exc:
-                error_msg = str(exc).lower()
-                if "too many requests" in error_msg:
-                    self.stdout.write(
-                        self.style.WARNING(
-                            f"Rate limit hit for {vehicle.get_reg()}. Waiting 60 seconds..."
-                        )
+
+        def fetch_vehicle(vehicle):
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    payload = fetch_dvla_record(
+                        vehicle.reg,
+                        api_key=api_key,
+                        url=url,
+                        user_agent=user_agent,
                     )
-                    time.sleep(60)
-                    # Retry once after waiting
-                    try:
-                        payload = fetch_dvla_record(
-                            vehicle.reg,
-                            api_key=api_key,
-                            url=url,
-                            user_agent=user_agent,
-                        )
-                        updates.append(build_dvla_update(vehicle, payload, checked_at=checked_at))
-                        time.sleep(2)
-                    except Exception as retry_exc:
-                        failures.append((vehicle, str(retry_exc)))
+                    return ("success", vehicle, payload)
+                except Exception as exc:
+                    error_msg = str(exc).lower()
+                    if "too many requests" in error_msg:
+                        if attempt < max_retries - 1:
+                            wait_time = 60 * (attempt + 1)
+                            time.sleep(wait_time)
+                            continue
+                    return ("failure", vehicle, str(exc))
+            return ("failure", vehicle, "Max retries exceeded")
+
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {executor.submit(fetch_vehicle, vehicle): vehicle for vehicle in vehicles}
+            for future in as_completed(futures):
+                status, vehicle, result = future.result()
+                if status == "success":
+                    updates.append(build_dvla_update(vehicle, result, checked_at=checked_at))
                 else:
-                    failures.append((vehicle, str(exc)))
-            lookup_progress.update(1)
+                    failures.append((vehicle, result))
+                lookup_progress.update(1)
 
         self._write_preview(scope_label, updates, failures)
 
