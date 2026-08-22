@@ -13,7 +13,12 @@ import secrets
 
 class CustomUserManager(UserManager):
     def get_by_natural_key(self, username):
-        return self.get(email__iexact=username)
+        # Try to find user by email first (case-insensitive)
+        try:
+            return self.get(email__iexact=username)
+        except self.model.DoesNotExist:
+            # If not found by email, try to find by username (case-insensitive)
+            return self.get(username__iexact=username)
 
 
 class DiscordLinkCode(models.Model):

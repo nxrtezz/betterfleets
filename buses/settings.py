@@ -189,7 +189,7 @@ DATABASES["default"]["ENGINE"] = "django.contrib.gis.db.backends.postgis"
 
 DATABASES["default"]["OPTIONS"] = {
     "application_name": os.environ.get("APPLICATION_NAME") or " ".join(sys.argv)[-63:],
-    "connect_timeout": 9,
+    "connect_timeout": 30,
 }
 
 DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
@@ -208,12 +208,12 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # Allauth specific settings
-ACCOUNT_AUTHENTICATION_METHOD = "email"
+ACCOUNT_AUTHENTICATION_METHOD = "username_email"
 ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_USERNAME_REQUIRED = True
 ACCOUNT_USER_MODEL_USERNAME_FIELD = "username"
 ACCOUNT_EMAIL_VERIFICATION = "none"
-ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_LOGIN_METHODS = {"username", "email"}
 
 # WebAuthn/Passkey settings (django-allauth)
 ALLAUTH_WEBAUTHN_RP_ID = os.environ.get("WEBAUTHN_RP_ID") or os.environ.get("FIDO2_RP_ID", "localhost")
