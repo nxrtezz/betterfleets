@@ -223,7 +223,8 @@ class Timetable:
         if self.detailed:
             trips = trips.select_related("garage", "vehicle_type")
 
-        if len(trips) > 1500:
+        # Use count() to avoid materializing the entire queryset
+        if trips.count() > 1500:
             self.date = None
             return
 
@@ -349,6 +350,9 @@ class Timetable:
                     prev_op = trip.operator_id
 
     def get_calendar_options(self, calendar_id):
+        if not self.calendars:
+            return
+            
         all_days = set()
         for calendar in self.calendars:
             calendar_days = calendar.get_days()
@@ -379,6 +383,9 @@ class Timetable:
 
     def get_day_options(self):
         """Return available days of week for this timetable."""
+        if not self.calendars:
+            return []
+            
         available_days = set()
         for calendar in self.calendars:
             days = calendar.get_days()
@@ -389,6 +396,9 @@ class Timetable:
         return sorted(available_days, key=lambda d: day_order.get(d, 0))
 
     def get_date_options(self):
+        if not self.calendars:
+            return
+            
         date = self.today
 
         for calendar in self.calendars:

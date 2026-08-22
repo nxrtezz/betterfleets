@@ -12,7 +12,7 @@
             <p>{{ timetable.calendar.describe_for_timetable() }}</p>
         {% elif timetable.day_of_week %}
             <select name="day_of_week" aria-label="Day of week">
-                {% set day_options = timetable.get_day_options() %}
+                {% set day_options = timetable.get_day_options() if timetable.calendars else [] %}
                 {% for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
                     {% if day in day_options %}
                         <option{% if day == timetable.day_of_week %} selected{% endif %} value="{{ day }}">{{ day }}</option>
@@ -29,7 +29,7 @@
             <input type="date" name="date" aria-label="Date" value="{{ timetable.date }}">
         {% else %}
             <select name="day_of_week" aria-label="Day of week">
-                {% set day_options = timetable.get_day_options() %}
+                {% set day_options = timetable.get_day_options() if timetable.calendars else [] %}
                 {% for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
                     {% if day in day_options %}
                         <option value="{{ day }}">{{ day }}</option>

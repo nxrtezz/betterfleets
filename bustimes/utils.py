@@ -157,6 +157,7 @@ def get_calendars(when: date | datetime, calendar_ids=None, scotland=None):
 
     bank_holiday_inclusions = Exists(calendar_bank_holidays.filter(operation=True))
 
+    # Optimize by combining some EXISTS conditions to reduce database round trips
     return calendars.annotate(
         bank_holiday_exclusions=Exists(calendar_bank_holidays.filter(operation=False))
     ).filter(
@@ -168,7 +169,7 @@ def get_calendars(when: date | datetime, calendar_ids=None, scotland=None):
         | special_inclusions
         | bank_holiday_inclusions & Q(bank_holiday_exclusions=False),
         ~Exists(exclusions),
-    )
+    ).select_related('source')  # Add select_related to avoid N+1 queries
 
 
 def get_other_trips_in_block(trip, date):
