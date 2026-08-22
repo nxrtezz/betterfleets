@@ -126,6 +126,7 @@ REQUEST_TARGET_MODELS = {
 TRUSTED_REQUEST_APPROVAL_SOURCES = {
     "stop_request",
     "service_request",
+    "vehicle_request",
 }
 
 
@@ -2409,6 +2410,11 @@ def create_request_log(
     many_to_many=None,
     status=None,
 ):
+    # Auto-approve vehicle requests from trusted users
+    auto_approve = status is None and source == "vehicle_request" and getattr(user, "trusted", False)
+    if auto_approve:
+        status = DataChangeLog.STATUS_APPLIED
+    
     log = DataChangeLog.objects.create(
         source=source,
         target_model=target_model,
@@ -2427,13 +2433,20 @@ def create_request_log(
         status=status or DataChangeLog.STATUS_PENDING,
         reason=summary,
     )
-    notify_request_created(
-        request_type=REQUEST_SOURCES.get(source, "Request"),
-        target_title=target_repr,
-        summary=summary,
-        user=user,
-        changes=changes,
-    )
+    
+    # If auto-approved, apply the change immediately
+    if auto_approve:
+        from busstops.data_changes import apply_pending_change
+        log = apply_pending_change(log, user=user)
+    else:
+        # Only send notification for pending requests (not auto-approved ones)
+        notify_request_created(
+            request_type=REQUEST_SOURCES.get(source, "Request"),
+            target_title=target_repr,
+            summary=summary,
+            user=user,
+            changes=changes,
+        )
     return log
 
 
@@ -3281,6 +3294,32 @@ def edit_vehicle(request, **kwargs):
             if advanced_field_updates:
                 data["advanced"] = advanced_field_updates
 
+            # Check for existing pending revisions before creating new one
+            has_pending = False
+            if "operator" in data:
+                if VehicleRevision.objects.filter(vehicle=vehicle, to_operator=data["operator"], pending=True).exists():
+                    form.add_error("operator", "There's already a pending edit for that")
+                    has_pending = True
+            if "operated_by" in data and not has_pending:
+                if VehicleRevision.objects.filter(vehicle=vehicle, to_operated_by=data["operated_by"], pending=True).exists():
+                    form.add_error("operated_by", "There's already a pending edit for that")
+                    has_pending = True
+            if "vehicle_type" in data and not has_pending:
+                if VehicleRevision.objects.filter(vehicle=vehicle, to_type=data["vehicle_type"], pending=True).exists():
+                    form.add_error("vehicle_type", "There's already a pending edit for that")
+                    has_pending = True
+            if "colours" in data and not has_pending:
+                if VehicleRevision.objects.filter(vehicle=vehicle, to_livery=data["colours"], pending=True).exists():
+                    form.add_error("colours", "There's already a pending edit for that")
+                    has_pending = True
+            if "garage" in data and not has_pending:
+                if VehicleRevision.objects.filter(vehicle=vehicle, to_garage=data["garage"], pending=True).exists():
+                    form.add_error("garage", "There's already a pending edit for that")
+                    has_pending = True
+            
+            if has_pending:
+                return render(request, f"vehicles/edit_vehicle.html", context)
+
             revision, features = get_revision(vehicle, data)
 
             revision.user = request.user
@@ -3300,21 +3339,22 @@ def edit_vehicle(request, **kwargs):
                     form = None
 
             except IntegrityError as e:
-                error = "There's already a pending edit for that"
-                if "unique_pending_livery" in e.args[0]:
-                    form.add_error("colours", error)
-                elif "unique_pending_type" in e.args[0]:
-                    form.add_error("vehicle_type", error)
-                elif "unique_pending_operator" in e.args[0]:
-                    form.add_error("operator", error)
-                elif "unique_pending_garage" in e.args[0]:
-                    form.add_error("garage", error)
+                # This should rarely happen now due to pre-checks, but handle edge cases
+                if "unique_pending_livery" in str(e):
+                    form.add_error("colours", "There's already a pending edit for that")
+                elif "unique_pending_type" in str(e):
+                    form.add_error("vehicle_type", "There's already a pending edit for that")
+                elif "unique_pending_operator" in str(e):
+                    form.add_error("operator", "There's already a pending edit for that")
+                elif "unique_pending_garage" in str(e):
+                    form.add_error("garage", "There's already a pending edit for that")
+                elif "unique_pending_operated_by" in str(e):
+                    form.add_error("operated_by", "There's already a pending edit for that")
                 elif (
-                    "vehicle_operator_and_code" in e.args[0]
-                    or "vehicle_operator_and_code_live" in e.args[0]
+                    "vehicle_operator_and_code" in str(e)
+                    or "vehicle_operator_and_code_live" in str(e)
                 ):
-                    error = f"{form.cleaned_data['operator']} already has a vehicle with the code {vehicle.code}"
-                    form.add_error("operator", error)
+                    form.add_error("operator", f"{form.cleaned_data['operator']} already has a vehicle with the code {vehicle.code}")
                 else:
                     raise
 

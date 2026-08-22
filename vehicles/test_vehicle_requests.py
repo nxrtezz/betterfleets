@@ -20,9 +20,19 @@ class NewVehicleRequestTests(TestCase):
             username="requester",
             email="requester@example.com",
             password="secret",
-            trusted=True,
+            trusted=False,  # Default to non-trusted for most tests
         )
         cls.user.user_permissions.add(
+            Permission.objects.get(codename="add_vehiclerevision")
+        )
+        # Create a trusted user for auto-approval tests
+        cls.trusted_user = User.objects.create_user(
+            username="trusted_requester",
+            email="trusted_requester@example.com",
+            password="secret",
+            trusted=True,
+        )
+        cls.trusted_user.user_permissions.add(
             Permission.objects.get(codename="add_vehiclerevision")
         )
 
@@ -46,6 +56,7 @@ class NewVehicleRequestTests(TestCase):
         self.assertContains(response, "Livery")
 
     def test_request_new_vehicle_creates_pending_approval(self):
+        # Use non-trusted user for this test
         self.client.force_login(self.user)
 
         response = self.client.post(
@@ -111,6 +122,31 @@ class NewVehicleRequestTests(TestCase):
 
         self.assertContains(response, "Vehicle request")
         self.assertContains(response, "Test Operator 1234")
+
+    def test_trusted_user_vehicle_request_auto_approved(self):
+        """Test that vehicle requests from trusted users are automatically approved"""
+        self.client.force_login(self.trusted_user)
+
+        response = self.client.post(
+            f"/operators/{self.operator.slug}/vehicles/request-new",
+            {
+                "code": "5678",
+                "reg": "YX25 DEF",
+                "summary": "Auto-approved trusted user request.",
+            },
+        )
+
+        # Should not show "sent for approval" since it's auto-approved
+        self.assertNotContains(response, "sent for approval")
+        
+        # Vehicle should be created immediately
+        vehicle = Vehicle.objects.get(operator=self.operator, code="5678")
+        self.assertEqual(vehicle.reg, "YX25DEF")
+        
+        # Log should be marked as applied
+        log = DataChangeLog.objects.get(target_pk=str(vehicle.id))
+        self.assertEqual(log.status, DataChangeLog.STATUS_APPLIED)
+        self.assertEqual(log.approved_by, self.trusted_user)
 
     def test_approved_request_creates_vehicle(self):
         self.client.force_login(self.user)
