@@ -15,6 +15,7 @@ class RequestCategory(models.TextChoices):
     LIVERY = "livery", "Livery"
     SITE_FEATURE = "site_feature", "Site Feature"
     NAMED_PAGE = "named_page", "Named Page"
+    PHOTO = "photo", "Photo"
     OTHER = "other", "Other"
 
 
@@ -89,6 +90,7 @@ class Request(models.Model):
     registration = models.CharField(max_length=24, blank=True)
     route = models.CharField(max_length=100, blank=True)
     expected_behaviour = models.TextField(blank=True)
+    photo_url = models.URLField(blank=True, help_text="Flickr photo URL for photo requests")
     
     # Tracking
     resolved_by = models.ForeignKey(

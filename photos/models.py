@@ -1,20 +1,24 @@
 from django.conf import settings
 from django.contrib.gis.db import models
-from imagekit.models import ImageSpecField
-from imagekit.processors import ResizeToFill
+from django.core.exceptions import ValidationError
+
+
+def validate_flickr_url(value):
+    """Validate that the URL is from Flickr."""
+    if not value:
+        return
+    if "flickr.com" not in value.lower():
+        raise ValidationError("Only Flickr URLs are allowed for photos.")
 
 
 class Photo(models.Model):
-    image = models.ImageField()
-    image_1200_630 = ImageSpecField(
-        source="image",
-        processors=[ResizeToFill(1200, 630)],
-        format="JPEG",
-        options={"quality": 60},
+    flickr_url = models.URLField(
+        validators=[validate_flickr_url],
+        verbose_name="Flickr URL",
+        help_text="Enter a Flickr photo URL"
     )
     credit = models.CharField(max_length=255, blank=True)
     caption = models.CharField(max_length=255, blank=True)
-    url = models.URLField(blank=True, verbose_name="URL")
     created_at = models.DateTimeField(null=True, blank=True)
     license = models.CharField(null=True, blank=True)
 
@@ -35,12 +39,8 @@ class Photo(models.Model):
     )
 
     def get_display_url(self):
-        """Return the URL to use for displaying this photo."""
-        if self.url:
-            return self.url
-        if self.image:
-            return self.image_1200_630.url
-        return None
+        """Return the Flickr URL for displaying this photo."""
+        return self.flickr_url
 
     def __str__(self):
-        return self.caption
+        return self.caption or self.flickr_url

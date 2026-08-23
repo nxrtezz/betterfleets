@@ -12,6 +12,33 @@ from .form_fields import RegField, SummaryField
 from .models import AdvancedField, Livery, Vehicle, VehicleFeature, VehicleReview, VehicleType
 
 
+class PhotoForm(forms.Form):
+    """Form for adding Flickr photos to vehicles."""
+    flickr_url = forms.URLField(
+        label="Flickr URL",
+        help_text="Enter a Flickr photo URL",
+        required=True
+    )
+    credit = forms.CharField(
+        label="Credit",
+        max_length=255,
+        required=False,
+        help_text="Photo credit (optional)"
+    )
+    caption = forms.CharField(
+        label="Caption",
+        max_length=255,
+        required=False,
+        help_text="Photo caption (optional)"
+    )
+
+    def clean_flickr_url(self):
+        url = self.cleaned_data.get('flickr_url')
+        if url and 'flickr.com' not in url.lower():
+            raise ValidationError("Only Flickr URLs are allowed for photos.")
+        return url
+
+
 class AutocompleteWidget(forms.Select):
     # optgroups method from the Django admin AutocompleteSelect widget
     optgroups = AutocompleteSelect.optgroups

@@ -137,27 +137,6 @@
             margin-bottom: 0.6rem;
         }
 
-        .vehicle-hero__photo {
-            flex: 0 0 auto;
-            width: 220px;
-            max-width: 40%;
-            border-radius: 0.6rem;
-            overflow: hidden;
-            border: 1px solid var(--border-color);
-            background: var(--brand-color);
-            aspect-ratio: 16/9;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .vehicle-hero__photo img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
-
         .vehicle-hero__info {
             flex: 1 1 0;
             min-width: 0;
@@ -262,13 +241,39 @@
             .vehicle-hero {
                 flex-direction: column;
             }
-            .vehicle-hero__photo {
-                width: 100%;
-                max-width: 100%;
-            }
             .reg-plate {
                 font-size: 1.35rem;
             }
+        }
+
+        /* ── Vehicle photo (bustimes.org style) ─────────────────────── */
+        .vehicle-photo {
+            margin: 0 0 1rem 0;
+            padding: 0;
+            border: 1px solid var(--border-color);
+            border-radius: 0.6rem;
+            overflow: hidden;
+            background: var(--brand-color);
+        }
+
+        .vehicle-photo img {
+            display: block;
+            width: 100%;
+            height: auto;
+            object-fit: cover;
+        }
+
+        .vehicle-photo figcaption {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.85rem;
+            color: var(--secondary-text-color);
+            background: var(--background-color);
+            border-top: 1px solid var(--border-color);
+            margin: 0;
+        }
+
+        .vehicle-photo figcaption a {
+            color: var(--link-color);
         }
     </style>
 {% endblock head %}
@@ -278,15 +283,22 @@
 {% block content %}
 
 {% if vehicle %}
-    <div class="vehicle-hero">
-        {% with photos=vehicle.photo_set.all %}
-        {% if photos %}
-            <div class="vehicle-hero__photo">
-                <img src="{{ photos.0.get_display_url }}" alt="{{ vehicle }}" loading="lazy">
-            </div>
-        {% endif %}
-        {% endwith %}
+    {% with photos=vehicle.photo_set.all %}
+    {% if photos %}
+        <figure class="vehicle-photo">
+            <img src="{{ photos.0.get_display_url }}" alt="{{ vehicle }}" loading="lazy">
+            {% if photos.0.credit %}
+                <figcaption>
+                    {% if photos.0.url %}
+                        <a href="{{ photos.0.url }}">{{ photos.0.credit }}</a>
+                    {% else %}{{ photos.0.credit }}{% endif %}
+                </figcaption>
+            {% endif %}
+        </figure>
+    {% endif %}
+    {% endwith %}
 
+    <div class="vehicle-hero">
         <div class="vehicle-hero__info">
             <div class="vehicle-header-row">
                 {% if vehicle.reg %}
@@ -331,10 +343,8 @@
             </p>
             
             <p>
-                <label style="font-weight: bold;">Photo:</label><br>
-                <input type="file" name="photo_image" accept="image/*" style="margin-bottom: 0.5rem;">
-                <small>or</small><br>
-                <input type="url" name="photo_url" placeholder="Image URL" style="width: 100%; max-width: 300px;">
+                <label style="font-weight: bold;">Flickr URL:</label><br>
+                <input type="url" name="photo_url" placeholder="Flickr photo URL" required style="width: 100%; max-width: 300px;">
             </p>
             
             <p>
@@ -344,6 +354,32 @@
             
             <button type="submit" class="button">Submit suggestion</button>
             <button type="button" onclick="document.getElementById('suggest-photo-form').style.display='none';" style="margin-left: 0.5rem;">Cancel</button>
+        </form>
+    </div>
+
+    <div id="request-photo-form" style="display: none; margin: 1rem 0; padding: 1rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--background-color);">
+        <h3 style="margin-top: 0;">Request a photo</h3>
+        <form action="{{ request.path }}" method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="request_photo" value="1">
+            
+            <p>
+                <label style="font-weight: bold;">Vehicle:</label><br>
+                <input type="text" value="{{ vehicle.get_reg }}{% if vehicle.fleet_number or vehicle.fleet_code %} ({{ vehicle.fleet_number|default:vehicle.fleet_code }}){% endif %}" readonly style="width: 100%; max-width: 300px;">
+            </p>
+            
+            <p>
+                <label style="font-weight: bold;">Flickr URL (if available):</label><br>
+                <input type="url" name="photo_url" placeholder="Flickr photo URL" style="width: 100%; max-width: 300px;">
+            </p>
+            
+            <p>
+                <label style="font-weight: bold;">Description:</label><br>
+                <textarea name="description" placeholder="Describe what photo you'd like added" required style="width: 100%; max-width: 300px;"></textarea>
+            </p>
+            
+            <button type="submit" class="button">Submit request</button>
+            <button type="button" onclick="document.getElementById('request-photo-form').style.display='none';" style="margin-left: 0.5rem;">Cancel</button>
         </form>
     </div>
     {% endif %}
@@ -390,6 +426,9 @@
             <input type="hidden" name="log_photo" value="1">
             <button type="submit" class="button">{% if vehicle_photographed %}Log photo ({{ photo_log_quantity }}){% else %}Log photo{% endif %}</button>
         </form>
+    {% endif %}
+    {% if request.user.is_authenticated %}
+        <button type="button" onclick="document.getElementById('request-photo-form').style.display='block';" class="button">Request photo</button>
     {% endif %}
     {% if can_drive_log %}
         <form action="{{ request.path }}{% if request.GET.date %}?date={{ request.GET.date|urlencode }}{% endif %}" method="POST">
@@ -592,20 +631,47 @@
             <h2 style="font-size: 1rem; margin-bottom: 0.75rem; opacity: 0.7;">More photos</h2>
             <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
                 {% for photo in photos %}{% if not forloop.first %}
-                    <img src="{{ photo.get_display_url }}" style="width: 180px; height: 95px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color);" alt="">
+                    <figure class="vehicle-photo" style="width: 180px; margin: 0;">
+                        <img src="{{ photo.get_display_url }}" alt="" loading="lazy">
+                        {% if photo.credit %}
+                            <figcaption style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+                                {% if photo.url %}
+                                    <a href="{{ photo.url }}">{{ photo.credit }}</a>
+                                {% else %}{{ photo.credit }}{% endif %}
+                            </figcaption>
+                        {% endif %}
+                    </figure>
                 {% endif %}{% endfor %}
             </div>
         </section>
     {% endif %}
     {% endwith %}
 
-    <form action="{{ request.path }}" method="POST" enctype="multipart/form-data" style="margin: 1rem 0;">
+    <h3 style="margin: 1rem 0 0.5rem;">Add photo (Flickr URL)</h3>
+    <form action="{{ request.path }}" method="POST" style="margin: 1rem 0;">
         {{ photo_form.as_p }}
         {% csrf_token %}
-        <input type="submit">
+        <input type="submit" class="button" value="Add photo">
     </form>
-
-{% endif %}
+    {% elif request.user.is_authenticated and request.user.trusted %}
+    <h3 style="margin: 1rem 0 0.5rem;">Add photo (Flickr URL)</h3>
+    <form action="{{ request.path }}" method="POST" style="margin: 1rem 0;">
+        <p>
+            <label style="font-weight: bold;">Flickr URL:</label><br>
+            <input type="url" name="tu_flickr_url" placeholder="Flickr photo URL" required style="width: 100%; max-width: 300px;">
+        </p>
+        <p>
+            <label style="font-weight: bold;">Credit:</label><br>
+            <input type="text" name="tu_credit" placeholder="Photo credit" style="width: 100%; max-width: 300px;">
+        </p>
+        <p>
+            <label style="font-weight: bold;">Caption:</label><br>
+            <input type="text" name="tu_caption" placeholder="Photo caption" style="width: 100%; max-width: 300px;">
+        </p>
+        {% csrf_token %}
+        <input type="submit" class="button" value="Add photo">
+    </form>
+    {% endif %}
 
 
 <div id="history"></div>

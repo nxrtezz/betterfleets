@@ -1979,6 +1979,8 @@ class VehicleDetailView(DetailView):
 
         if self.request.user.has_perm("photos.add_photo"):
             context["photo_form"] = PhotoForm()
+        elif getattr(self.request.user, "trusted", False):
+            context["photo_form"] = PhotoForm()
         if self.request.user.is_authenticated:
             context["can_log_vehicle"] = True
             context["vehicle_logged"] = has_vehicle_been_logged(
@@ -2177,84 +2179,103 @@ class VehicleDetailView(DetailView):
             )
             review.delete()
         elif self.request.user.has_perm("photos.add_photo"):
-            form = PhotoForm(self.request.POST, self.request.FILES)
+            form = PhotoForm(self.request.POST)
             if form.is_valid():
                 photo = Photo()
                 photo.user = self.request.user
-                
-                if form.cleaned_data.get("image"):
-                    photo.image = form.cleaned_data["image"]
-                    photo.save()
-                    photo.vehicles.add(vehicle)
-                elif form.cleaned_data.get("url"):
-                    try:
-                        add_flickr_photo(form.cleaned_data["url"], vehicle, self.request)
-                    except (IndexError, requests.RequestException):
-                        pass
+                photo.flickr_url = form.cleaned_data["flickr_url"]
+                photo.credit = form.cleaned_data.get("credit", "")
+                photo.caption = form.cleaned_data.get("caption", "")
+                photo.save()
+                photo.vehicles.add(vehicle)
+                messages.success(self.request, "Photo added successfully.")
+        elif getattr(self.request.user, "trusted", False) and "tu_flickr_url" in self.request.POST:
+            # Trusted user photo addition
+            flickr_url = self.request.POST.get("tu_flickr_url")
+            credit = self.request.POST.get("tu_credit", "")
+            caption = self.request.POST.get("tu_caption", "")
+            
+            if not flickr_url:
+                messages.error(self.request, "Please provide a Flickr URL.")
+                return self.get(*args, **kwargs)
+            
+            if 'flickr.com' not in flickr_url.lower():
+                messages.error(self.request, "Only Flickr URLs are allowed.")
+                return self.get(*args, **kwargs)
+            
+            photo = Photo()
+            photo.user = self.request.user
+            photo.flickr_url = flickr_url
+            photo.credit = credit
+            photo.caption = caption
+            photo.save()
+            photo.vehicles.add(vehicle)
+            messages.success(self.request, "Photo added successfully.")
         
         elif self.request.user.is_authenticated and "suggest_photo" in self.request.POST:
-            from PIL import Image
-            import io
             from service_requests.models import Request, RequestCategory
             
-            photo_image = self.request.FILES.get("photo_image")
             photo_url = self.request.POST.get("photo_url")
             summary = self.request.POST.get("summary")
             
-            if not photo_image and not photo_url:
-                messages.error(self.request, "Please provide either a photo file or URL.")
+            if not photo_url:
+                messages.error(self.request, "Please provide a Flickr URL.")
+                return self.get(*args, **kwargs)
+            
+            if 'flickr.com' not in photo_url.lower():
+                messages.error(self.request, "Only Flickr URLs are allowed.")
                 return self.get(*args, **kwargs)
             
             if not summary:
                 messages.error(self.request, "Please provide a summary.")
                 return self.get(*args, **kwargs)
             
-            # Compress image if uploaded
-            photo_data = None
-            if photo_image:
-                img = Image.open(photo_image)
-                img_format = img.format or 'JPEG'
-                
-                # Convert to RGB if necessary for JPEG
-                if img_format == 'JPEG' and img.mode in ('RGBA', 'P'):
-                    img = img.convert('RGB')
-                
-                output = io.BytesIO()
-                # Compress to max 2MB
-                quality = 95
-                while quality > 10:
-                    output.seek(0)
-                    output.truncate()
-                    img.save(output, format='JPEG', quality=quality, optimize=True)
-                    if output.tell() <= 2 * 1024 * 1024:  # 2MB
-                        break
-                    quality -= 5
-                
-                photo_data = output.getvalue()
-            
             # Create request for photo suggestion
             description = f"Photo suggestion for {vehicle}\n\n"
-            if photo_url:
-                description += f"Photo URL: {photo_url}\n"
-            else:
-                description += "Photo: Uploaded file\n"
+            description += f"Flickr URL: {photo_url}\n"
             description += f"Summary: {summary}"
             
             request_obj = Request.objects.create(
                 title=f"Photo suggestion for {vehicle}",
                 description=description,
-                category=RequestCategory.VEHICLE,
+                category=RequestCategory.PHOTO,
                 vehicle=vehicle,
+                photo_url=photo_url,
                 author=self.request.user,
             )
             
-            # Store photo data in description if uploaded
-            if photo_data:
-                import base64
-                request_obj.description += f"\n\nPhoto data (base64): {base64.b64encode(photo_data).decode('utf-8')}"
-                request_obj.save()
-            
             messages.success(self.request, "Photo suggestion submitted for review.")
+
+        elif self.request.user.is_authenticated and "request_photo" in self.request.POST:
+            from service_requests.models import Request, RequestCategory
+            
+            photo_url = self.request.POST.get("photo_url")
+            description = self.request.POST.get("description")
+            
+            if not description:
+                messages.error(self.request, "Please provide a description.")
+                return self.get(*args, **kwargs)
+            
+            if photo_url and 'flickr.com' not in photo_url.lower():
+                messages.error(self.request, "Only Flickr URLs are allowed.")
+                return self.get(*args, **kwargs)
+            
+            # Create request for photo
+            request_description = f"Photo request for {vehicle}\n\n"
+            request_description += f"Description: {description}\n"
+            if photo_url:
+                request_description += f"Flickr URL: {photo_url}\n"
+            
+            request_obj = Request.objects.create(
+                title=f"Photo request for {vehicle}",
+                description=request_description,
+                category=RequestCategory.PHOTO,
+                vehicle=vehicle,
+                photo_url=photo_url or "",
+                author=self.request.user,
+            )
+            
+            messages.success(self.request, "Photo request submitted.")
 
         return self.get(*args, **kwargs)
 
