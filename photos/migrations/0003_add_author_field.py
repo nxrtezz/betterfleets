@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('photos', '0002_add_flickr_url_and_author'),
+        ('photos', '0002_add_flickr_url'),
     ]
 
     operations = [
