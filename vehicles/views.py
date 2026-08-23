@@ -2181,14 +2181,17 @@ class VehicleDetailView(DetailView):
         elif self.request.user.has_perm("photos.add_photo"):
             form = PhotoForm(self.request.POST)
             if form.is_valid():
-                photo = Photo()
-                photo.user = self.request.user
-                photo.flickr_url = form.cleaned_data["flickr_url"]
-                photo.credit = form.cleaned_data.get("credit", "")
-                photo.caption = form.cleaned_data.get("caption", "")
-                photo.save()
-                photo.vehicles.add(vehicle)
-                messages.success(self.request, "Photo added successfully.")
+                try:
+                    photo = Photo()
+                    photo.user = self.request.user
+                    photo.flickr_url = form.cleaned_data["flickr_url"]
+                    photo.credit = form.cleaned_data.get("credit", "")
+                    photo.caption = form.cleaned_data.get("caption", "")
+                    photo.save()  # This will trigger automatic download
+                    photo.vehicles.add(vehicle)
+                    messages.success(self.request, "Photo added successfully.")
+                except Exception as e:
+                    messages.error(self.request, f"Error adding photo: {str(e)}")
         elif getattr(self.request.user, "trusted", False) and "tu_flickr_url" in self.request.POST:
             # Trusted user photo addition
             flickr_url = self.request.POST.get("tu_flickr_url")
@@ -2203,14 +2206,17 @@ class VehicleDetailView(DetailView):
                 messages.error(self.request, "Only Flickr URLs are allowed.")
                 return self.get(*args, **kwargs)
             
-            photo = Photo()
-            photo.user = self.request.user
-            photo.flickr_url = flickr_url
-            photo.credit = credit
-            photo.caption = caption
-            photo.save()
-            photo.vehicles.add(vehicle)
-            messages.success(self.request, "Photo added successfully.")
+            try:
+                photo = Photo()
+                photo.user = self.request.user
+                photo.flickr_url = flickr_url
+                photo.credit = credit
+                photo.caption = caption
+                photo.save()  # This will trigger automatic download
+                photo.vehicles.add(vehicle)
+                messages.success(self.request, "Photo added successfully.")
+            except Exception as e:
+                messages.error(self.request, f"Error adding photo: {str(e)}")
         
         elif self.request.user.is_authenticated and "suggest_photo" in self.request.POST:
             from service_requests.models import Request, RequestCategory
@@ -2233,7 +2239,8 @@ class VehicleDetailView(DetailView):
             # Create request for photo suggestion
             description = f"Photo suggestion for {vehicle}\n\n"
             description += f"Flickr URL: {photo_url}\n"
-            description += f"Summary: {summary}"
+            description += f"Summary: {summary}\n"
+            description += "Note: Image will be automatically downloaded from Flickr URL when approved."
             
             request_obj = Request.objects.create(
                 title=f"Photo suggestion for {vehicle}",
@@ -2265,6 +2272,7 @@ class VehicleDetailView(DetailView):
             request_description += f"Description: {description}\n"
             if photo_url:
                 request_description += f"Flickr URL: {photo_url}\n"
+                request_description += "Note: Image will be automatically downloaded from Flickr URL when approved."
             
             request_obj = Request.objects.create(
                 title=f"Photo request for {vehicle}",

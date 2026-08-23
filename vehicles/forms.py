@@ -16,7 +16,7 @@ class PhotoForm(forms.Form):
     """Form for adding Flickr photos to vehicles."""
     flickr_url = forms.URLField(
         label="Flickr URL",
-        help_text="Enter a Flickr photo URL",
+        help_text="Enter a Flickr photo URL (image will be downloaded automatically)",
         required=True
     )
     credit = forms.CharField(

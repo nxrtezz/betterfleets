@@ -333,7 +333,7 @@
     {% if request.user.is_authenticated %}
     <div id="suggest-photo-form" style="display: none; margin: 1rem 0; padding: 1rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--background-color);">
         <h3 style="margin-top: 0;">Suggest a photo</h3>
-        <form action="{{ request.path }}" method="POST" enctype="multipart/form-data">
+        <form action="{{ request.path }}" method="POST">
             {% csrf_token %}
             <input type="hidden" name="suggest_photo" value="1">
             
@@ -344,7 +344,7 @@
             
             <p>
                 <label style="font-weight: bold;">Flickr URL:</label><br>
-                <input type="url" name="photo_url" placeholder="Flickr photo URL" required style="width: 100%; max-width: 300px;">
+                <input type="url" name="photo_url" placeholder="Flickr photo URL (image will be downloaded)" required style="width: 100%; max-width: 300px;">
             </p>
             
             <p>
@@ -370,7 +370,7 @@
             
             <p>
                 <label style="font-weight: bold;">Flickr URL (if available):</label><br>
-                <input type="url" name="photo_url" placeholder="Flickr photo URL" style="width: 100%; max-width: 300px;">
+                <input type="url" name="photo_url" placeholder="Flickr photo URL (image will be downloaded)" style="width: 100%; max-width: 300px;">
             </p>
             
             <p>
@@ -658,7 +658,7 @@
     <form action="{{ request.path }}" method="POST" style="margin: 1rem 0;">
         <p>
             <label style="font-weight: bold;">Flickr URL:</label><br>
-            <input type="url" name="tu_flickr_url" placeholder="Flickr photo URL" required style="width: 100%; max-width: 300px;">
+            <input type="url" name="tu_flickr_url" placeholder="Flickr photo URL (image will be downloaded)" required style="width: 100%; max-width: 300px;">
         </p>
         <p>
             <label style="font-weight: bold;">Credit:</label><br>
