@@ -7,6 +7,7 @@ import requests
 from io import BytesIO
 from PIL import Image
 import re
+from bs4 import BeautifulSoup
 
 
 def validate_flickr_url(value):
@@ -16,45 +17,49 @@ def validate_flickr_url(value):
 
 
 def download_image_from_flickr(flickr_url):
-    """Download the main image from a Flickr URL."""
+    """Download the main image from a Flickr URL by parsing the page HTML."""
     try:
-        # Extract photo ID from Flickr URL
-        # Flickr URLs typically look like: https://www.flickr.com/photos/username/1234567890/
-        import re
-        match = re.search(r'/photos/[^/]+/(\d+)/?', flickr_url)
-        if not match:
-            raise ValidationError("Could not extract photo ID from Flickr URL")
-        
-        photo_id = match.group(1)
-        
-        # Try to get the largest available image size
-        # Flickr uses different URL patterns for different sizes
-        # We'll try common patterns
-        possible_sizes = [
-            f'https://live.staticflickr.com/{photo_id[:3]}/{photo_id}_{photo_id}_o.jpg',  # Original
-            f'https://live.staticflickr.com/{photo_id[:3]}/{photo_id}_{photo_id}_b.jpg',  # Large
-            f'https://live.staticflickr.com/{photo_id[:3]}/{photo_id}_{photo_id}_c.jpg',  # Medium
-            f'https://live.staticflickr.com/{photo_id[:3]}/{photo_id}_{photo_id}.jpg',     # Default
-        ]
-        
-        last_error = None
-        for url in possible_sizes:
-            try:
-                response = requests.get(url, timeout=10)
-                if response.status_code == 200 and response.headers.get('content-type', '').startswith('image/'):
-                    return Image.open(BytesIO(response.content))
-            except Exception as e:
-                last_error = e
-                continue
-        
-        # If all direct URL attempts fail, try the original URL
+        # Fetch the Flickr page
         response = requests.get(flickr_url, timeout=10)
         response.raise_for_status()
         
-        if response.headers.get('content-type', '').startswith('image/'):
-            return Image.open(BytesIO(response.content))
+        # Parse the HTML
+        soup = BeautifulSoup(response.content, 'html.parser')
         
-        raise ValidationError(f"Could not download image from Flickr URL. Last error: {str(last_error)}")
+        # Find the main photo img tag with class "main-photo"
+        main_photo = soup.find('img', class_='main-photo')
+        if not main_photo:
+            raise ValidationError("Could not find main photo on Flickr page")
+        
+        # Get the image URL
+        img_url = main_photo.get('src')
+        if not img_url:
+            raise ValidationError("Could not find image source URL")
+        
+        # Add https:// if the URL starts with //
+        if img_url.startswith('//'):
+            img_url = 'https:' + img_url
+        
+        # Extract title and author from alt text
+        # Format: "Title | by Author" or "Title, Location, Date | by Author"
+        alt_text = main_photo.get('alt', '')
+        title = ''
+        author = ''
+        
+        if alt_text:
+            # Split by " | by " to separate title from author
+            if ' | by ' in alt_text:
+                parts = alt_text.split(' | by ')
+                title = parts[0].strip()
+                author = parts[1].strip() if len(parts) > 1 else ''
+            else:
+                title = alt_text
+        
+        # Download the image
+        img_response = requests.get(img_url, timeout=10)
+        img_response.raise_for_status()
+        
+        return Image.open(BytesIO(img_response.content)), title, author
         
     except Exception as e:
         raise ValidationError(f"Could not download image from Flickr URL: {str(e)}")
@@ -76,6 +81,7 @@ class Photo(models.Model):
     )
     credit = models.CharField(max_length=255, blank=True)
     caption = models.CharField(max_length=255, blank=True)
+    author = models.CharField(max_length=255, blank=True, help_text="Photo author from Flickr")
     url = models.URLField(blank=True, verbose_name="URL")
     created_at = models.DateTimeField(null=True, blank=True)
     license = models.CharField(null=True, blank=True)
@@ -107,7 +113,15 @@ class Photo(models.Model):
     def download_from_flickr(self):
         """Download image from Flickr URL and save to image field."""
         if self.flickr_url:
-            img = download_image_from_flickr(self.flickr_url)
+            img, title, author = download_image_from_flickr(self.flickr_url)
+            
+            # Set title and author if not already provided
+            if not self.caption and title:
+                self.caption = title
+            if not self.credit and author:
+                self.credit = author
+            if not self.author and author:
+                self.author = author
             
             # Convert to RGB if necessary for JPEG
             if img.mode in ('RGBA', 'P'):

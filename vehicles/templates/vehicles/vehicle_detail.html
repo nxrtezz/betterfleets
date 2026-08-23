@@ -275,6 +275,19 @@
         .vehicle-photo figcaption a {
             color: var(--link-color);
         }
+
+        .vehicle-photo__title {
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+            color: var(--text-color);
+        }
+
+        .vehicle-photo__author {
+            font-size: 0.75rem;
+            color: var(--secondary-text-color);
+            font-style: italic;
+        }
     </style>
 {% endblock head %}
 
@@ -287,11 +300,14 @@
     {% if photos %}
         <figure class="vehicle-photo">
             <img src="{{ photos.0.get_display_url }}" alt="{{ vehicle }}" loading="lazy">
-            {% if photos.0.credit %}
+            {% if photos.0.caption or photos.0.author %}
                 <figcaption>
-                    {% if photos.0.url %}
-                        <a href="{{ photos.0.url }}">{{ photos.0.credit }}</a>
-                    {% else %}{{ photos.0.credit }}{% endif %}
+                    {% if photos.0.caption %}
+                        <div class="vehicle-photo__title">{{ photos.0.caption }}</div>
+                    {% endif %}
+                    {% if photos.0.author %}
+                        <div class="vehicle-photo__author">by {{ photos.0.author }}</div>
+                    {% endif %}
                 </figcaption>
             {% endif %}
         </figure>
@@ -633,11 +649,14 @@
                 {% for photo in photos %}{% if not forloop.first %}
                     <figure class="vehicle-photo" style="width: 180px; margin: 0;">
                         <img src="{{ photo.get_display_url }}" alt="" loading="lazy">
-                        {% if photo.credit %}
+                        {% if photo.caption or photo.author %}
                             <figcaption style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
-                                {% if photo.url %}
-                                    <a href="{{ photo.url }}">{{ photo.credit }}</a>
-                                {% else %}{{ photo.credit }}{% endif %}
+                                {% if photo.caption %}
+                                    <div class="vehicle-photo__title" style="font-size: 0.8rem;">{{ photo.caption }}</div>
+                                {% endif %}
+                                {% if photo.author %}
+                                    <div class="vehicle-photo__author" style="font-size: 0.7rem;">by {{ photo.author }}</div>
+                                {% endif %}
                             </figcaption>
                         {% endif %}
                     </figure>
@@ -662,11 +681,15 @@
         </p>
         <p>
             <label style="font-weight: bold;">Credit:</label><br>
-            <input type="text" name="tu_credit" placeholder="Photo credit" style="width: 100%; max-width: 300px;">
+            <input type="text" name="tu_credit" placeholder="Photo credit (optional)" style="width: 100%; max-width: 300px;">
         </p>
         <p>
             <label style="font-weight: bold;">Caption:</label><br>
-            <input type="text" name="tu_caption" placeholder="Photo caption" style="width: 100%; max-width: 300px;">
+            <input type="text" name="tu_caption" placeholder="Photo caption (optional)" style="width: 100%; max-width: 300px;">
+        </p>
+        <p>
+            <label style="font-weight: bold;">Author:</label><br>
+            <input type="text" name="tu_author" placeholder="Photo author (optional)" style="width: 100%; max-width: 300px;">
         </p>
         {% csrf_token %}
         <input type="submit" class="button" value="Add photo">

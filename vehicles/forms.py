@@ -23,13 +23,19 @@ class PhotoForm(forms.Form):
         label="Credit",
         max_length=255,
         required=False,
-        help_text="Photo credit (optional)"
+        help_text="Photo credit (optional, will be auto-filled from Flickr if not provided)"
     )
     caption = forms.CharField(
         label="Caption",
         max_length=255,
         required=False,
-        help_text="Photo caption (optional)"
+        help_text="Photo caption (optional, will be auto-filled from Flickr if not provided)"
+    )
+    author = forms.CharField(
+        label="Author",
+        max_length=255,
+        required=False,
+        help_text="Photo author (optional, will be auto-filled from Flickr if not provided)"
     )
 
     def clean_flickr_url(self):

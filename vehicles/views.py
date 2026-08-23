@@ -2187,6 +2187,7 @@ class VehicleDetailView(DetailView):
                     photo.flickr_url = form.cleaned_data["flickr_url"]
                     photo.credit = form.cleaned_data.get("credit", "")
                     photo.caption = form.cleaned_data.get("caption", "")
+                    photo.author = form.cleaned_data.get("author", "")
                     photo.save()  # This will trigger automatic download
                     photo.vehicles.add(vehicle)
                     messages.success(self.request, "Photo added successfully.")
@@ -2197,6 +2198,7 @@ class VehicleDetailView(DetailView):
             flickr_url = self.request.POST.get("tu_flickr_url")
             credit = self.request.POST.get("tu_credit", "")
             caption = self.request.POST.get("tu_caption", "")
+            author = self.request.POST.get("tu_author", "")
             
             if not flickr_url:
                 messages.error(self.request, "Please provide a Flickr URL.")
@@ -2212,6 +2214,7 @@ class VehicleDetailView(DetailView):
                 photo.flickr_url = flickr_url
                 photo.credit = credit
                 photo.caption = caption
+                photo.author = author
                 photo.save()  # This will trigger automatic download
                 photo.vehicles.add(vehicle)
                 messages.success(self.request, "Photo added successfully.")
