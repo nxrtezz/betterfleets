@@ -7,6 +7,9 @@ class Migration(migrations.Migration):
         ("busstops", "0027_bustimes_sync_state_stop_groups"),
     ]
 
+    # This migration was originally 0028_routenotice.py
+    # Renamed to 0028_route_notice.py to avoid conflict with duplicate
+
     operations = [
         migrations.CreateModel(
             name="RouteNotice",
