@@ -19,6 +19,8 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     geos-bin \
     libgeos-dev \
+    gdal-bin \
+    libgdal-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -30,6 +32,7 @@ COPY uv.lock pyproject.toml /app/
 RUN uv sync --frozen
 
 ENV PATH="/app/.venv/bin:$PATH"
+ENV GDAL_LIBRARY_PATH=/usr/lib/gdal/libgdal.so
 
 # Install Playwright
 RUN uv pip install playwright
@@ -41,7 +44,6 @@ COPY --from=0 /app/busstops/static /app/busstops/static
 COPY . /app/
 
 ENV PORT=8000 STATIC_ROOT=/staticfiles
-RUN ./manage.py collectstatic --noinput
 
 EXPOSE 8000
 CMD ["gunicorn", "buses.wsgi"]
