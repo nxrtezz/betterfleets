@@ -41,6 +41,14 @@ class Migration(migrations.Migration):
                         to="busstops.service",
                     ),
                 ),
+                (
+                    "other_services",
+                    models.ManyToManyField(
+                        blank=True,
+                        related_name="related_route_notices",
+                        to="busstops.service",
+                    ),
+                ),
             ],
             options={
                 "ordering": ("-start", "-end", "title"),
