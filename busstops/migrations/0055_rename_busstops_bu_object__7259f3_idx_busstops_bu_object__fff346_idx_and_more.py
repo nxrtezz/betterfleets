@@ -41,11 +41,6 @@ class Migration(migrations.Migration):
             name='featured_image',
         ),
         migrations.AddField(
-            model_name='routenotice',
-            name='other_services',
-            field=models.ManyToManyField(blank=True, related_name='related_route_notices', to='busstops.service'),
-        ),
-        migrations.AddField(
             model_name='service',
             name='is_rail_replacement',
             field=models.BooleanField(db_index=True, default=False, help_text='This service is a rail replacement service.'),
