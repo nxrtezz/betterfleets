@@ -5,7 +5,7 @@ This document describes the isolated development environment for BetterFleets V2
 ## Overview
 
 The dev environment is completely isolated from production:
-- **Separate database**: `betterfleets_dev` with user `dev_user`
+- **Separate database**: `postgres` database with user `postgres` (separate container)
 - **Separate containers**: `bfdev-django`, `bfdev-postgres`, `bfdev-redis`
 - **Separate volumes**: `postgres_data_dev`, `media_dev`
 - **Separate ports**: Web exposed on `18000:8000` (internal 8000, external 18000)
@@ -124,7 +124,7 @@ docker compose -f docker-compose.dev.yml --env-file .env.dev exec web_dev python
 
 ### Database
 - **Production**: `postgres` database, user `postgres`, password `postgres`
-- **Dev**: `betterfleets_dev` database, user `dev_user`, password `dev_password`
+- **Dev**: `postgres` database, user `postgres`, password `postgres` (separate container)
 
 ### Volumes
 - **Production**: `postgres_data`, media directory
