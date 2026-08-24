@@ -9,12 +9,17 @@ services:
       - SECRET_KEY=${SECRET_KEY-}
       - DATABASE_URL=${DATABASE_URL-postgis://dev_user:dev_password@bfdev-postgres:5432/betterfleets_dev}
       - REDIS_URL=${REDIS_URL-redis://bfdev-redis:6379}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS-localhost 127.0.0.1 dev.eeveeit.uk}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS-http://localhost http://dev.eeveeit.uk https://dev.eeveeit.uk}
+      - FIDO2_RP_ID=${FIDO2_RP_ID-localhost}
+      - FIDO2_RP_NAME=${FIDO2_RP_NAME-BetterFleet-Dev}
+      - FIDO2_RP_ORIGINS=${FIDO2_RP_ORIGINS-http://localhost:18000,http://dev.eeveeit.uk}
       - NTA_API_KEY
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
       - PYTHONWARNINGS=all
     ports:
-      - "8010:8000"
+      - "18000:8000"
     restart: on-failure
     volumes:
       - .:/app:cached

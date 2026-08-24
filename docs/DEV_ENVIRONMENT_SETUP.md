@@ -8,7 +8,7 @@ The dev environment is completely isolated from production:
 - **Separate database**: `betterfleets_dev` with user `dev_user`
 - **Separate containers**: `bfdev-django`, `bfdev-postgres`, `bfdev-redis`
 - **Separate volumes**: `postgres_data_dev`, `media_dev`
-- **Separate ports**: Web exposed on `8010:8000` (internal 8000, external 8010)
+- **Separate ports**: Web exposed on `18000:8000` (internal 8000, external 18000)
 - **Separate environment file**: `.env.dev`
 - **Separate Dockerfile**: `Dockerfile.dev` (uses standard Python base instead of custom base image)
 
@@ -136,7 +136,7 @@ docker compose -f docker-compose.dev.yml --env-file .env.dev exec web_dev python
 
 ### Ports
 - **Production**: Web on `8000:8000`
-- **Dev**: Web on `8010:8000`
+- **Dev**: Web on `18000:8000`
 
 ### Environment Variables
 - **Production**: Uses `.env`
@@ -144,7 +144,7 @@ docker compose -f docker-compose.dev.yml --env-file .env.dev exec web_dev python
 
 ## Accessing the Dev Environment
 
-- **Direct access**: http://localhost:8010
+- **Direct access**: http://localhost:18000
 - **Via Nginx**: http://dev.eeveeit.uk (after nginx configuration)
 - **Django admin**: http://dev.eeveeit.uk/admin (after creating superuser)
 
@@ -154,7 +154,7 @@ docker compose -f docker-compose.dev.yml --env-file .env.dev exec web_dev python
 1. Ensure Docker Desktop is running
 2. Stop production if running: `docker compose down`
 3. Start development: `docker compose -f docker-compose.dev.yml --env-file .env.dev up -d`
-4. Access at http://localhost:8010
+4. Access at http://localhost:18000
 
 ### To switch back to production:
 1. Stop development: `docker compose -f docker-compose.dev.yml --env-file .env.dev down`
@@ -164,7 +164,7 @@ docker compose -f docker-compose.dev.yml --env-file .env.dev exec web_dev python
 ### Running both environments simultaneously:
 Both environments can run at the same time since they use different ports and containers:
 - Production: `docker compose up -d` (port 8000)
-- Development: `docker compose -f docker-compose.dev.yml --env-file .env.dev up -d` (port 8010)
+- Development: `docker compose -f docker-compose.dev.yml --env-file .env.dev up -d` (port 18000)
 
 ## Cleanup
 
@@ -195,7 +195,7 @@ Before starting V2 feature development, verify:
 - [ ] Docker Desktop is running
 - [ ] Development environment can start: `docker compose -f docker-compose.dev.yml --env-file .env.dev up -d`
 - [ ] Development database is accessible: `docker compose -f docker-compose.dev.yml --env-file .env.dev exec web_dev python manage.py migrate`
-- [ ] Development environment is accessible at http://localhost:8010
+- [ ] Development environment is accessible at http://localhost:18000
 - [ ] Production environment remains unaffected: `docker ps` should not show production containers if they were stopped
 
 ## V2 Development Process
