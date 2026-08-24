@@ -2198,7 +2198,6 @@ class VehicleDetailView(DetailView):
             flickr_url = self.request.POST.get("tu_flickr_url")
             credit = self.request.POST.get("tu_credit", "")
             caption = self.request.POST.get("tu_caption", "")
-            author = self.request.POST.get("tu_author", "")
             
             if not flickr_url:
                 messages.error(self.request, "Please provide a Flickr URL.")
@@ -2214,7 +2213,6 @@ class VehicleDetailView(DetailView):
                 photo.flickr_url = flickr_url
                 photo.credit = credit
                 photo.caption = caption
-                photo.author = author
                 photo.save()  # This will trigger automatic download
                 photo.vehicles.add(vehicle)
                 messages.success(self.request, "Photo added successfully.")
@@ -2255,38 +2253,6 @@ class VehicleDetailView(DetailView):
             )
             
             messages.success(self.request, "Photo suggestion submitted for review.")
-
-        elif self.request.user.is_authenticated and "request_photo" in self.request.POST:
-            from service_requests.models import Request, RequestCategory
-            
-            photo_url = self.request.POST.get("photo_url")
-            description = self.request.POST.get("description")
-            
-            if not description:
-                messages.error(self.request, "Please provide a description.")
-                return self.get(*args, **kwargs)
-            
-            if photo_url and 'flickr.com' not in photo_url.lower():
-                messages.error(self.request, "Only Flickr URLs are allowed.")
-                return self.get(*args, **kwargs)
-            
-            # Create request for photo
-            request_description = f"Photo request for {vehicle}\n\n"
-            request_description += f"Description: {description}\n"
-            if photo_url:
-                request_description += f"Flickr URL: {photo_url}\n"
-                request_description += "Note: Image will be automatically downloaded from Flickr URL when approved."
-            
-            request_obj = Request.objects.create(
-                title=f"Photo request for {vehicle}",
-                description=request_description,
-                category=RequestCategory.PHOTO,
-                vehicle=vehicle,
-                photo_url=photo_url or "",
-                author=self.request.user,
-            )
-            
-            messages.success(self.request, "Photo request submitted.")
 
         return self.get(*args, **kwargs)
 

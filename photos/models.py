@@ -81,7 +81,6 @@ class Photo(models.Model):
     )
     credit = models.CharField(max_length=255, blank=True)
     caption = models.CharField(max_length=255, blank=True)
-    author = models.CharField(max_length=255, blank=True, help_text="Photo author from Flickr")
     url = models.URLField(blank=True, verbose_name="URL")
     created_at = models.DateTimeField(null=True, blank=True)
     license = models.CharField(null=True, blank=True)
@@ -120,8 +119,6 @@ class Photo(models.Model):
                 self.caption = title
             if not self.credit and author:
                 self.credit = author
-            if not self.author and author:
-                self.author = author
             
             # Convert to RGB if necessary for JPEG
             if img.mode in ('RGBA', 'P'):

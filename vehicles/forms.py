@@ -31,12 +31,6 @@ class PhotoForm(forms.Form):
         required=False,
         help_text="Photo caption (optional, will be auto-filled from Flickr if not provided)"
     )
-    author = forms.CharField(
-        label="Author",
-        max_length=255,
-        required=False,
-        help_text="Photo author (optional, will be auto-filled from Flickr if not provided)"
-    )
 
     def clean_flickr_url(self):
         url = self.cleaned_data.get('flickr_url')
