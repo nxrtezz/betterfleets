@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    entrypoint: sh -c "uv sync --group dev --group test; ./manage.py collectstatic --noinput; DEBUG=1 exec ./manage.py runserver 0.0.0.0:8000"
+    entrypoint: sh -c "uv sync --group dev --group test; DEBUG=1 exec ./manage.py runserver 0.0.0.0:8000"
     container_name: bfdev-django
     environment:
       - SECRET_KEY=${SECRET_KEY-}
