@@ -1,6 +1,6 @@
 # Development Environment Setup
 
-This document describes the isolated development environment for betterfleets, accessible at `dev.eeveeit.uk`.
+This document describes the isolated development environment for BetterFleets V2, accessible at `dev.eeveeit.uk`.
 
 ## Overview
 
@@ -15,7 +15,31 @@ The dev environment is completely isolated from production:
 
 1. `docker-compose.dev.yml` - Dev Docker Compose configuration
 2. `.env.dev` - Dev environment variables
-3. `nginx-dev.conf` - Nginx server block for dev.eeveeit.uk
+3. `nginx-dev.conf` - Nginx server block for dev.eeveeit.uk (if using nginx)
+
+## Git Workflow for V2 Development
+
+BetterFleets V2 development uses a dedicated `dev` branch to ensure production safety:
+
+1. **Switch to development branch:**
+   ```bash
+   git checkout dev
+   ```
+
+2. **Make V2 changes on the dev branch only**
+
+3. **Switch back to production when needed:**
+   ```bash
+   git checkout main
+   ```
+
+4. **Merge V2 changes to production when ready:**
+   ```bash
+   git checkout main
+   git merge dev
+   ```
+
+**Important:** Never make V2 changes directly on the `main` branch. The `dev` branch isolates all V2 development work from production.
 
 ## Run Commands
 
@@ -97,8 +121,8 @@ docker compose -f docker-compose.dev.yml --env-file .env.dev exec web_dev python
 ## Isolation Details
 
 ### Database
-- **Production**: `postgres` database, user `postgres`
-- **Dev**: `betterfleets_dev` database, user `dev_user`, password `dev_secure_password`
+- **Production**: `postgres` database, user `postgres`, password `postgres`
+- **Dev**: `betterfleets_dev` database, user `dev_user`, password `dev_password`
 
 ### Volumes
 - **Production**: `postgres_data`, media directory
@@ -122,6 +146,24 @@ docker compose -f docker-compose.dev.yml --env-file .env.dev exec web_dev python
 - **Via Nginx**: http://dev.eeveeit.uk (after nginx configuration)
 - **Django admin**: http://dev.eeveeit.uk/admin (after creating superuser)
 
+## Switching Between Production and Development
+
+### To switch to development environment:
+1. Ensure Docker Desktop is running
+2. Stop production if running: `docker compose down`
+3. Start development: `docker compose -f docker-compose.dev.yml --env-file .env.dev up -d`
+4. Access at http://localhost:8010
+
+### To switch back to production:
+1. Stop development: `docker compose -f docker-compose.dev.yml --env-file .env.dev down`
+2. Start production: `docker compose up -d`
+3. Access at http://localhost:8000
+
+### Running both environments simultaneously:
+Both environments can run at the same time since they use different ports and containers:
+- Production: `docker compose up -d` (port 8000)
+- Development: `docker compose -f docker-compose.dev.yml --env-file .env.dev up -d` (port 8010)
+
 ## Cleanup
 
 To completely remove the dev environment (including volumes):
@@ -142,3 +184,24 @@ docker compose -f docker-compose.dev.yml --env-file .env.dev down -v --rmi all
 - DEBUG is enabled in dev mode
 - The dev environment does not affect production in any way
 - Both environments can run simultaneously
+
+## V2 Development Safety Checklist
+
+Before starting V2 feature development, verify:
+
+- [ ] You are on the `dev` branch: `git branch` should show `* dev`
+- [ ] Docker Desktop is running
+- [ ] Development environment can start: `docker compose -f docker-compose.dev.yml --env-file .env.dev up -d`
+- [ ] Development database is accessible: `docker compose -f docker-compose.dev.yml --env-file .env.dev exec web_dev python manage.py migrate`
+- [ ] Development environment is accessible at http://localhost:8010
+- [ ] Production environment remains unaffected: `docker ps` should not show production containers if they were stopped
+
+## V2 Development Process
+
+1. Ensure you're on the `dev` branch
+2. Start the development environment
+3. Make your changes
+4. Test in the development environment
+5. Commit changes to the `dev` branch
+6. Push to GitHub: `git push origin dev`
+7. When V2 is complete, merge to `main` for production deployment
