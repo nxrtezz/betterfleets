@@ -6,16 +6,18 @@ This document describes the isolated development environment for BetterFleets V2
 
 The dev environment is completely isolated from production:
 - **Separate database**: `betterfleets_dev` with user `dev_user`
-- **Separate containers**: `django_web_dev`, `postgres_dev`, `redis_dev`
+- **Separate containers**: `bfdev-django`, `bfdev-postgres`, `bfdev-redis`
 - **Separate volumes**: `postgres_data_dev`, `media_dev`
 - **Separate ports**: Web exposed on `8010:8000` (internal 8000, external 8010)
 - **Separate environment file**: `.env.dev`
+- **Separate Dockerfile**: `Dockerfile.dev` (uses standard Python base instead of custom base image)
 
 ## Files Created
 
 1. `docker-compose.dev.yml` - Dev Docker Compose configuration
 2. `.env.dev` - Dev environment variables
-3. `nginx-dev.conf` - Nginx server block for dev.eeveeit.uk (if using nginx)
+3. `Dockerfile.dev` - Dev Dockerfile (uses standard Python base image)
+4. `nginx-dev.conf` - Nginx server block for dev.eeveeit.uk (if using nginx)
 
 ## Git Workflow for V2 Development
 
@@ -130,7 +132,7 @@ docker compose -f docker-compose.dev.yml --env-file .env.dev exec web_dev python
 
 ### Container Names
 - **Production**: `django_web`, `postgres`, `redis`
-- **Dev**: `django_web_dev`, `postgres_dev`, `redis_dev`
+- **Dev**: `bfdev-django`, `bfdev-postgres`, `bfdev-redis`
 
 ### Ports
 - **Production**: Web on `8000:8000`

@@ -1,12 +1,14 @@
 services:
   web_dev:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     entrypoint: sh -c "uv sync --group dev --group test; DEBUG=1 exec ./manage.py runserver 0.0.0.0:8000"
-    container_name: django_web_dev
+    container_name: bfdev-django
     environment:
       - SECRET_KEY=${SECRET_KEY-}
-      - DATABASE_URL=${DATABASE_URL-postgis://dev_user:dev_password@postgres_dev:5432/betterfleets_dev}
-      - REDIS_URL=${REDIS_URL-redis://redis_dev:6379}
+      - DATABASE_URL=${DATABASE_URL-postgis://dev_user:dev_password@bfdev-postgres:5432/betterfleets_dev}
+      - REDIS_URL=${REDIS_URL-redis://bfdev-redis:6379}
       - NTA_API_KEY
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
@@ -23,7 +25,7 @@ services:
 
   postgres_dev:
     image: postgis/postgis
-    container_name: postgres_dev
+    container_name: bfdev-postgres
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
     environment:
@@ -38,7 +40,7 @@ services:
 
   redis_dev:
     image: redis
-    container_name: redis_dev
+    container_name: bfdev-redis
 
 volumes:
   postgres_data_dev:
