@@ -382,18 +382,24 @@
                     </td>
                 {% endif %}
                 <td class="tabular"{% if not vehicle.reg %} colspan="2"{% endif %}>
-                    <a href="{{ vehicle.get_fleet_code_url }}"{% if vehicle.vehicle_type.style == "train" and vehicle.fleet_code %} target="_blank" rel="noopener"{% endif %}>
+                    <a href="{{ vehicle.get_fleet_code_url }}"{% if vehicle.vehicle_type.style == "train" and vehicle.fleet_code %} target="_blank" rel="noopener"{% endif %}
+                       {% if vehicle.operated_by %}
+                           title="{% if vehicle.operator_id == object.id %}On loan to {{ vehicle.operated_by }}{% else %}On loan from {{ vehicle.operator }}{% endif %}"
+                       {% endif %}>
                         {% if vehicle.fleet_code or vehicle.fleet_number %}
-                            {% firstof vehicle.fleet_code vehicle.fleet_number %}
+                            {% if vehicle.operated_by %}<em>{% firstof vehicle.fleet_code vehicle.fleet_number %}</em>{% else %}{% firstof vehicle.fleet_code vehicle.fleet_number %}{% endif %}
                         {% elif not vehicle.reg %}
-                            {{ vehicle.code }}
+                            {% if vehicle.operated_by %}<em>{{ vehicle.code }}</em>{% else %}{{ vehicle.code }}{% endif %}
                         {% endif %}
                     </a>
                 </td>
                 {% if vehicle.reg %}
                     <td>
-                        <a href="{{ vehicle.get_absolute_url }}" class="reg">
-                            {% if vehicle.preserved %}<em>{{ vehicle.get_reg }}</em>{% else %}{{ vehicle.get_reg }}{% endif %}
+                        <a href="{{ vehicle.get_absolute_url }}" class="reg"
+                           {% if vehicle.operated_by %}
+                           title="{% if vehicle.operator_id == object.id %}On loan to {{ vehicle.operated_by }}{% else %}On loan from {{ vehicle.operator }}{% endif %}"
+                           {% endif %}>
+                            {% if vehicle.preserved or vehicle.operated_by %}<em>{{ vehicle.get_reg }}</em>{% else %}{{ vehicle.get_reg }}{% endif %}
                         </a>
                     </td>
                 {% endif %}

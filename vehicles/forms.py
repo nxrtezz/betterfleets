@@ -253,7 +253,7 @@ class EditVehicleForm(OperatorVehicleColumnFieldsMixin, AdvancedFieldsMixin, for
         widget=AutocompleteWidget(field=Vehicle.operated_by.field),
         required=False,
         empty_label="",
-        help_text="Operator that operates this vehicle (if different from the owner)",
+        help_text="Loan operator (if this vehicle is on loan to a different operator)",
     )
     garage = forms.ModelChoiceField(
         queryset=Garage.objects,

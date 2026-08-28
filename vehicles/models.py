@@ -609,7 +609,7 @@ class Vehicle(models.Model):
         null=True,
         blank=True,
         related_name="operated_vehicles",
-        help_text="Operator that operates this vehicle (if different from the owner)",
+        help_text="Loan operator (if this vehicle is on loan to a different operator)",
     )
     vehicle_type = models.ForeignKey(
         VehicleType, models.SET_NULL, null=True, blank=True
