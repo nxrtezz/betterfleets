@@ -69,7 +69,6 @@ from busstops.models import (
     ServiceCode,
     StopUsage,
 )
-from busstops.bustimes_sync import compact_registration
 from busstops.utils import (
     build_depot_map_html,
     get_operator_depots,
@@ -3601,7 +3600,7 @@ def request_new_vehicle(request, slug=None):
         # Check if a vehicle with this registration already exists in the database
         reg = cleaned_data.get("reg")
         if reg:
-            reg = compact_registration(reg)
+            # RegField already normalizes the registration (uppercase, removes spaces)
             if Vehicle.objects.filter(reg__iexact=reg).exists():
                 existing_vehicle = Vehicle.objects.filter(reg__iexact=reg).first()
                 form.add_error(

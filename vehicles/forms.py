@@ -529,7 +529,7 @@ link to a picture to prove it. Be polite.""",
         if vehicle.fleet_code:
             self.fields["fleet_number"].initial = vehicle.fleet_code
         elif vehicle.fleet_number is not None:
-            self.fields["fleet_number"].intial = str(vehicle.fleet_number)
+            self.fields["fleet_number"].initial = str(vehicle.fleet_number)
 
         if vehicle.vehicle_type_id and not vehicle.is_spare_ticket_machine():
             if "spare_ticket_machine" in self.fields:
@@ -591,15 +591,19 @@ link to a picture to prove it. Be polite.""",
             self.order_fields(ordered_fields)
         
         if getattr(self, 'advanced_field_fields', None):
-            ordered_fields = [name for name in self.field_order if name in self.fields]
-            advanced_field_names = list(self.advanced_field_fields)
-            if "summary" in ordered_fields:
-                ordered_fields.remove("summary")
-                ordered_fields.extend(advanced_field_names)
-                ordered_fields.append("summary")
-            else:
-                ordered_fields.extend(advanced_field_names)
-            self.order_fields(ordered_fields)
+            # Get all current field names
+            current_field_names = list(self.fields.keys())
+            advanced_field_names = list(self.advanced_field_fields.keys())
+            
+            # Build the new order: basic fields first, then advanced fields, then summary
+            basic_fields = [name for name in current_field_names if not name.startswith(self.advanced_field_prefix) and name != "summary"]
+            new_order = basic_fields + advanced_field_names
+            
+            # Add summary at the end if it exists
+            if "summary" in current_field_names:
+                new_order.append("summary")
+            
+            self.order_fields(new_order)
 
 
 class DebuggerForm(forms.Form):
