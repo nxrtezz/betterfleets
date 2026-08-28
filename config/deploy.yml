@@ -7,7 +7,7 @@
 service: bustimes
 
 # Name of the container image.
-image: jclgoodwin/bustimes-org
+image: bustimes/bustimes-org
 
 # Deploy to these servers.
 servers:

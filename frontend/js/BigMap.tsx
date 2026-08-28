@@ -585,7 +585,7 @@ export default function BigMap(
         vehiclesAbortController.current = null;
       }
 
-      let _bounds: LngLatBounds;
+      let _bounds: LngLatBounds | undefined;
       let url: string | undefined;
       switch (props.mode) {
         case MapMode.Slippy:
@@ -664,7 +664,9 @@ export default function BigMap(
 
       const allVehicles = Array.from(vehicleMap.values());
 
-      vehiclesHighWaterMark.current = _bounds;
+      if (props.mode === MapMode.Slippy && _bounds) {
+        vehiclesHighWaterMark.current = _bounds;
+      }
 
       if (
         props.mode === MapMode.Operator &&
