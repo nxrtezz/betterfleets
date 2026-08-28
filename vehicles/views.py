@@ -1020,12 +1020,18 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
             loaned_vehicles = annotate_logged_state(loaned_vehicles, request.user)
             loaned_vehicles = annotate_photographed_state(loaned_vehicles, request.user)
             
-            vehicles = vehicles.union(loaned_vehicles)
-
+            # Apply select_related before union (Django doesn't support select_related after union)
             if "latest_journey_id" in _vehicle_db_columns():
                 vehicles = vehicles.select_related("latest_journey")
+                loaned_vehicles = loaned_vehicles.select_related("latest_journey")
+            
+            # Apply schema compatibility before union
+            vehicles = apply_vehicle_schema_compat(vehicles)
+            loaned_vehicles = apply_vehicle_schema_compat(loaned_vehicles)
+            
+            vehicles = vehicles.union(loaned_vehicles)
 
-            # Apply prefetch_related
+            # Apply prefetch_related (this works after union)
             vehicles = vehicles.prefetch_related(
                 Prefetch(
                     "reviews",
@@ -1034,8 +1040,6 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                     ),
                 )
             )
-
-            vehicles = apply_vehicle_schema_compat(vehicles)
 
     if historical:
         vehicles = vehicles.order_by(
@@ -1080,7 +1084,7 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
 
     completion_summary = None
     if show_completion and slug and not group_slug:
-        # Skip completion summary for union querysets (owned + operated vehicles)
+        # Skip completion summary for union querysets (owned + loaned vehicles)
         # as filter() is not supported on union querysets
         if not historical:
             completion_summary = None
