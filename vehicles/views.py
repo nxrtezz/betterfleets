@@ -1043,11 +1043,12 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                 )
             )
             
-            # Apply schema compatibility before union
-            vehicles = apply_vehicle_schema_compat(vehicles)
-            loaned_vehicles = apply_vehicle_schema_compat(loaned_vehicles)
-            
+            # Note: Don't apply schema compatibility before union as defer() can cause column count mismatches
+            # Schema compatibility will be applied after union if needed
             vehicles = vehicles.union(loaned_vehicles)
+            
+            # Apply schema compatibility after union
+            vehicles = apply_vehicle_schema_compat(vehicles)
 
     if historical:
         vehicles = vehicles.order_by(
