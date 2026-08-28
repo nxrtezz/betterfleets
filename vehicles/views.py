@@ -1025,13 +1025,7 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                 vehicles = vehicles.select_related("latest_journey")
                 loaned_vehicles = loaned_vehicles.select_related("latest_journey")
             
-            # Apply schema compatibility before union
-            vehicles = apply_vehicle_schema_compat(vehicles)
-            loaned_vehicles = apply_vehicle_schema_compat(loaned_vehicles)
-            
-            vehicles = vehicles.union(loaned_vehicles)
-
-            # Apply prefetch_related (this works after union)
+            # Apply prefetch_related before union (Django doesn't support prefetch_related after union)
             vehicles = vehicles.prefetch_related(
                 Prefetch(
                     "reviews",
@@ -1040,6 +1034,20 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                     ),
                 )
             )
+            loaned_vehicles = loaned_vehicles.prefetch_related(
+                Prefetch(
+                    "reviews",
+                    queryset=VehicleReview.objects.filter(
+                        status=VehicleReview.Status.PUBLISHED
+                    ),
+                )
+            )
+            
+            # Apply schema compatibility before union
+            vehicles = apply_vehicle_schema_compat(vehicles)
+            loaned_vehicles = apply_vehicle_schema_compat(loaned_vehicles)
+            
+            vehicles = vehicles.union(loaned_vehicles)
 
     if historical:
         vehicles = vehicles.order_by(
@@ -1129,6 +1137,10 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                 ),
             )
         )
+        if "latest_journey_id" in _vehicle_db_columns():
+            vehicles = vehicles.select_related("latest_journey")
+        vehicles = apply_vehicle_schema_compat(vehicles)
+        
         if historical:
             vehicles = vehicles.order_by(
                 "-historical_fleet_year", "fleet_number", "fleet_code", "reg", "code"
