@@ -1031,11 +1031,11 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
             elif sort_option == "type_desc":
                 vehicles = vehicles.order_by("-vehicle_type__name", "-fleet_number", "-fleet_code", "-reg", "-code")
             elif sort_option == "age_asc":
-                # Oldest first - sort by introduced_date ascending
-                vehicles = vehicles.order_by("introduced_date", "fleet_number", "fleet_code", "reg", "code")
+                # Oldest first - sort by year_of_manufacture ascending
+                vehicles = vehicles.order_by("year_of_manufacture", "fleet_number", "fleet_code", "reg", "code")
             elif sort_option == "age_desc":
-                # Newest first - sort by introduced_date descending
-                vehicles = vehicles.order_by("-introduced_date", "-fleet_number", "-fleet_code", "-reg", "-code")
+                # Newest first - sort by year_of_manufacture descending
+                vehicles = vehicles.order_by("-year_of_manufacture", "-fleet_number", "-fleet_code", "-reg", "-code")
             else:
                 # Default sorting
                 has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
@@ -1120,9 +1120,11 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                 elif sort_option == "type_desc":
                     vehicles = vehicles.order_by("-vehicle_type__name", "-fleet_number", "-fleet_code", "-reg", "-code")
                 elif sort_option == "age_asc":
-                    vehicles = vehicles.order_by("introduced_date", "fleet_number", "fleet_code", "reg", "code")
+                    # Oldest first - sort by year_of_manufacture ascending
+                    vehicles = vehicles.order_by("year_of_manufacture", "fleet_number", "fleet_code", "reg", "code")
                 elif sort_option == "age_desc":
-                    vehicles = vehicles.order_by("-introduced_date", "-fleet_number", "-fleet_code", "-reg", "-code")
+                    # Newest first - sort by year_of_manufacture descending
+                    vehicles = vehicles.order_by("-year_of_manufacture", "-fleet_number", "-fleet_code", "-reg", "-code")
                 else:
                     # Default sorting
                     has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
