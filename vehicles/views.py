@@ -985,13 +985,7 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
             if not historical and "withdrawn" not in request.GET and not withdrawn_filter:
                 vehicles = vehicles.filter(**current_fleet_filter(withdrawn=False))
 
-            # Also include vehicles on loan to this operator
-            loaned_vehicles = Vehicle.objects.filter(operated_by=operator, **current_fleet_filter()).select_related("livery", "operator")
-            if not historical:
-                loaned_vehicles = loaned_vehicles.filter(**current_fleet_filter(withdrawn=False))
-            vehicles = vehicles.union(loaned_vehicles)
-
-            # Apply annotations
+            # Apply annotations before union (Django doesn't support annotate after union)
             vehicles = vehicles.annotate(feature_names=features_string_agg)
             vehicles = vehicles.annotate(accessibility_names=accessibility_string_agg)
             vehicles = vehicles.annotate(
@@ -1005,6 +999,28 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
             )
             vehicles = annotate_logged_state(vehicles, request.user)
             vehicles = annotate_photographed_state(vehicles, request.user)
+
+            # Also include vehicles on loan to this operator
+            loaned_vehicles = Vehicle.objects.filter(operated_by=operator, **current_fleet_filter()).select_related("livery", "operator")
+            if not historical:
+                loaned_vehicles = loaned_vehicles.filter(**current_fleet_filter(withdrawn=False))
+            
+            # Apply same annotations to loaned vehicles before union
+            loaned_vehicles = loaned_vehicles.annotate(feature_names=features_string_agg)
+            loaned_vehicles = loaned_vehicles.annotate(accessibility_names=accessibility_string_agg)
+            loaned_vehicles = loaned_vehicles.annotate(
+                pending_edits=Exists("vehiclerevision", filter=Q(pending=True)),
+                livery_name=Case(When(livery__show_name=True, then="livery__name")),
+                vehicle_type_name=F("vehicle_type__name"),
+                garage_name=Case(
+                    When(garage__name="", then="garage__code"),
+                    default="garage__name",
+                ),
+            )
+            loaned_vehicles = annotate_logged_state(loaned_vehicles, request.user)
+            loaned_vehicles = annotate_photographed_state(loaned_vehicles, request.user)
+            
+            vehicles = vehicles.union(loaned_vehicles)
 
             if "latest_journey_id" in _vehicle_db_columns():
                 vehicles = vehicles.select_related("latest_journey")
