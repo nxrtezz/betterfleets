@@ -803,6 +803,7 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
     historical_year_cards = []
     selected_historical_year = None
     show_completion = request.user.is_authenticated
+    sort_option = request.GET.get("sort", "")
     mass_log_mode = (
         show_completion
         and request.user.is_authenticated
@@ -933,6 +934,14 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
             logged_filter = request.GET.get("logged")
             
             if not historical:
+                # Withdrawn filter
+                withdrawn_filter = request.GET.get("withdrawn")
+                if withdrawn_filter == "0":
+                    vehicles = vehicles.filter(**current_fleet_filter(withdrawn=False))
+                elif withdrawn_filter != "1":
+                    # Default behavior: hide withdrawn unless explicitly shown
+                    vehicles = vehicles.filter(**current_fleet_filter(withdrawn=False))
+                
                 garage_id = request.GET.get("garage")
                 if garage_id and garage_id.isdigit():
                     selected_garage = Garage.objects.filter(
@@ -974,7 +983,7 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                     elif logged_filter == "not_photographed":
                         vehicles = vehicles.filter(has_been_photographed=False)
 
-            if not historical and "withdrawn" not in request.GET:
+            if not historical and "withdrawn" not in request.GET and not withdrawn_filter:
                 vehicles = vehicles.filter(**current_fleet_filter(withdrawn=False))
 
             # Apply annotations
@@ -1012,14 +1021,38 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
             "-historical_fleet_year", "fleet_number", "fleet_code", "reg", "code"
         )
     elif slug and not group_slug:
-        # Check if the operator has any fleet_number values set
-        has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
-
-        if has_fleet_numbers:
-            vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+        # Apply custom sorting if specified
+        if sort_option:
+            if sort_option == "fleet_number_asc":
+                vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+            elif sort_option == "fleet_number_desc":
+                vehicles = vehicles.order_by("-fleet_number", "-fleet_code", "-reg", "-code")
+            elif sort_option == "type_asc":
+                vehicles = vehicles.order_by("vehicle_type__name", "fleet_number", "fleet_code", "reg", "code")
+            elif sort_option == "type_desc":
+                vehicles = vehicles.order_by("-vehicle_type__name", "-fleet_number", "-fleet_code", "-reg", "-code")
+            elif sort_option == "age_asc":
+                # Oldest first - sort by introduced_date ascending
+                vehicles = vehicles.order_by("introduced_date", "fleet_number", "fleet_code", "reg", "code")
+            elif sort_option == "age_desc":
+                # Newest first - sort by introduced_date descending
+                vehicles = vehicles.order_by("-introduced_date", "-fleet_number", "-fleet_code", "-reg", "-code")
+            else:
+                # Default sorting
+                has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
+                if has_fleet_numbers:
+                    vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+                else:
+                    vehicles = vehicles.order_by("vehicle_type__name", "fleet_code", "reg", "code")
         else:
-            # No fleet numbers - sort by vehicle type
-            vehicles = vehicles.order_by("vehicle_type__name", "fleet_code", "reg", "code")
+            # Check if the operator has any fleet_number values set
+            has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
+
+            if has_fleet_numbers:
+                vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+            else:
+                # No fleet numbers - sort by vehicle type
+                vehicles = vehicles.order_by("vehicle_type__name", "fleet_code", "reg", "code")
     else:
         # Group view - default ordering
         vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
@@ -1076,14 +1109,37 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                 "-historical_fleet_year", "fleet_number", "fleet_code", "reg", "code"
             )
         else:
-            # Check if the operator has any fleet_number values set
-            has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
-
-            if has_fleet_numbers:
-                vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+            # Apply custom sorting if specified
+            sort_option = request.GET.get("sort", "")
+            if sort_option:
+                if sort_option == "fleet_number_asc":
+                    vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+                elif sort_option == "fleet_number_desc":
+                    vehicles = vehicles.order_by("-fleet_number", "-fleet_code", "-reg", "-code")
+                elif sort_option == "type_asc":
+                    vehicles = vehicles.order_by("vehicle_type__name", "fleet_number", "fleet_code", "reg", "code")
+                elif sort_option == "type_desc":
+                    vehicles = vehicles.order_by("-vehicle_type__name", "-fleet_number", "-fleet_code", "-reg", "-code")
+                elif sort_option == "age_asc":
+                    vehicles = vehicles.order_by("introduced_date", "fleet_number", "fleet_code", "reg", "code")
+                elif sort_option == "age_desc":
+                    vehicles = vehicles.order_by("-introduced_date", "-fleet_number", "-fleet_code", "-reg", "-code")
+                else:
+                    # Default sorting
+                    has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
+                    if has_fleet_numbers:
+                        vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+                    else:
+                        vehicles = vehicles.order_by("vehicle_type__name", "fleet_code", "reg", "code")
             else:
-                # No fleet numbers - sort by vehicle type
-                vehicles = vehicles.order_by("vehicle_type__name", "fleet_code", "reg", "code")
+                # Check if the operator has any fleet_number values set
+                has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
+
+                if has_fleet_numbers:
+                    vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+                else:
+                    # No fleet numbers - sort by vehicle type
+                    vehicles = vehicles.order_by("vehicle_type__name", "fleet_code", "reg", "code")
         completion_summary = get_completion_summary_for_queryset(vehicle_ids, request.user)
 
     if group_slug:
@@ -1125,12 +1181,16 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
             "selected_livery": selected_livery if not historical else None,
             "selected_vehicle_type": selected_vehicle_type if not historical else None,
             "logged_filter": logged_filter if not historical else None,
+            "sort_option": sort_option if not historical else None,
             "available_liveries": Livery.objects.filter(
                 vehicle__operator=operator
             ).distinct().order_by('name') if not historical else Livery.objects.none(),
             "available_vehicle_types": VehicleType.objects.filter(
                 vehicle__operator=operator
             ).distinct().order_by('name') if not historical else VehicleType.objects.none(),
+            "available_garages": Garage.objects.filter(
+                vehicle__operator=operator
+            ).distinct().order_by('name') if not historical else Garage.objects.none(),
         }
 
     if request.user.is_authenticated:
