@@ -924,7 +924,7 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                 card["liveries"] = list(year_liveries)
         else:
             # Include vehicles owned by this operator
-            vehicles = operator.vehicle_set.filter(**current_fleet_filter()).select_related("livery")
+            vehicles = Vehicle.objects.filter(operator=operator, **current_fleet_filter()).select_related("livery")
 
             # Apply filters
             selected_garage = None
@@ -985,6 +985,64 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
             if not historical and "withdrawn" not in request.GET and not withdrawn_filter:
                 vehicles = vehicles.filter(**current_fleet_filter(withdrawn=False))
 
+            # Also include vehicles on loan to this operator
+            loaned_vehicles = Vehicle.objects.filter(operated_by=operator, **current_fleet_filter()).select_related("livery")
+            
+            # Apply the same filters to loaned vehicles as owned vehicles
+            if not historical:
+                # Withdrawn filter
+                withdrawn_filter = request.GET.get("withdrawn")
+                if withdrawn_filter == "0":
+                    loaned_vehicles = loaned_vehicles.filter(**current_fleet_filter(withdrawn=False))
+                elif withdrawn_filter != "1":
+                    # Default behavior: hide withdrawn unless explicitly shown
+                    loaned_vehicles = loaned_vehicles.filter(**current_fleet_filter(withdrawn=False))
+                
+                garage_id = request.GET.get("garage")
+                if garage_id and garage_id.isdigit():
+                    selected_garage = Garage.objects.filter(
+                        pk=int(garage_id), operators=operator
+                    ).first()
+                    if selected_garage:
+                        loaned_vehicles = loaned_vehicles.filter(garage=selected_garage)
+                    else:
+                        loaned_vehicles = loaned_vehicles.none()
+                elif garage_id:
+                    loaned_vehicles = loaned_vehicles.none()
+                
+                # Livery filter
+                livery_id = request.GET.get("livery")
+                if livery_id and livery_id.isdigit():
+                    selected_livery = Livery.objects.filter(pk=int(livery_id)).first()
+                    if selected_livery:
+                        loaned_vehicles = loaned_vehicles.filter(livery=selected_livery)
+                    else:
+                        loaned_vehicles = loaned_vehicles.none()
+                
+                # Vehicle type filter
+                vehicle_type_id = request.GET.get("vehicle_type")
+                if vehicle_type_id and vehicle_type_id.isdigit():
+                    selected_vehicle_type = VehicleType.objects.filter(pk=int(vehicle_type_id)).first()
+                    if selected_vehicle_type:
+                        loaned_vehicles = loaned_vehicles.filter(vehicle_type=selected_vehicle_type)
+                    else:
+                        loaned_vehicles = loaned_vehicles.none()
+                
+                # Logged filter (for authenticated users)
+                if logged_filter and request.user.is_authenticated:
+                    if logged_filter == "ridden":
+                        loaned_vehicles = loaned_vehicles.filter(has_been_ridden=True)
+                    elif logged_filter == "photographed":
+                        loaned_vehicles = loaned_vehicles.filter(has_been_photographed=True)
+                    elif logged_filter == "not_ridden":
+                        loaned_vehicles = loaned_vehicles.filter(has_been_ridden=False)
+                    elif logged_filter == "not_photographed":
+                        loaned_vehicles = loaned_vehicles.filter(has_been_photographed=False)
+            
+            # Apply the same final filter to loaned vehicles
+            if not historical and "withdrawn" not in request.GET and not withdrawn_filter:
+                loaned_vehicles = loaned_vehicles.filter(**current_fleet_filter(withdrawn=False))
+
             # Apply annotations before union (Django doesn't support annotate after union)
             vehicles = vehicles.annotate(feature_names=features_string_agg)
             vehicles = vehicles.annotate(accessibility_names=accessibility_string_agg)
@@ -999,11 +1057,6 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
             )
             vehicles = annotate_logged_state(vehicles, request.user)
             vehicles = annotate_photographed_state(vehicles, request.user)
-
-            # Also include vehicles on loan to this operator
-            loaned_vehicles = Vehicle.objects.filter(operated_by=operator, **current_fleet_filter()).select_related("livery", "operator")
-            if not historical:
-                loaned_vehicles = loaned_vehicles.filter(**current_fleet_filter(withdrawn=False))
             
             # Apply same annotations to loaned vehicles before union
             loaned_vehicles = loaned_vehicles.annotate(feature_names=features_string_agg)
