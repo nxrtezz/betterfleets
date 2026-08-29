@@ -924,7 +924,7 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                 card["liveries"] = list(year_liveries)
         else:
             # Include vehicles owned by this operator
-            vehicles = Vehicle.objects.filter(operator=operator, **current_fleet_filter()).select_related("livery")
+            vehicles = Vehicle.objects.filter(operator=operator, **current_fleet_filter()).select_related("livery", "operator")
 
             # Apply filters
             selected_garage = None
@@ -986,7 +986,7 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                 vehicles = vehicles.filter(**current_fleet_filter(withdrawn=False))
 
             # Also include vehicles on loan to this operator
-            loaned_vehicles = Vehicle.objects.filter(operated_by=operator, **current_fleet_filter()).select_related("livery")
+            loaned_vehicles = Vehicle.objects.filter(operated_by=operator, **current_fleet_filter()).select_related("livery", "operator")
             
             # Apply the same filters to loaned vehicles as owned vehicles
             if not historical:
