@@ -920,3 +920,50 @@ class SornVehicleFilterForm(forms.Form):
         label="Awaiting delivery only", required=False
     )
     demonstrator_only = forms.BooleanField(label="Demonstrator only", required=False)
+
+
+# Aliases for management_views.py compatibility
+VehicleRequestForm = NewVehicleRequestForm
+OperatorRequestForm = NewOperatorRequestForm
+VehicleTypeRequestForm = NewVehicleModelRequestForm
+
+
+class LiveryRequestForm(forms.Form):
+    name = forms.CharField(max_length=255, label="Livery name")
+    colour = forms.CharField(max_length=7, label="Primary colour", help_text="Hex code e.g. #0055aa")
+    colours = forms.CharField(max_length=255, label="Colours", help_text="Space-separated hex codes e.g. #0055aa #ffffff")
+    summary = SummaryField(
+        max_length=255,
+        help_text="Explain the livery that should be added and any supporting details.",
+    )
+
+
+class GarageRequestForm(forms.Form):
+    operator = forms.ModelChoiceField(
+        queryset=Operator.objects.order_by("name"),
+        required=True,
+        label="Operator",
+    )
+    name = forms.CharField(max_length=255, label="Garage name")
+    code = forms.CharField(max_length=10, label="Garage code")
+    summary = SummaryField(
+        max_length=255,
+        help_text="Explain the garage that should be added and any supporting details.",
+    )
+
+
+class LiveFleetBulkImportForm(forms.Form):
+    operator = forms.ModelChoiceField(
+        queryset=Operator.objects.order_by("name"),
+        required=True,
+        label="Operator",
+    )
+    bulk_text = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 10, "placeholder": "Paste tab-separated vehicle data here..."}),
+        help_text="Paste vehicle data from the template or export",
+    )
+    workbook = forms.FileField(
+        required=False,
+        help_text="Or upload a completed .xlsx or .csv file",
+    )

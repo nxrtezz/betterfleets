@@ -404,6 +404,7 @@ window.STADIA_MAPS_API_KEY = "{{ STADIA_MAPS_API_KEY|default_if_none:''|escapejs
         {% else %}
             <li><a href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}">Sign in</a></li>
         {% endif %}
+        <li><a href="{% url 'request_hub' %}">Requests</a></li>
         <li><a href="/rules">Rules</a></li>
         <li><a href="https://discord.gg/QfmMuYH88Q">Discord</a></li>
         <li><a href="/data">Data & Privacy</a></li>
