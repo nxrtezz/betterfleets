@@ -482,7 +482,8 @@ class BusGroup(models.Model):
     header_foreground = ColourField(max_length=7, blank=True)
     accent_colour = ColourField(max_length=7, blank=True)
     banner = models.ImageField(upload_to="bus-groups/banners", blank=True, null=True)
-    vehicles = models.ManyToManyField("Vehicle", blank=True, related_name="bus_groups")
+    event_date = models.DateField(blank=True, null=True)
+    event_end_date = models.DateField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
 

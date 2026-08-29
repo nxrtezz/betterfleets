@@ -1,0 +1,117 @@
+{% extends 'page.html' %}
+{% load static %}
+
+{% block title %}Events - bustimes.org{% endblock %}
+
+{% block head %}
+    <style>
+        .events-search {
+            margin: 0 0 2rem;
+        }
+        
+        .events-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .event-card {
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+        
+        .event-card:hover {
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+        }
+        
+        .event-card__banner {
+            height: 150px;
+            background-color: var(--border-color);
+            background-size: cover;
+            background-position: center;
+        }
+        
+        .event-card__body {
+            padding: 1rem;
+        }
+        
+        .event-card__title {
+            margin: 0 0 0.5rem;
+            font-size: 1.25rem;
+        }
+        
+        .event-card__title a {
+            color: inherit;
+            text-decoration: none;
+        }
+        
+        .event-card__title a:hover {
+            text-decoration: underline;
+        }
+        
+        .event-card__meta {
+            display: flex;
+            gap: 1rem;
+            color: var(--secondary-text-color);
+            font-size: 0.875rem;
+        }
+        
+        .event-card__date {
+            font-weight: 500;
+        }
+        
+        .event-card__description {
+            margin: 0.75rem 0 0;
+            color: var(--text-color);
+            font-size: 0.9rem;
+        }
+    </style>
+{% endblock head %}
+
+{% block content %}
+
+<h1>Events</h1>
+
+<form method="get" class="events-search">
+    <label for="search">Search events</label>
+    <input id="search" name="search" type="search" value="{{ search_query }}" placeholder="Search by title">
+    <input type="submit" value="Search">
+    {% if search_query %}
+        <a href="{% url 'events' %}" class="button">Clear</a>
+    {% endif %}
+</form>
+
+{% if bus_groups %}
+    <div class="events-grid">
+        {% for bus_group in bus_groups %}
+            <article class="event-card">
+                <div class="event-card__banner"{% if bus_group.banner %} style="background-image: url('{{ bus_group.banner.url }}')"{% endif %}></div>
+                <div class="event-card__body">
+                    <h2 class="event-card__title">
+                        <a href="{{ bus_group.get_absolute_url }}">{{ bus_group.title }}</a>
+                    </h2>
+                    <div class="event-card__meta">
+                        <span class="event-card__date">
+                            {% if bus_group.event_date %}
+                                {{ bus_group.event_date }}
+                                {% if bus_group.event_end_date and bus_group.event_end_date != bus_group.event_date %}
+                                    - {{ bus_group.event_end_date }}
+                                {% endif %}
+                            {% endif %}
+                        </span>
+                        <span>{{ bus_group.vehicle_count }} vehicle{{ bus_group.vehicle_count|pluralize }}</span>
+                    </div>
+                    {% if bus_group.description %}
+                        <p class="event-card__description">{{ bus_group.description|truncatewords:30 }}</p>
+                    {% endif %}
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>No events found{% if search_query %} matching "{{ search_query }}"{% endif %}.</p>
+{% endif %}
+
+{% endblock content %}

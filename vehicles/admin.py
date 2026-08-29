@@ -275,18 +275,14 @@ class VehicleNamePageAdmin(admin.ModelAdmin):
 
 @admin.register(models.BusGroup)
 class BusGroupAdmin(admin.ModelAdmin):
-    list_display = ("title", "slug", "vehicle_total", "modified_at")
+    list_display = ("title", "slug", "modified_at")
     search_fields = (
         "title",
         "description",
-        "vehicles__code",
-        "vehicles__fleet_code",
-        "vehicles__reg",
     )
     prepopulated_fields = {"slug": ("title",)}
-    filter_horizontal = ("vehicles",)
     fieldsets = (
-        (None, {"fields": ("title", "slug", "description", "vehicles")}),
+        (None, {"fields": ("title", "slug", "description", "event_date", "event_end_date")}),
         (
             "Branding",
             {
@@ -299,10 +295,6 @@ class BusGroupAdmin(admin.ModelAdmin):
             },
         ),
     )
-
-    @admin.display(description="Vehicles")
-    def vehicle_total(self, obj):
-        return obj.vehicles.count()
 
 
 class VehicleAdminForm(ModelForm):

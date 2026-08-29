@@ -1813,6 +1813,29 @@ def bus_group_detail(request, slug):
 
 
 @require_safe
+def events(request):
+    search_query = request.GET.get("search", "").strip()
+    
+    bus_groups = BusGroup.objects.annotate(
+        vehicle_count=Count("vehicles")
+    ).filter(
+        event_date__isnull=False
+    ).order_by("event_date", "event_end_date", "title")
+    
+    if search_query:
+        bus_groups = bus_groups.filter(title__icontains=search_query)
+    
+    return render(
+        request,
+        "vehicles/events.html",
+        {
+            "bus_groups": bus_groups,
+            "search_query": search_query,
+        },
+    )
+
+
+@require_safe
 def bus_group_vehicle_search(request, slug):
     require_superuser(request)
     bus_group = get_object_or_404(BusGroup, slug=slug)

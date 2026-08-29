@@ -6,6 +6,7 @@ from fleet import views as fleet_views
 
 urlpatterns = [
     path("dashboard", views.dashboard_home, name="dashboard_home"),
+    path("events", views.events, name="events"),
     path("bus-groups/<slug:slug>", views.bus_group_detail, name="bus_group_detail"),
     path(
         "bus-groups/<slug:slug>/vehicle-search",
