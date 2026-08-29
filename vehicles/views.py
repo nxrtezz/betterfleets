@@ -38,7 +38,7 @@ from django.core.exceptions import PermissionDenied, BadRequest
 from django.core.paginator import Paginator
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError, connection, transaction
-from django.db.models import Avg, Case, CharField, Count, F, Max, OuterRef, Prefetch, Q, When, Value
+from django.db.models import Avg, Case, CharField, Count, F, Max, Prefetch, Q, When, Value
 from django.db.models.aggregates import StringAgg
 from django.db.models.functions import Coalesce, Now
 from django.http import Http404, HttpResponse, JsonResponse
@@ -202,45 +202,7 @@ def require_dashboard_access(request):
     raise PermissionDenied
 
 
-def _get_bus_group_vehicle_search_results(query: str, bus_group: BusGroup):
-    query = (query or "").strip()
-    if not query:
-        return []
 
-    compact = query.replace(" ", "").upper()
-    queryset = (
-        apply_vehicle_schema_compat(
-            Vehicle.objects.select_related("operator", "vehicle_type")
-        )
-        .filter(
-            Q(code__iexact=query)
-            | Q(code__icontains=query)
-            | Q(fleet_code__iexact=query)
-            | Q(fleet_code__icontains=query)
-            | Q(reg__iexact=compact)
-            | Q(reg__icontains=compact)
-            | Q(name__icontains=query)
-            | Q(operator__name__icontains=query)
-        )
-        .order_by("operator__name", "fleet_number", "fleet_code", "reg", "code")
-        .distinct()[:25]
-    )
-    existing_ids = set(bus_group.vehicles.values_list("pk", flat=True))
-    results = []
-    for vehicle in queryset:
-        fleet_ref = vehicle.fleet_code or vehicle.fleet_number or vehicle.code
-        reg = vehicle.get_reg() if vehicle.reg else "No registration"
-        operator_name = vehicle.operator.name if vehicle.operator_id else "No operator"
-        type_name = vehicle.vehicle_type.name if vehicle.vehicle_type_id else ""
-        results.append(
-            {
-                "id": vehicle.pk,
-                "label": f"{fleet_ref} - {reg}",
-                "meta": " | ".join(filter(None, [operator_name, type_name])),
-                "already_added": vehicle.pk in existing_ids,
-            }
-        )
-    return results
 
 
 DASHBOARD_MODEL_ORDER = {
@@ -1755,43 +1717,9 @@ def operator_debug(request, slug):
     )
 
 
-@require_http_methods(["GET", "POST"])
+@require_http_methods(["GET"])
 def bus_group_detail(request, slug):
     bus_group = get_object_or_404(BusGroup, slug=slug)
-
-    if request.method == "POST":
-        require_superuser(request)
-        vehicle_ids = [
-            int(vehicle_id)
-            for vehicle_id in request.POST.getlist("vehicle_ids")
-            if vehicle_id.isdigit()
-        ]
-        if vehicle_ids:
-            vehicles_to_add = list(Vehicle.objects.filter(pk__in=vehicle_ids))
-            bus_group.vehicles.add(*vehicles_to_add)
-            messages.success(
-                request,
-                f"Added {len(vehicles_to_add)} bus(es) to {bus_group}.",
-            )
-        else:
-            messages.info(request, "No buses were selected.")
-        return redirect(bus_group.get_absolute_url())
-
-    vehicles = list(
-        bus_group.vehicles.select_related("operator", "vehicle_type", "livery", "garage")
-        .annotate(
-            livery_name=Case(When(livery__show_name=True, then="livery__name")),
-            vehicle_type_name=F("vehicle_type__name"),
-            garage_name=Case(
-                When(garage__name="", then="garage__code"),
-                default="garage__name",
-            ),
-        )
-        .order_by("operator__name", "fleet_number", "fleet_code", "reg", "code")
-    )
-    operator_ids = {vehicle.operator_id for vehicle in vehicles if vehicle.operator_id}
-    for vehicle in vehicles:
-        vehicle.row_class = vehicle.get_fleet_row_class()
 
     return render(
         request,
@@ -1799,15 +1727,6 @@ def bus_group_detail(request, slug):
         {
             "object": bus_group,
             "page_theme": bus_group,
-            "vehicles": vehicles,
-            "operators_count": len(operator_ids),
-            "branding_column": any(vehicle.branding for vehicle in vehicles),
-            "name_column": any(vehicle.name for vehicle in vehicles),
-            "notes_column": any(
-                vehicle.notes and not vehicle.is_spare_ticket_machine()
-                for vehicle in vehicles
-            ),
-            "garage_column": any(vehicle.garage_name for vehicle in vehicles),
         },
     )
 
@@ -1816,9 +1735,7 @@ def bus_group_detail(request, slug):
 def events(request):
     search_query = request.GET.get("search", "").strip()
     
-    bus_groups = BusGroup.objects.annotate(
-        vehicle_count=Count("vehicles")
-    ).filter(
+    bus_groups = BusGroup.objects.filter(
         event_date__isnull=False
     ).order_by("event_date", "event_end_date", "title")
     
@@ -1835,12 +1752,7 @@ def events(request):
     )
 
 
-@require_safe
-def bus_group_vehicle_search(request, slug):
-    require_superuser(request)
-    bus_group = get_object_or_404(BusGroup, slug=slug)
-    results = _get_bus_group_vehicle_search_results(request.GET.get("q", ""), bus_group)
-    return JsonResponse({"results": results})
+
 
 
 def respond_conditionally(request, response):
