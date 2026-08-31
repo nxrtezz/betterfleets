@@ -127,6 +127,7 @@ TRUSTED_REQUEST_APPROVAL_SOURCES = {
     "stop_request",
     "service_request",
     "vehicle_request",
+    "vehicle_type_request",
 }
 
 

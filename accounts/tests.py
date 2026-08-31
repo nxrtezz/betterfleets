@@ -2,7 +2,7 @@
 from unittest.mock import patch
 
 from django.core import mail
-from django.test import Client, TransactionTestCase, override_settings
+from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
 from busstops.models import Operator
@@ -335,17 +335,23 @@ class UserDirectoryTests(TransactionTestCase):
         self.assertContains(response, "Best Editor")
 
     def test_general_search_includes_users(self):
-        User.objects.create_user(
+        searchable_user = User.objects.create_user(
             username="searchable-user",
             email="searchable@example.com",
             display_name="Searchable Person",
             password="secret",
         )
 
+        # Anonymous users should not see user search results
         response = self.client.get("/search", {"q": "Searchable"})
+        self.assertNotContains(response, "user")
+        self.assertNotContains(response, "Searchable")
 
+        # Authenticated users should see user search results
+        self.client.force_login(self.viewer)
+        response = self.client.get("/search", {"q": "Searchable"})
         self.assertContains(response, "user")
-        self.assertContains(response, "Searchable Person")
+        self.assertContains(response, "Searchable")
 
     @override_settings(
         PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
