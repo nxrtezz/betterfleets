@@ -113,6 +113,7 @@ REQUEST_SOURCES = {
     "service_request": "Service",
     "operator_request": "Operator",
     "vehicle_type_request": "Vehicle Model",
+    "photo_suggestion": "Photo Suggestion",
 }
 
 
@@ -121,6 +122,7 @@ REQUEST_TARGET_MODELS = {
     "service_request": Service,
     "operator_request": Operator,
     "vehicle_type_request": VehicleType,
+    "photo_suggestion": Vehicle,
 }
 
 TRUSTED_REQUEST_APPROVAL_SOURCES = {
@@ -128,6 +130,7 @@ TRUSTED_REQUEST_APPROVAL_SOURCES = {
     "service_request",
     "vehicle_request",
     "vehicle_type_request",
+    "photo_suggestion",
 }
 
 
@@ -2240,7 +2243,13 @@ class VehicleDetailView(DetailView):
                 instance=vehicle,
                 operation="add_photo",
                 changes={"flickr_url": {"to": flickr_url}},
-                payload={"flickr_url": flickr_url},
+                payload={
+                    "flickr_url": flickr_url,
+                    "requested_by_id": self.request.user.id,
+                    "requested_by_label": str(self.request.user),
+                    "requested_title": f"Photo for {vehicle}",
+                    "summary": f"Photo suggestion by {self.request.user.username}",
+                },
                 reason=f"Photo suggestion by {self.request.user.username}"
             )
             
@@ -2581,7 +2590,14 @@ def can_apply_request_log(user, log):
 def can_cancel_request_log(user, log):
     if not getattr(user, "is_authenticated", False):
         return False
-    return str((log.payload or {}).get("requested_by_id") or "") == str(user.id)
+    requested_by_id = (log.payload or {}).get("requested_by_id")
+    if not requested_by_id and log.source == "photo_suggestion":
+        # For photo suggestions, extract username from reason and check against current user
+        reason = log.reason or ""
+        if "by " in reason:
+            username = reason.split("by ")[-1].strip()
+            return username == user.username
+    return str(requested_by_id or "") == str(user.id)
 
 
 def build_request_change_items(log):
@@ -2599,7 +2615,7 @@ def build_request_change_items(log):
             "is_code": False,
         }
         lower_label = str(label).lower()
-        if lower_label == "image url":
+        if lower_label == "image url" or lower_label == "flickr url":
             item["is_link"] = True
         elif lower_label in {"left css", "right css"}:
             item["preview_css"] = str(value)
@@ -2884,11 +2900,27 @@ def wrap_vehicle_revision(revision):
 
 def wrap_request_log(log):
     requested_by_id = (log.payload or {}).get("requested_by_id")
-    requested_by_label = (log.payload or {}).get("requested_by_label") or requested_by_id
-    if requested_by_id:
-        requested_by_user = User.objects.filter(pk=requested_by_id).first()
-        if requested_by_user:
-            requested_by_label = str(requested_by_user)
+    # For photo suggestions, get the user from the reason field if requested_by_id is not in payload
+    if log.source == "photo_suggestion" and not requested_by_id:
+        # Extract username from reason like "Photo suggestion by username"
+        reason = log.reason or ""
+        if "by " in reason:
+            username = reason.split("by ")[-1].strip()
+            requested_by_user = User.objects.filter(username=username).first()
+            if requested_by_user:
+                requested_by_id = str(requested_by_user.id)
+                requested_by_label = str(requested_by_user)
+            else:
+                requested_by_label = username
+        else:
+            requested_by_label = "Unknown user"
+    else:
+        requested_by_label = (log.payload or {}).get("requested_by_label") or requested_by_id
+        if requested_by_id:
+            requested_by_user = User.objects.filter(pk=requested_by_id).first()
+            if requested_by_user:
+                requested_by_label = str(requested_by_user)
+    
     request_type_label = REQUEST_SOURCES.get(log.source, "Request")
     target_model = REQUEST_TARGET_MODELS.get(log.source)
     payload = log.payload or {}
@@ -2922,6 +2954,17 @@ def wrap_request_log(log):
         code = fields.get("code") or ((log.changes or {}).get("code") or {}).get("to") or ""
         if operator_id and operator_label and code:
             requested_title = f"{operator_label} {code}"
+    
+    # Handle photo suggestions - they target existing vehicles
+    if log.source == "photo_suggestion" and target_model:
+        try:
+            if log.target_pk and log.target_pk.isdigit():
+                created_object = target_model.objects.get(pk=log.target_pk)
+                if created_object and hasattr(created_object, "get_absolute_url"):
+                    object_url = created_object.get_absolute_url()
+                    requested_title = f"Photo for {created_object}"
+        except (target_model.DoesNotExist, ValueError):
+            pass
 
     created_title = str(created_object) if created_object else ""
 
