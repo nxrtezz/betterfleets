@@ -494,8 +494,9 @@ class MassEditBusesForm(MassAddBusesForm):
     pass
 
 
-class NewHistoricalFleetForm(MassAddBusesForm):
-    pass
+# HistoricalFleet model was removed - this form is no longer functional
+# class NewHistoricalFleetForm(MassAddBusesForm):
+#     pass
 
 
 class MassAddRoutesForm(forms.Form):
@@ -3304,7 +3305,6 @@ class OperatorAdmin(admin.ModelAdmin):
         if request.user.is_superuser and obj:
             fields.append("mass_add_buses_link")
             fields.append("mass_add_routes_link")
-            fields.append("new_historical_fleet_link")
             fields.append("mass_edit_buses_link")
             fields.append("vehicle_admin_link")
             fields.append("depot_admin_link")
@@ -3346,11 +3346,6 @@ class OperatorAdmin(admin.ModelAdmin):
                 name="busstops_operator_mass_add_routes_current",
             ),
             path(
-                "<path:object_id>/new-historical-fleet/",
-                self.admin_site.admin_view(self.new_historical_fleet_view),
-                name="busstops_operator_new_historical_fleet",
-            ),
-            path(
                 "<path:object_id>/mass-edit-buses/",
                 self.admin_site.admin_view(self.mass_edit_buses_view),
                 name="busstops_operator_mass_edit_buses",
@@ -3382,11 +3377,6 @@ class OperatorAdmin(admin.ModelAdmin):
     def mass_add_routes_link(self, obj):
         url = reverse("admin:busstops_operator_mass_add_routes", args=(obj.pk,))
         return format_html('<a class="button" href="{}">Mass add routes</a>', url)
-
-    @admin.display(description="New historical fleet")
-    def new_historical_fleet_link(self, obj):
-        url = reverse("admin:busstops_operator_new_historical_fleet", args=(obj.pk,))
-        return format_html('<a class="button" href="{}">New Historical Fleet</a>', url)
 
     @admin.display(description="Mass edit buses")
     def mass_edit_buses_link(self, obj):
@@ -4613,117 +4603,118 @@ vehicle.garage.name if vehicle.garage else "",
             context,
         )
 
-    def new_historical_fleet_view(self, request, object_id):
-        if not request.user.is_superuser:
-            raise PermissionDenied
-
-        operator = self.get_object(request, object_id)
-        if operator is None:
-            raise PermissionDenied
-
-        rows = []
-        created = 0
-        updated = 0
-        errors = 0
-
-        if request.method == "POST":
-            form = NewHistoricalFleetForm(request.POST, request.FILES)
-            if form.is_valid():
-                rows_text = form.cleaned_data.get("rows_text") or ""
-                workbook = form.cleaned_data.get("workbook")
-                try:
-                    if workbook:
-                        rows_text = self._rows_text_from_workbook(workbook, service=service)
-                except ValueError as exc:
-                    form.add_error("workbook", str(exc))
-
-                if not form.errors and not rows_text.strip():
-                    form.add_error(None, "Paste rows or upload a completed workbook.")
-
-                if not form.errors:
-                    from vehicles.historical_fleet_bulk_import import (
-                        bulk_import_historical_vehicles,
-                        parse_pasted_rows,
-                    )
-
-                    rows, parse_err = parse_pasted_rows(rows_text)
-                    if parse_err:
-                        form.add_error(None, parse_err)
-                    else:
-                        # Parse rows for preview
-                        from vehicles.historical_fleet_bulk_import import build_historical_vehicles
-
-                        instances, row_errors = build_historical_vehicles(operator.id, rows)
-                        
-                        # Build preview rows
-                        rows = []
-                        for i, (instance, error) in enumerate(zip(instances, row_errors), 1):
-                            rows.append({
-                                "row_number": i,
-                                "fleet_number": instance.fleet_number,
-                                "fleet_code": instance.fleet_code,
-                                "reg": instance.reg,
-                                "vehicle_type": instance.vehicle_type.name if instance.vehicle_type else "",
-                                "livery": instance.livery.name if instance.livery else "",
-                                "joined_fleet_date": instance.joined_fleet_date.strftime("%d-%m-%Y") if instance.joined_fleet_date else "",
-                                "left_fleet_date": instance.left_fleet_date.strftime("%d-%m-%Y") if instance.left_fleet_date else "",
-                                "errors": error if error else "",
-                            })
-
-                        form = NewHistoricalFleetForm(
-                            initial={
-                                "rows_text": rows_text,
-                            }
-                        )
-
-                        if request.POST.get("action") == "commit":
-                            created, import_errors = bulk_import_historical_vehicles(operator.id, rows_text)
-                            errors = len(import_errors)
-                            if created:
-                                self.message_user(
-                                    request,
-                                    f"Historical fleet import complete: created {created}, errors {errors}",
-                                )
-                            elif errors:
-                                self.message_user(
-                                    request,
-                                    f"No rows imported. {errors} row(s) had errors.",
-                                    level=messages.WARNING,
-                                )
-                        else:
-                            self.message_user(
-                                request,
-                                "Preview generated. Review rows and click Commit import when ready.",
-                            )
-        else:
-            form = NewHistoricalFleetForm()
-
-        context = {
-            **self.admin_site.each_context(request),
-            "opts": self.model._meta,
-            "original": operator,
-            "operator": operator,
-            "title": f"New historical fleet for {operator}",
-            "form": form,
-            "rows": rows,
-            "can_commit": any(not row["errors"] for row in rows),
-            "created": created,
-            "updated": updated,
-            "errors": errors,
-            "template_download_url": reverse(
-                "admin:busstops_operator_mass_add_buses_template", args=(operator.pk,)
-            ) + "?historical=1",
-            "export_download_url": "",
-            "allow_create": True,
-            "commit_label": "Commit historical fleet",
-            "historical_import": True,
-        }
-
-        return TemplateResponse(
-            request,
-            "admin/busstops/operator/mass_buses.html",
-            context,
-        )
+    # HistoricalFleet model was removed - this view is no longer functional
+    # def new_historical_fleet_view(self, request, object_id):
+    #     if not request.user.is_superuser:
+    #         raise PermissionDenied
+    #
+    #     operator = self.get_object(request, object_id)
+    #     if operator is None:
+    #         raise PermissionDenied
+    #
+    #     rows = []
+    #     created = 0
+    #     updated = 0
+    #     errors = 0
+    #
+    #     if request.method == "POST":
+    #         form = NewHistoricalFleetForm(request.POST, request.FILES)
+    #         if form.is_valid():
+    #             rows_text = form.cleaned_data.get("rows_text") or ""
+    #             workbook = form.cleaned_data.get("workbook")
+    #             try:
+    #                 if workbook:
+    #                     rows_text = self._rows_text_from_workbook(workbook, service=service)
+    #             except ValueError as exc:
+    #                 form.add_error("workbook", str(exc))
+    #
+    #             if not form.errors and not rows_text.strip():
+    #                 form.add_error(None, "Paste rows or upload a completed workbook.")
+    #
+    #             if not form.errors:
+    #                 from vehicles.historical_fleet_bulk_import import (
+    #                     bulk_import_historical_vehicles,
+    #                     parse_pasted_rows,
+    #                 )
+    #
+    #                 rows, parse_err = parse_pasted_rows(rows_text)
+    #                 if parse_err:
+    #                     form.add_error(None, parse_err)
+    #                 else:
+    #                     # Parse rows for preview
+    #                     from vehicles.historical_fleet_bulk_import import build_historical_vehicles
+    #
+    #                     instances, row_errors = build_historical_vehicles(operator.id, rows)
+    #
+    #                     # Build preview rows
+    #                     rows = []
+    #                     for i, (instance, error) in enumerate(zip(instances, row_errors), 1):
+    #                         rows.append({
+    #                             "row_number": i,
+    #                             "fleet_number": instance.fleet_number,
+    #                             "fleet_code": instance.fleet_code,
+    #                             "reg": instance.reg,
+    #                             "vehicle_type": instance.vehicle_type.name if instance.vehicle_type else "",
+    #                             "livery": instance.livery.name if instance.livery else "",
+    #                             "joined_fleet_date": instance.joined_fleet_date.strftime("%d-%m-%Y") if instance.joined_fleet_date else "",
+    #                             "left_fleet_date": instance.left_fleet_date.strftime("%d-%m-%Y") if instance.left_fleet_date else "",
+    #                             "errors": error if error else "",
+    #                         })
+    #
+    #                     form = NewHistoricalFleetForm(
+    #                         initial={
+    #                             "rows_text": rows_text,
+    #                         }
+    #                     )
+    #
+    #                     if request.POST.get("action") == "commit":
+    #                         created, import_errors = bulk_import_historical_vehicles(operator.id, rows_text)
+    #                         errors = len(import_errors)
+    #                         if created:
+    #                             self.message_user(
+    #                                 request,
+    #                                 f"Historical fleet import complete: created {created}, errors {errors}",
+    #                             )
+    #                         elif errors:
+    #                             self.message_user(
+    #                                 request,
+    #                                 f"No rows imported. {errors} row(s) had errors.",
+    #                                 level=messages.WARNING,
+    #                             )
+    #                     else:
+    #                         self.message_user(
+    #                             request,
+    #                             "Preview generated. Review rows and click Commit import when ready.",
+    #                         )
+    #     else:
+    #         form = NewHistoricalFleetForm()
+    #
+    #     context = {
+    #         **self.admin_site.each_context(request),
+    #         "opts": self.model._meta,
+    #         "original": operator,
+    #         "operator": operator,
+    #         "title": f"New historical fleet for {operator}",
+    #         "form": form,
+    #         "rows": rows,
+    #         "can_commit": any(not row["errors"] for row in rows),
+    #         "created": created,
+    #         "updated": updated,
+    #         "errors": errors,
+    #         "template_download_url": reverse(
+    #             "admin:busstops_operator_mass_add_buses_template", args=(operator.pk,)
+    #         ) + "?historical=1",
+    #         "export_download_url": "",
+    #         "allow_create": True,
+    #         "commit_label": "Commit historical fleet",
+    #         "historical_import": True,
+    #     }
+    #
+    #     return TemplateResponse(
+    #         request,
+    #         "admin/busstops/operator/mass_buses.html",
+    #         context,
+    #     )
 
     def mass_edit_buses_view(self, request, object_id):
         if not request.user.is_superuser:
