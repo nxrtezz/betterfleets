@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+import os
 from functools import lru_cache
 from itertools import pairwise, groupby
 from types import SimpleNamespace
@@ -3590,6 +3591,83 @@ def requests_home(request):
             "breadcrumb": [RequestsPage()],
         },
     )
+
+
+@login_required
+def report_bug(request):
+    if request.method == "POST":
+        category = request.POST.get("category")
+        severity = request.POST.get("severity")
+        summary = request.POST.get("summary")
+
+        if not all([category, severity, summary]):
+            return render(
+                request,
+                "requests.html",
+                {
+                    "error": "All fields are required",
+                    "entries": [],
+                    "breadcrumb": [RequestsPage()],
+                },
+            )
+
+        try:
+            webhook_url = os.environ.get("BUG_DISCORD_ENDPOINT")
+            if webhook_url:
+                severity_num = int(severity)
+                emoji_map = {
+                    1: "🟢",
+                    2: "🟢",
+                    3: "🟡",
+                    4: "🟡",
+                    5: "🟠",
+                    6: "🟠",
+                    7: "🔴",
+                    8: "🔴",
+                    9: "🔴",
+                    10: "🚨",
+                }
+                emoji = emoji_map.get(severity_num, "⚪")
+
+                embed = {
+                    "title": f"{emoji} Bug Report - {category.upper()}",
+                    "description": summary,
+                    "fields": [
+                        {"name": "Category", "value": category, "inline": True},
+                        {"name": "Severity", "value": f"{severity_num}/10", "inline": True},
+                        {"name": "Reported by", "value": str(request.user), "inline": True},
+                    ],
+                    "color": severity_num * 100000 if severity_num <= 5 else 16711680,
+                }
+
+                response = requests.post(
+                    webhook_url,
+                    json={"embeds": [embed]},
+                    headers={"Content-Type": "application/json"},
+                )
+                response.raise_for_status()
+
+            return render(
+                request,
+                "requests.html",
+                {
+                    "success": "Bug report submitted successfully",
+                    "entries": [],
+                    "breadcrumb": [RequestsPage()],
+                },
+            )
+        except Exception as e:
+            return render(
+                request,
+                "requests.html",
+                {
+                    "error": f"Failed to submit bug report: {str(e)}",
+                    "entries": [],
+                    "breadcrumb": [RequestsPage()],
+                },
+            )
+
+    return redirect("requests_home")
 
 
 @login_required

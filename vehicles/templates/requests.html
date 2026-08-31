@@ -4,6 +4,15 @@
 
 {% block bodyclass %}narrow{% endblock %}
 
+{% block head %}
+<style>
+.request-form { display:grid; gap:1rem; max-width:500px; }
+.request-form label { display:grid; gap:.35rem; font-weight:600; }
+.request-form select, .request-form input, .request-form textarea { width:100%; padding:.5rem; border:1px solid var(--border-color); border-radius:.25rem; background:var(--background-color); color:var(--text-color); }
+.request-form small { font-weight:400; color:var(--text-color); opacity:0.7; }
+</style>
+{% endblock %}
+
 {% block content %}
 
 <h1>Requests</h1>
@@ -14,6 +23,40 @@
     <li><a href="{% url 'request_operator' %}">Operator</a></li>
     <li><a href="{% url 'request_vehicle_model' %}">Vehicle Model</a></li>
 </ul>
+
+<h2>Report a Bug</h2>
+{% if error %}
+<div style="background:var(--error-background); color:var(--error-text); padding:1rem; border-radius:.5rem; margin-bottom:1rem;">{{ error }}</div>
+{% endif %}
+{% if success %}
+<div style="background:var(--success-background); color:var(--success-text); padding:1rem; border-radius:.5rem; margin-bottom:1rem;">{{ success }}</div>
+{% endif %}
+<form method="post" action="{% url 'report_bug' %}">
+    {% csrf_token %}
+    <div class="request-form">
+        <label for="category">
+            Category
+            <select name="category" id="category" required>
+                <option value="">Select a category</option>
+                <option value="ui">UI/UX</option>
+                <option value="data">Data Issue</option>
+                <option value="performance">Performance</option>
+                <option value="security">Security</option>
+                <option value="other">Other</option>
+            </select>
+        </label>
+        <label for="severity">
+            Severity (1-10)
+            <input type="number" name="severity" id="severity" min="1" max="10" required>
+            <small>1 = minor, 10 = critical</small>
+        </label>
+        <label for="summary">
+            Summary
+            <textarea name="summary" id="summary" rows="4" required></textarea>
+        </label>
+        <button type="submit" class="button">Submit Bug Report</button>
+    </div>
+</form>
 
 {% if entries %}
     <h2>Recent requests</h2>
