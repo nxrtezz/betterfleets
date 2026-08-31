@@ -11,73 +11,67 @@ from django.views.decorators.http import require_POST
 
 from busstops.models import Operator
 
-from .forms import (
-    GarageRequestForm,
-    LiveFleetBulkImportForm,
-    LiveryRequestForm,
-    OperatorRequestForm,
-    VehicleRequestForm,
-    VehicleTypeRequestForm,
-)
+from .forms import LiveFleetBulkImportForm
 from .historical_fleet_bulk_import import (
     build_template_workbook,
     bulk_import_live_vehicles,
     export_operator_fleet_rows,
     rows_text_from_uploaded_workbook,
 )
-from .models import AdditionRequest, AdditionRequestStatus, AdditionRequestType, Vehicle, VehicleType, Livery
+from .models import Vehicle, VehicleType, Livery
 
 
-REQUEST_CONFIGS = {
-    AdditionRequestType.LIVERY: {
-        "title": "Request a livery",
-        "intro": "Submit a livery for review. A superuser has to approve it before it becomes selectable in fleet imports and edits.",
-        "form_class": LiveryRequestForm,
-        "nav_label": "Liveries",
-    },
-    AdditionRequestType.VEHICLE_TYPE: {
-        "title": "Request a vehicle type",
-        "intro": "Submit a vehicle type for review. Superusers approve these before they become available in the fleet database.",
-        "form_class": VehicleTypeRequestForm,
-        "nav_label": "Vehicle Types",
-    },
-    AdditionRequestType.VEHICLE: {
-        "title": "Request a vehicle",
-        "intro": "Submit a specific vehicle for review. Include all details like fleet number, registration, operator, livery, and other specifications.",
-        "form_class": VehicleRequestForm,
-        "nav_label": "Vehicles",
-    },
-    AdditionRequestType.OPERATOR: {
-        "title": "Request an operator",
-        "intro": "Submit a new operator for review. Only superusers can authorise the operator into the live database.",
-        "form_class": OperatorRequestForm,
-        "nav_label": "Operators",
-    },
-    AdditionRequestType.GARAGE: {
-        "title": "Request a garage",
-        "intro": "Submit a garage for review. Superusers approve these before they can be assigned to vehicles.",
-        "form_class": GarageRequestForm,
-        "nav_label": "Garage",
-    },
-}
-
-
-REQUEST_TYPE_ALIASES = {
-    "liveries": AdditionRequestType.LIVERY,
-    "vehicle-types": AdditionRequestType.VEHICLE_TYPE,
-    "vehicles": AdditionRequestType.VEHICLE,
-    "operators": AdditionRequestType.OPERATOR,
-    "garages": AdditionRequestType.GARAGE,
-}
-
-
-REQUEST_NAV = [
-    (AdditionRequestType.LIVERY, "/requests/liveries"),
-    (AdditionRequestType.VEHICLE_TYPE, "/requests/vehicle-types"),
-    (AdditionRequestType.VEHICLE, "/requests/vehicles"),
-    (AdditionRequestType.OPERATOR, "/requests/operators"),
-    (AdditionRequestType.GARAGE, "/requests/garages"),
-]
+# AdditionRequest model was removed - these configurations and views are no longer functional
+# REQUEST_CONFIGS = {
+#     AdditionRequestType.LIVERY: {
+#         "title": "Request a livery",
+#         "intro": "Submit a livery for review. A superuser has to approve it before it becomes selectable in fleet imports and edits.",
+#         "form_class": LiveryRequestForm,
+#         "nav_label": "Liveries",
+#     },
+#     AdditionRequestType.VEHICLE_TYPE: {
+#         "title": "Request a vehicle type",
+#         "intro": "Submit a vehicle type for review. Superusers approve these before they become available in the fleet database.",
+#         "form_class": VehicleTypeRequestForm,
+#         "nav_label": "Vehicle Types",
+#     },
+#     AdditionRequestType.VEHICLE: {
+#         "title": "Request a vehicle",
+#         "intro": "Submit a specific vehicle for review. Include all details like fleet number, registration, operator, livery, and other specifications.",
+#         "form_class": VehicleRequestForm,
+#         "nav_label": "Vehicles",
+#     },
+#     AdditionRequestType.OPERATOR: {
+#         "title": "Request an operator",
+#         "intro": "Submit a new operator for review. Only superusers can authorise the operator into the live database.",
+#         "form_class": OperatorRequestForm,
+#         "nav_label": "Operators",
+#     },
+#     AdditionRequestType.GARAGE: {
+#         "title": "Request a garage",
+#         "intro": "Submit a garage for review. Superusers approve these before they can be assigned to vehicles.",
+#         "form_class": GarageRequestForm,
+#         "nav_label": "Garage",
+#     },
+# }
+#
+#
+# REQUEST_TYPE_ALIASES = {
+#     "liveries": AdditionRequestType.LIVERY,
+#     "vehicle-types": AdditionRequestType.VEHICLE_TYPE,
+#     "vehicles": AdditionRequestType.VEHICLE,
+#     "operators": AdditionRequestType.OPERATOR,
+#     "garages": AdditionRequestType.GARAGE,
+# }
+#
+#
+# REQUEST_NAV = [
+#     (AdditionRequestType.LIVERY, "/requests/liveries"),
+#     (AdditionRequestType.VEHICLE_TYPE, "/requests/vehicle-types"),
+#     (AdditionRequestType.VEHICLE, "/requests/vehicles"),
+#     (AdditionRequestType.OPERATOR, "/requests/operators"),
+#     (AdditionRequestType.GARAGE, "/requests/garages"),
+# ]
 
 
 def _ensure_superuser(request):
@@ -97,137 +91,138 @@ def _build_workbook_response(workbook, filename: str):
     return response
 
 
-@login_required
-def request_hub(request):
-    recent_requests = []
-    pending_requests = None
-    
-    # Use safe manager methods to handle encoding errors
-    recent_requests = (
-        AdditionRequest.objects.safe_filter(requested_by=request.user)
-        .select_related("reviewed_by")
-        .order_by("status", "-created_at")[:20]
-    )
-    
-    pending_requests = None
-    if request.user.is_superuser:
-        pending_requests = AdditionRequest.objects.safe_filter(
-            status=AdditionRequestStatus.PENDING
-        ).select_related("requested_by")[:20]
-    
-    return render(
-        request,
-        "requests/request_hub.html",
-        {
-            "request_nav": REQUEST_NAV,
-            "recent_requests": recent_requests,
-            "pending_requests": pending_requests,
-        },
-    )
-
-
-@login_required
-def addition_request_page(request, request_type):
-    request_type = REQUEST_TYPE_ALIASES.get(request_type, request_type)
-    config = REQUEST_CONFIGS[request_type]
-    form_class = config["form_class"]
-    form = form_class(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        form.save(request.user)
-        messages.success(
-            request,
-            f"{config['nav_label']} request submitted for approval.",
-        )
-        return redirect(request.path)
-
-    recent_requests = (
-        AdditionRequest.objects.filter(requested_by=request.user, request_type=request_type)
-        .select_related("reviewed_by")
-        .order_by("-created_at")[:10]
-    )
-    return render(
-        request,
-        "requests/request_form.html",
-        {
-            "form": form,
-            "request_type": request_type,
-            "request_nav": REQUEST_NAV,
-            "page_title": config["title"],
-            "page_intro": config["intro"],
-            "recent_requests": recent_requests,
-        },
-    )
-
-
-@login_required
-def addition_request_review(request):
-    _ensure_superuser(request)
-    
-    try:
-        if request.method == "POST":
-            action = request.POST.get("action")
-            try:
-                with transaction.atomic():
-                    addition_request = get_object_or_404(
-                        AdditionRequest.objects.select_for_update(),
-                        pk=request.POST.get("request_id"),
-                    )
-                    if action == "approve":
-                        created_object = addition_request.approve(request.user)
-                        messages.success(
-                            request,
-                            f"Approved {addition_request.get_summary()} and created {created_object}.",
-                        )
-                    elif action == "reject":
-                        addition_request.reject(
-                            request.user,
-                            notes=(request.POST.get("review_notes") or "").strip(),
-                        )
-                        messages.success(
-                            request,
-                            f"Rejected {addition_request.get_summary()}.",
-                        )
-            except ValueError as exc:
-                messages.error(request, str(exc))
-            except UnicodeDecodeError:
-                messages.error(request, "Encoding error occurred while processing request. Please try again.")
-            return redirect("addition_request_review")
-
-        # Use safe manager methods to handle encoding errors
-        pending_requests = AdditionRequest.objects.safe_filter(
-            status=AdditionRequestStatus.PENDING
-        ).select_related("requested_by")
-        
-        recent_requests = AdditionRequest.objects.safe_filter(
-            status__in=[AdditionRequestStatus.APPROVED, AdditionRequestStatus.REJECTED]
-        ).select_related("requested_by", "reviewed_by")[:30]
-        
-        return render(
-            request,
-            "requests/request_review.html",
-            {
-                "request_nav": REQUEST_NAV,
-                "pending_requests": pending_requests,
-                "recent_requests": recent_requests,
-            },
-        )
-    
-    except UnicodeDecodeError:
-        # Handle any remaining UnicodeDecodeError at the view level
-        messages.error(
-            request, 
-            "An encoding error occurred while loading the page. "
-            "Some data may not be displayed due to encoding issues in the database."
-        )
-        return render(
-            request,
-            "requests/request_review.html",
-            {
-                "request_nav": REQUEST_NAV,
-                "pending_requests": AdditionRequest.objects.none(),
-                "recent_requests": AdditionRequest.objects.none(),
-            },
-        )
+# AdditionRequest model was removed - these views are no longer functional
+# @login_required
+# def request_hub(request):
+#     recent_requests = []
+#     pending_requests = None
+#
+#     # Use safe manager methods to handle encoding errors
+#     recent_requests = (
+#         AdditionRequest.objects.safe_filter(requested_by=request.user)
+#         .select_related("reviewed_by")
+#         .order_by("status", "-created_at")[:20]
+#     )
+#
+#     pending_requests = None
+#     if request.user.is_superuser:
+#         pending_requests = AdditionRequest.objects.safe_filter(
+#             status=AdditionRequestStatus.PENDING
+#         ).select_related("requested_by")[:20]
+#
+#     return render(
+#         request,
+#         "requests/request_hub.html",
+#         {
+#             "request_nav": REQUEST_NAV,
+#             "recent_requests": recent_requests,
+#             "pending_requests": pending_requests,
+#         },
+#     )
+#
+#
+# @login_required
+# def addition_request_page(request, request_type):
+#     request_type = REQUEST_TYPE_ALIASES.get(request_type, request_type)
+#     config = REQUEST_CONFIGS[request_type]
+#     form_class = config["form_class"]
+#     form = form_class(request.POST or None)
+#     if request.method == "POST" and form.is_valid():
+#         form.save(request.user)
+#         messages.success(
+#             request,
+#             f"{config['nav_label']} request submitted for approval.",
+#         )
+#         return redirect(request.path)
+#
+#     recent_requests = (
+#         AdditionRequest.objects.filter(requested_by=request.user, request_type=request_type)
+#         .select_related("reviewed_by")
+#         .order_by("-created_at")[:10]
+#     )
+#     return render(
+#         request,
+#         "requests/request_form.html",
+#         {
+#             "form": form,
+#             "request_type": request_type,
+#             "request_nav": REQUEST_NAV,
+#             "page_title": config["title"],
+#             "page_intro": config["intro"],
+#             "recent_requests": recent_requests,
+#         },
+#     )
+#
+#
+# @login_required
+# def addition_request_review(request):
+#     _ensure_superuser(request)
+#
+#     try:
+#         if request.method == "POST":
+#             action = request.POST.get("action")
+#             try:
+#                 with transaction.atomic():
+#                     addition_request = get_object_or_404(
+#                         AdditionRequest.objects.select_for_update(),
+#                         pk=request.POST.get("request_id"),
+#                     )
+#                     if action == "approve":
+#                         created_object = addition_request.approve(request.user)
+#                         messages.success(
+#                             request,
+#                             f"Approved {addition_request.get_summary()} and created {created_object}.",
+#                         )
+#                     elif action == "reject":
+#                         addition_request.reject(
+#                             request.user,
+#                             notes=(request.POST.get("review_notes") or "").strip(),
+#                         )
+#                         messages.success(
+#                             request,
+#                             f"Rejected {addition_request.get_summary()}.",
+#                         )
+#             except ValueError as exc:
+#                 messages.error(request, str(exc))
+#             except UnicodeDecodeError:
+#                 messages.error(request, "Encoding error occurred while processing request. Please try again.")
+#             return redirect("addition_request_review")
+#
+#         # Use safe manager methods to handle encoding errors
+#         pending_requests = AdditionRequest.objects.safe_filter(
+#             status=AdditionRequestStatus.PENDING
+#         ).select_related("requested_by")
+#
+#         recent_requests = AdditionRequest.objects.safe_filter(
+#             status__in=[AdditionRequestStatus.APPROVED, AdditionRequestStatus.REJECTED]
+#         ).select_related("requested_by", "reviewed_by")[:30]
+#
+#         return render(
+#             request,
+#             "requests/request_review.html",
+#             {
+#                 "request_nav": REQUEST_NAV,
+#                 "pending_requests": pending_requests,
+#                 "recent_requests": recent_requests,
+#             },
+#         )
+#
+#     except UnicodeDecodeError:
+#         # Handle any remaining UnicodeDecodeError at the view level
+#         messages.error(
+#             request,
+#             "An encoding error occurred while loading the page. "
+#             "Some data may not be displayed due to encoding issues in the database."
+#         )
+#         return render(
+#             request,
+#             "requests/request_review.html",
+#             {
+#                 "request_nav": REQUEST_NAV,
+#                 "pending_requests": AdditionRequest.objects.none(),
+#                 "recent_requests": AdditionRequest.objects.none(),
+#             },
+#         )
 
 
 @login_required
@@ -267,8 +262,6 @@ def live_fleet_mass_import(request):
         {
             "form": form,
             "template_download_url": reverse("live_fleet_mass_import_template"),
-            "review_url": reverse("addition_request_review"),
-            "request_hub_url": reverse("request_hub"),
             "imported_count": imported_count,
             "row_errors": row_errors,
             "issues": issues,

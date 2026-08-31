@@ -16,9 +16,10 @@ urlpatterns = [
         name="dashboard_add_model",
     ),
     path("requests", views.requests_home, name="requests_home"),
-    path("requests/hub", management_views.request_hub, name="request_hub"),
-    path("requests/<str:request_type>", management_views.addition_request_page, name="addition_request_page"),
-    path("requests/review", management_views.addition_request_review, name="addition_request_review"),
+    # AdditionRequest model was removed - these URL patterns are no longer functional
+    # path("requests/hub", management_views.request_hub, name="request_hub"),
+    # path("requests/<str:request_type>", management_views.addition_request_page, name="addition_request_page"),
+    # path("requests/review", management_views.addition_request_review, name="addition_request_review"),
     path("requests/vehicle", views.request_new_vehicle, name="request_vehicle"),
     path("requests/service", views.request_new_service, name="request_service"),
     path("requests/operator", views.request_new_operator, name="request_operator"),

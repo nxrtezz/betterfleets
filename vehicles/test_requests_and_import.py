@@ -6,17 +6,12 @@ from busstops.models import DataSource, Operator
 from bustimes.models import Garage
 
 from .historical_fleet_bulk_import import COLUMN_KEYS
-from .models import AdditionRequest, AdditionRequestStatus, AdditionRequestType, Livery, Vehicle, VehicleType
+from .models import Livery, Vehicle, VehicleType
 
 
 class RequestsAndImportViewsTests(TestCase):
     def setUp(self):
         self.user_model = get_user_model()
-        self.user = self.user_model.objects.create_user(
-            email="user@example.com",
-            username="user",
-            password="password123",
-        )
         self.superuser = self.user_model.objects.create_superuser(
             email="admin@example.com",
             username="admin",
@@ -35,44 +30,45 @@ class RequestsAndImportViewsTests(TestCase):
         row = "\t".join(values)
         return f"{header}\n{row}"
 
-    def test_authenticated_user_can_submit_livery_request(self):
-        self.client.login(email="user@example.com", password="password123")
-
-        response = self.client.post(
-            reverse("addition_request_page", args=(AdditionRequestType.LIVERY,)),
-            {
-                "name": "New Blue",
-                "colour": "#0055aa",
-                "colours": "#0055aa #ffffff",
-            },
-            follow=True,
-        )
-
-        self.assertEqual(response.status_code, 200)
-        addition_request = AdditionRequest.objects.get()
-        self.assertEqual(addition_request.request_type, AdditionRequestType.LIVERY)
-        self.assertEqual(addition_request.status, AdditionRequestStatus.PENDING)
-        self.assertEqual(addition_request.requested_by, self.user)
-        self.assertEqual(addition_request.data["name"], "New Blue")
-
-    def test_superuser_can_approve_livery_request(self):
-        addition_request = AdditionRequest.objects.create(
-            request_type=AdditionRequestType.LIVERY,
-            requested_by=self.user,
-            data={"name": "Approval Blue", "colour": "#003399", "colours": "#003399 #ffffff"},
-        )
-        self.client.login(email="admin@example.com", password="password123")
-
-        response = self.client.post(
-            reverse("addition_request_review"),
-            {"request_id": addition_request.pk, "action": "approve"},
-            follow=True,
-        )
-
-        self.assertEqual(response.status_code, 200)
-        addition_request.refresh_from_db()
-        self.assertEqual(addition_request.status, AdditionRequestStatus.APPROVED)
-        self.assertTrue(Livery.objects.filter(name="Approval Blue", published=True).exists())
+    # AdditionRequest model was removed - these tests are no longer functional
+    # def test_authenticated_user_can_submit_livery_request(self):
+    #     self.client.login(email="user@example.com", password="password123")
+    #
+    #     response = self.client.post(
+    #         reverse("addition_request_page", args=(AdditionRequestType.LIVERY,)),
+    #         {
+    #             "name": "New Blue",
+    #             "colour": "#0055aa",
+    #             "colours": "#0055aa #ffffff",
+    #         },
+    #         follow=True,
+    #     )
+    #
+    #     self.assertEqual(response.status_code, 200)
+    #     addition_request = AdditionRequest.objects.get()
+    #     self.assertEqual(addition_request.request_type, AdditionRequestType.LIVERY)
+    #     self.assertEqual(addition_request.status, AdditionRequestStatus.PENDING)
+    #     self.assertEqual(addition_request.requested_by, self.user)
+    #     self.assertEqual(addition_request.data["name"], "New Blue")
+    #
+    # def test_superuser_can_approve_livery_request(self):
+    #     addition_request = AdditionRequest.objects.create(
+    #         request_type=AdditionRequestType.LIVERY,
+    #         requested_by=self.user,
+    #         data={"name": "Approval Blue", "colour": "#003399", "colours": "#003399 #ffffff"},
+    #     )
+    #     self.client.login(email="admin@example.com", password="password123")
+    #
+    #     response = self.client.post(
+    #         reverse("addition_request_review"),
+    #         {"request_id": addition_request.pk, "action": "approve"},
+    #         follow=True,
+    #     )
+    #
+    #     self.assertEqual(response.status_code, 200)
+    #     addition_request.refresh_from_db()
+    #     self.assertEqual(addition_request.status, AdditionRequestStatus.APPROVED)
+    #     self.assertTrue(Livery.objects.filter(name="Approval Blue", published=True).exists())
 
     def test_live_fleet_mass_import_reports_missing_records_with_admin_links(self):
         self.client.login(email="admin@example.com", password="password123")
