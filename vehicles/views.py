@@ -2218,6 +2218,36 @@ class VehicleDetailView(DetailView):
                 photo_log.save(update_fields=["quantity"])
                 messages.success(self.request, f"Photo logged (total: {photo_log.quantity}).")
             return self.get(*args, **kwargs)
+        if (
+            self.request.user.is_authenticated
+            and "suggest_photo" in self.request.POST
+        ):
+            from busstops.data_changes import record_pending_change
+            from django.http import JsonResponse
+            
+            flickr_url = self.request.POST.get("photo_url", "")
+            if not flickr_url or "flickr.com" not in flickr_url.lower():
+                if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({"success": False, "error": "Please enter a valid Flickr URL"})
+                else:
+                    messages.error(self.request, "Please enter a valid Flickr URL")
+                    return self.get(*args, **kwargs)
+            
+            # Create a pending change for the photo suggestion
+            record_pending_change(
+                source="photo_suggestion",
+                instance=vehicle,
+                operation="add_photo",
+                changes={"flickr_url": {"to": flickr_url}},
+                payload={"flickr_url": flickr_url},
+                reason=f"Photo suggestion by {self.request.user.username}"
+            )
+            
+            if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({"success": True})
+            else:
+                messages.success(self.request, "Photo suggestion submitted for approval!")
+                return self.get(*args, **kwargs)
         if self.request.user.is_authenticated and (
             "rating" in self.request.POST or "message" in self.request.POST
         ):
@@ -3670,6 +3700,87 @@ def report_bug(request):
     return redirect("requests_home")
 
 
+
+
+
+@login_required
+def generic_request_page(request):
+    form = forms.GenericRequestForm(request.POST or None)
+    request_log = None
+
+    if request.method == "POST" and form.is_valid():
+        try:
+            webhook_url = os.environ.get("REQUEST_DISCORD_ENDPOINT")
+            if webhook_url:
+                category = form.cleaned_data["category"]
+                title = form.cleaned_data["title"]
+                description = form.cleaned_data["description"]
+                priority = form.cleaned_data["priority"]
+                
+                emoji_map = {
+                    "low": "🟢",
+                    "medium": "🟡",
+                    "high": "🟠",
+                    "urgent": "🔴",
+                }
+                emoji = emoji_map.get(priority, "⚪")
+
+                embed = {
+                    "title": f"{emoji} {category.upper()} Request",
+                    "description": description,
+                    "fields": [
+                        {"name": "Title", "value": title, "inline": True},
+                        {"name": "Category", "value": category, "inline": True},
+                        {"name": "Priority", "value": priority.capitalize(), "inline": True},
+                        {"name": "Reported by", "value": str(request.user), "inline": True},
+                    ],
+                    "color": 16711680 if priority == "urgent" else (11750886 if priority == "high" else (16776960 if priority == "medium" else 5068894)),
+                }
+
+                response = requests.post(
+                    webhook_url,
+                    json={"embeds": [embed]},
+                    headers={"Content-Type": "application/json"},
+                )
+                response.raise_for_status()
+
+            return render(
+                request,
+                "request_form.html",
+                {
+                    "form": None,
+                    "request_log": {"success": True},
+                    "request_title": "Generic Request",
+                    "submit_label": "Submit Request",
+                    "breadcrumb": [RequestsPage()],
+                },
+            )
+        except Exception as e:
+            return render(
+                request,
+                "request_form.html",
+                {
+                    "form": form,
+                    "error": f"Failed to submit request: {str(e)}",
+                    "request_title": "Generic Request",
+                    "submit_label": "Submit Request",
+                    "breadcrumb": [RequestsPage()],
+                },
+            )
+
+    return render(
+        request,
+        "request_form.html",
+        {
+            "form": form,
+            "request_log": request_log,
+            "request_title": "Generic Request",
+            "submit_label": "Submit Request",
+            "breadcrumb": [RequestsPage()],
+        },
+    )
+
+
 @login_required
 def request_new_vehicle(request, slug=None):
     check_user(request)
@@ -3927,16 +4038,36 @@ def request_new_operator(request):
         elif Operator.objects.filter(name__iexact=name).exists():
             form.add_error("name", "An operator with that name already exists.")
         else:
+            fields = {
+                "noc": noc,
+                "name": name,
+            }
+            changes = {
+                "operator code": {"from": "", "to": noc},
+                "name": {"from": "", "to": name},
+            }
+            
+            # Add optional fields if provided
+            if form.cleaned_data.get("logo"):
+                fields["logo"] = form.cleaned_data["logo"]
+                changes["logo"] = {"from": "", "to": form.cleaned_data["logo"]}
+            if form.cleaned_data.get("vehicle_mode"):
+                fields["vehicle_mode"] = form.cleaned_data["vehicle_mode"]
+                changes["vehicle mode"] = {"from": "", "to": form.cleaned_data["vehicle_mode"]}
+            if form.cleaned_data.get("group"):
+                fields["group"] = str(form.cleaned_data["group"])
+                changes["group"] = {"from": "", "to": str(form.cleaned_data["group"])}
+            if form.cleaned_data.get("region"):
+                fields["region"] = str(form.cleaned_data["region"])
+                changes["region"] = {"from": "", "to": str(form.cleaned_data["region"])}
+            
             request_log = create_request_log(
                 source="operator_request",
                 target_model="busstops.operator",
                 target_pk=request_key,
                 target_repr=f"{noc} {name}",
-                fields={"noc": noc, "name": name},
-                changes={
-                    "operator code": {"from": "", "to": noc},
-                    "name": {"from": "", "to": name},
-                },
+                fields=fields,
+                changes=changes,
                 summary=form.cleaned_data["summary"],
                 user=request.user,
             )

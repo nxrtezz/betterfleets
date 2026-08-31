@@ -19,6 +19,8 @@
 .request-form button { padding:.75rem 1.5rem; font-size:1rem; }
 .success-message { background:var(--success-background); color:var(--success-text); padding:1rem; border-radius:.5rem; margin-bottom:1rem; }
 .error-message { background:var(--error-background); color:var(--error-text); padding:1rem; border-radius:.5rem; margin-bottom:1rem; }
+.form-section { margin-bottom:2rem; }
+.form-section h2 { margin:0 0 1rem 0; }
 </style>
 {% endblock %}
 
@@ -33,10 +35,11 @@
             <li><a href="{% url 'request_service' %}">Service</a></li>
             <li><a href="{% url 'request_operator' %}">Operator</a></li>
             <li><a href="{% url 'request_vehicle_model' %}">Vehicle Model</a></li>
+            <li><a href="#generic-request">Generic Request</a></li>
         </ul>
     </section>
 
-    <section class="request-card">
+    <section class="request-card form-section">
         <h2>Report a Bug</h2>
         {% if error %}
         <div class="error-message">{{ error }}</div>
@@ -70,6 +73,12 @@
                 <button type="submit" class="button">Submit Bug Report</button>
             </div>
         </form>
+    </section>
+
+    <section class="request-card form-section" id="generic-request">
+        <h2>Generic Request</h2>
+        <p>Have a feature request, improvement idea, or data correction? Submit it here.</p>
+        <a href="{% url 'generic_request_page' %}" class="button">Submit Generic Request</a>
     </section>
 
     {% if entries %}

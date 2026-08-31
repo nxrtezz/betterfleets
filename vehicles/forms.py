@@ -4,7 +4,7 @@ from django.contrib.admin.widgets import AutocompleteSelect
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 
-from busstops.models import Manufacturer, Operator, OperatorVehicleColumn
+from busstops.models import Manufacturer, Operator, OperatorGroup, OperatorVehicleColumn, Region
 from bustimes.models import Garage
 
 from .fields import validate_colours
@@ -858,6 +858,32 @@ class NewServiceRequestForm(forms.Form):
 class NewOperatorRequestForm(forms.Form):
     noc = forms.CharField(label="Operator code (NOC)", max_length=10)
     name = forms.CharField(max_length=100, label="Operator name")
+    logo = forms.URLField(required=False, label="Logo URL", help_text="URL to operator logo image")
+    vehicle_mode = forms.ChoiceField(
+        required=False,
+        choices=[
+            ("", "Select vehicle mode"),
+            ("bus", "Bus"),
+            ("coach", "Coach"),
+            ("tram", "Tram"),
+            ("train", "Train"),
+            ("ferry", "Ferry"),
+            ("other", "Other"),
+        ],
+        label="Vehicle mode"
+    )
+    group = forms.ModelChoiceField(
+        queryset=OperatorGroup.objects.order_by("name"),
+        required=False,
+        empty_label="Select operator group",
+        label="Operator group"
+    )
+    region = forms.ModelChoiceField(
+        queryset=Region.objects.order_by("name"),
+        required=False,
+        empty_label="Select region",
+        label="Region"
+    )
     summary = SummaryField(
         max_length=255,
         help_text="Explain what should be added and provide any useful evidence.",
@@ -880,6 +906,38 @@ class NewVehicleModelRequestForm(forms.Form):
     summary = SummaryField(
         max_length=255,
         help_text="Explain the model that should be added and any supporting details.",
+    )
+
+
+class GenericRequestForm(forms.Form):
+    category = forms.ChoiceField(
+        choices=[
+            ("", "Select category"),
+            ("feature", "Feature Request"),
+            ("improvement", "Improvement"),
+            ("correction", "Data Correction"),
+            ("other", "Other"),
+        ],
+        required=True,
+        label="Category"
+    )
+    title = forms.CharField(max_length=255, label="Title", required=True)
+    description = forms.CharField(
+        widget=forms.Textarea,
+        label="Description",
+        required=True,
+        help_text="Please provide details about your request"
+    )
+    priority = forms.ChoiceField(
+        choices=[
+            ("", "Select priority"),
+            ("low", "Low"),
+            ("medium", "Medium"),
+            ("high", "High"),
+            ("urgent", "Urgent"),
+        ],
+        required=True,
+        label="Priority"
     )
 
 

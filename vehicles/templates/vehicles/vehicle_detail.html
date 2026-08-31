@@ -289,6 +289,36 @@
             font-style: italic;
         }
     </style>
+    <script>
+        function suggestPhoto() {
+            const flickrUrl = prompt("Enter Flickr photo URL:");
+            if (flickrUrl) {
+                const formData = new FormData();
+                formData.append('suggest_photo', '1');
+                formData.append('photo_url', flickrUrl);
+                formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+                
+                fetch('{{ request.path }}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Photo suggestion submitted for approval!');
+                    } else {
+                        alert('Error: ' + (data.error || 'Failed to submit suggestion'));
+                    }
+                })
+                .catch(error => {
+                    alert('Error: ' + error.message);
+                });
+            }
+        }
+    </script>
 {% endblock head %}
 
 {% block bodyclass %}narrow{% endblock %}
@@ -346,33 +376,7 @@
 
     {% include 'previous_operators.html' %}
 
-    {% if request.user.is_authenticated %}
-    <div id="suggest-photo-form" style="display: none; margin: 1rem 0; padding: 1rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--background-color);">
-        <h3 style="margin-top: 0;">Suggest a photo</h3>
-        <form action="{{ request.path }}" method="POST">
-            {% csrf_token %}
-            <input type="hidden" name="suggest_photo" value="1">
-            
-            <p>
-                <label style="font-weight: bold;">Vehicle:</label><br>
-                <input type="text" value="{{ vehicle.get_reg }}{% if vehicle.fleet_number or vehicle.fleet_code %} ({{ vehicle.fleet_number|default:vehicle.fleet_code }}){% endif %}" readonly style="width: 100%; max-width: 300px;">
-            </p>
-            
-            <p>
-                <label style="font-weight: bold;">Flickr URL:</label><br>
-                <input type="url" name="photo_url" placeholder="Flickr photo URL (image will be downloaded)" required style="width: 100%; max-width: 300px;">
-            </p>
-            
-            <p>
-                <label style="font-weight: bold;">Summary:</label><br>
-                <input type="text" name="summary" placeholder="Describe your photo suggestion" required style="width: 100%; max-width: 300px;">
-            </p>
-            
-            <button type="submit" class="button">Submit suggestion</button>
-            <button type="button" onclick="document.getElementById('suggest-photo-form').style.display='none';" style="margin-left: 0.5rem;">Cancel</button>
-        </form>
-    </div>
-    {% endif %}
+
 
     {% if vehicle.has_sorn_vor_suggestion %}
         <div class="message">
@@ -416,9 +420,6 @@
             <input type="hidden" name="log_photo" value="1">
             <button type="submit" class="button">{% if vehicle_photographed %}Log photo ({{ photo_log_quantity }}){% else %}Log photo{% endif %}</button>
         </form>
-    {% endif %}
-    {% if request.user.is_authenticated %}
-        <button type="button" onclick="document.getElementById('suggest-photo-form').style.display='block';" class="button">Suggest photo</button>
     {% endif %}
     {% if can_drive_log %}
         <form action="{{ request.path }}{% if request.GET.date %}?date={{ request.GET.date|urlencode }}{% endif %}" method="POST">

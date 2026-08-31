@@ -123,6 +123,33 @@ def apply_pending_change(log: DataChangeLog, *, user=None) -> DataChangeLog:
     if log.status != DataChangeLog.STATUS_PENDING:
         return log
 
+    # Handle photo suggestions specially
+    if log.operation == "add_photo" and log.source == "photo_suggestion":
+        from photos.models import Photo
+        
+        model = apps.get_model(log.target_model)
+        instance = model._default_manager.select_for_update().get(pk=log.target_pk)
+        flickr_url = (log.payload or {}).get("flickr_url")
+        
+        if flickr_url:
+            try:
+                photo = Photo(flickr_url=flickr_url)
+                photo.user = user
+                photo.save()
+                photo.vehicles.add(instance)
+            except Exception as e:
+                # Log the error but don't fail the entire transaction
+                log.reason = f"Failed to download photo: {str(e)}"
+                log.status = DataChangeLog.STATUS_REJECTED
+                log.save(update_fields=["status", "reason"])
+                return log
+        
+        log.status = DataChangeLog.STATUS_APPLIED
+        log.approved_by = user
+        log.applied_at = timezone.now()
+        log.save(update_fields=["status", "approved_by", "applied_at"])
+        return log
+
     model = apps.get_model(log.target_model)
     if log.operation == "create":
         instance = model()
