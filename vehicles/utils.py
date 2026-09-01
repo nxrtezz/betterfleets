@@ -1,3 +1,4 @@
+import json
 import math
 
 from django.core.cache import caches
@@ -182,6 +183,13 @@ def get_revision(vehicle, data):
             from_value = (vehicle.data or {}).get(key, "")
             revision.changes[f"data:{key}"] = f"-{from_value}\n+{to_value}"
 
+    if "advanced" in data:
+        for key, to_value in data.pop("advanced").items():
+            from_value = (vehicle.advanced or {}).get(key)
+            revision.changes[f"advanced:{key}"] = (
+                f"-{json.dumps(from_value)}\n+{json.dumps(to_value)}"
+            )
+
     assert not data
 
     return revision, features
@@ -252,6 +260,17 @@ def apply_revision(revision, features=None):
                 data.pop(data_key, None)
             vehicle.data = data or None
             changed_fields.append("data")
+
+        elif field.startswith("advanced:"):
+            advanced_key = field.split(":", 1)[1]
+            advanced_value = json.loads(to_value)
+            advanced = dict(vehicle.advanced or {})
+            if advanced_value is None:
+                advanced.pop(advanced_key, None)
+            else:
+                advanced[advanced_key] = advanced_value
+            vehicle.advanced = advanced
+            changed_fields.append("advanced")
 
         elif field in ("joined_fleet", "left_fleet"):
             setattr(vehicle, field, to_value)

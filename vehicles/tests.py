@@ -20,6 +20,7 @@ from busstops.models import (
 )
 
 from .models import (
+    AdvancedField,
     Livery,
     Vehicle,
     VehicleFeature,
@@ -820,6 +821,44 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
                     ]
                 },
             )
+
+    def test_advanced_vehicle_edit_preserves_fleet_assignment(self):
+        from bustimes.models import Garage
+
+        garage = Garage.objects.create(
+            code="LYNX",
+            name="Lynx Garage",
+            operator=self.lynx,
+        )
+        self.vehicle_1.garage = garage
+        self.vehicle_1.save(update_fields=["garage"])
+        AdvancedField.objects.create(name="Engine", slug="engine")
+        self.client.force_login(self.trusted_user)
+
+        response = self.client.post(
+            f"{self.vehicle_1.get_edit_url()}?advanced",
+            {
+                "fleet_number": "1",
+                "reg": "FD54JYA",
+                "vehicle_type": self.vehicle_1.vehicle_type_id,
+                "colours": "",
+                "advanced_engine": "Cummins ISB",
+                "summary": "Added engine details.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["form"])
+        revision = response.context["revision"]
+        self.assertFalse(revision.pending)
+        self.assertEqual(revision.changes["advanced:engine"], '-null\n+"Cummins ISB"')
+
+        self.vehicle_1.refresh_from_db()
+        self.assertEqual(self.vehicle_1.advanced, {"engine": "Cummins ISB"})
+        self.assertEqual(self.vehicle_1.operator, self.lynx)
+        self.assertEqual(self.vehicle_1.garage, garage)
+        self.assertFalse(self.vehicle_1.withdrawn)
+        self.assertFalse(self.vehicle_1.preserved)
 
     def test_remove_fleet_number(self):
         self.client.force_login(self.staff_user)

@@ -1,7 +1,8 @@
 import datetime
 from decimal import Decimal
-import subprocess
+import json
 import re
+import subprocess
 import struct
 import uuid
 from collections import Counter
@@ -1403,6 +1404,12 @@ class VehicleRevision(models.Model):
                         yield ("marked preserved", "", "")
                     else:
                         yield ("cleared preserved", "", "")
+                elif key.startswith("advanced:"):
+                    yield (
+                        f"advanced: {key.split(':', 1)[1]}",
+                        json.loads(before),
+                        json.loads(after),
+                    )
                 else:
                     yield (key, before, after)
 
@@ -1448,6 +1455,17 @@ class VehicleRevision(models.Model):
                     else:
                         vehicle.fleet_number = None
                     fields += ["fleet_number", "fleet_code"]
+                elif key.startswith("advanced:"):
+                    advanced_key = key.split(":", 1)[1]
+                    advanced = dict(vehicle.advanced or {})
+                    if json.loads(after) == advanced.get(advanced_key):
+                        before_value = json.loads(before)
+                        if before_value is None:
+                            advanced.pop(advanced_key, None)
+                        else:
+                            advanced[advanced_key] = before_value
+                        vehicle.advanced = advanced
+                        fields.append("advanced")
                 else:
                     yield f"vehicle {vehicle.id} {key} not reverted"
 
