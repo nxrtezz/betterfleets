@@ -860,6 +860,31 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
         self.assertFalse(self.vehicle_1.withdrawn)
         self.assertFalse(self.vehicle_1.preserved)
 
+    def test_advanced_vehicle_edit_with_pending_type_change_renders_form_error(self):
+        replacement_type = VehicleType.objects.create(name="Replacement Type")
+        VehicleRevision.objects.create(
+            vehicle=self.vehicle_1,
+            from_type=self.vehicle_1.vehicle_type,
+            to_type=replacement_type,
+            pending=True,
+            created_at=timezone.now(),
+        )
+        self.client.force_login(self.staff_user)
+
+        response = self.client.post(
+            f"{self.vehicle_1.get_edit_url()}?advanced",
+            {
+                "fleet_number": "1",
+                "reg": "FD54JYA",
+                "vehicle_type": replacement_type.pk,
+                "colours": "",
+                "summary": "Corrected vehicle type.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "There's already a pending edit for that")
+
     def test_remove_fleet_number(self):
         self.client.force_login(self.staff_user)
 

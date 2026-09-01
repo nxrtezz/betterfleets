@@ -3481,7 +3481,16 @@ def edit_vehicle(request, **kwargs):
                     has_pending = True
             
             if has_pending:
-                return render(request, f"vehicles/edit_vehicle.html", context)
+                return render(
+                    request,
+                    "edit_vehicle.html",
+                    {
+                        **context,
+                        "form": form,
+                        "object": vehicle,
+                        "vehicle": vehicle,
+                    },
+                )
 
             revision, features = get_revision(vehicle, data)
 
