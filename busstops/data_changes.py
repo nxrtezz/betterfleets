@@ -14,7 +14,11 @@ from django.db import transaction
 from django.utils import timezone
 
 from .models import DataChangeLog
-from photos.models import Photo
+from photos.models import Photo, truncate_photo_text
+
+
+def _short_reason(message: str) -> str:
+    return str(message)[: DataChangeLog._meta.get_field("reason").max_length]
 
 
 def _get_flickr_image_info(flickr_url):
@@ -173,7 +177,9 @@ def apply_pending_change(log: DataChangeLog, *, user=None) -> DataChangeLog:
                 image_url, credit = _get_flickr_image_info(flickr_url)
                 
                 if not image_url:
-                    log.reason = "Could not extract image URL from Flickr page"
+                    log.reason = _short_reason(
+                        "Could not extract image URL from Flickr page"
+                    )
                     log.status = DataChangeLog.STATUS_REJECTED
                     log.save(update_fields=["status", "reason"])
                     return log
@@ -186,7 +192,8 @@ def apply_pending_change(log: DataChangeLog, *, user=None) -> DataChangeLog:
                     # Create the photo
                     photo = Photo()
                     photo.user = user
-                    photo.credit = credit or ""
+                    photo.author = ""
+                    photo.credit = truncate_photo_text(credit)
 
                     # Save the image first to prevent automatic Flickr download
                     sha1 = hashlib.sha1(usedforsecurity=False)
@@ -203,7 +210,7 @@ def apply_pending_change(log: DataChangeLog, *, user=None) -> DataChangeLog:
                     photo.vehicles.add(instance)
             except Exception as e:
                 # Log the error but don't fail the entire transaction
-                log.reason = f"Failed to download photo: {str(e)}"
+                log.reason = _short_reason(f"Failed to download photo: {e}")
                 log.status = DataChangeLog.STATUS_REJECTED
                 log.save(update_fields=["status", "reason"])
                 return log

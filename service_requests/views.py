@@ -206,7 +206,7 @@ def change_status(request, request_id):
                 # Handle photo request approval
                 if req.category == RequestCategory.PHOTO and req.photo_url and req.vehicle:
                     try:
-                        from photos.models import Photo
+                        from photos.models import Photo, truncate_photo_text
                         
                         # Extract the actual image URL and optional credit from Flickr page
                         image_url, credit = get_flickr_image_url(req.photo_url)
@@ -221,7 +221,8 @@ def change_status(request, request_id):
                         # Create the photo
                         photo = Photo()
                         photo.user = request.user
-                        photo.credit = credit or ""
+                        photo.author = ""
+                        photo.credit = truncate_photo_text(credit)
                         
                         # Extract photo ID for caption if possible
                         photo_id_match = re.search(r'/photos/[^/]+/(\d+)', req.photo_url)

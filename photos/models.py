@@ -10,6 +10,15 @@ import re
 from bs4 import BeautifulSoup
 
 
+MAX_PHOTO_TEXT_LENGTH = 255
+
+
+def truncate_photo_text(value):
+    if not value:
+        return ""
+    return str(value)[:MAX_PHOTO_TEXT_LENGTH]
+
+
 def validate_flickr_url(value):
     """Validate that the URL is from Flickr."""
     if value and "flickr.com" not in value.lower():
@@ -117,9 +126,9 @@ class Photo(models.Model):
             
             # Set title and author if not already provided
             if not self.caption and title:
-                self.caption = title
+                self.caption = truncate_photo_text(title)
             if not self.credit and author:
-                self.credit = author
+                self.credit = truncate_photo_text(author)
             
             # Convert to RGB if necessary for JPEG
             if img.mode in ('RGBA', 'P'):
@@ -145,6 +154,10 @@ class Photo(models.Model):
             )
 
     def save(self, *args, **kwargs):
+        self.author = truncate_photo_text(self.author)
+        self.credit = truncate_photo_text(self.credit)
+        self.caption = truncate_photo_text(self.caption)
+
         # Download from Flickr if URL is provided and no image exists
         should_download = self.flickr_url and not self.image
         super().save(*args, **kwargs)
