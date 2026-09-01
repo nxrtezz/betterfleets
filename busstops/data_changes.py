@@ -38,8 +38,17 @@ def _get_flickr_image_info(flickr_url):
             author = None
             if alt_text and '| by' in alt_text:
                 author = alt_text.split('| by')[-1].strip()
+            elif alt_text:
+                # Fallback: use the entire alt text if no "| by" pattern
+                author = alt_text.strip()
             
-            return image_url, author
+            # If still no author, try to extract from URL
+            if not author:
+                url_match = re.search(r'/photos/([^/]+)/', flickr_url)
+                if url_match:
+                    author = url_match.group(1)
+            
+            return image_url, author or "Unknown"
         
         return None, None
     except Exception as e:
