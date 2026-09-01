@@ -233,6 +233,11 @@ def change_status(request, request_id):
                     except Exception as e:
                         messages.error(request, f"Request status changed to {new_status}, but failed to add photo: {str(e)}")
                     return redirect("service_requests:detail", id=request_id)
+                        
+                        messages.success(request, f"Request status changed to {new_status}. Photo added successfully.")
+                    except Exception as e:
+                        messages.error(request, f"Request status changed to {new_status}, but failed to add photo: {str(e)}")
+                    return redirect("service_requests:detail", id=request_id)
             
             # Create history entry
             RequestHistory.objects.create(
