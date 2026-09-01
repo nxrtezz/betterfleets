@@ -221,7 +221,7 @@ def change_status(request, request_id):
                             photo.caption = f"Photo {photo_id}"
                         
                         # Save the image
-                        sha1 = hashlib.sha1()
+                        sha1 = hashlib.sha1(usedforsecurity=False)
                         sha1.update(image_response.content)
                         photo.image.save(f"{sha1.hexdigest()}.jpg", ContentFile(image_response.content))
                         photo.save()
