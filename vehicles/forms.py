@@ -9,7 +9,7 @@ from bustimes.models import Garage
 
 from .fields import validate_colours
 from .form_fields import RegField, SummaryField
-from .models import AdvancedField, Livery, Vehicle, VehicleFeature, VehicleReview, VehicleType
+from .models import Livery, Vehicle, VehicleFeature, VehicleReview, VehicleType
 
 
 class PhotoForm(forms.Form):
@@ -87,77 +87,7 @@ class OperatorVehicleColumnFieldsMixin:
         return updates
 
 
-class AdvancedFieldsMixin:
-    advanced_field_prefix = "advanced_"
-
-    def add_advanced_fields(self, values=None):
-        self.advanced_fields = []
-        self.advanced_field_fields = {}
-        
-        self.advanced_fields = list(
-            AdvancedField.objects.all().order_by("display_order", "name")
-        )
-        values = values or {}
-        
-        for field in self.advanced_fields:
-            field_name = f"{self.advanced_field_prefix}{field.slug}"
-            
-            if field.field_type == AdvancedField.FieldType.BOOLEAN:
-                self.fields[field_name] = forms.BooleanField(
-                    label=field.name,
-                    help_text=field.help_text,
-                    required=False,
-                )
-            elif field.field_type == AdvancedField.FieldType.NUMBER:
-                self.fields[field_name] = forms.IntegerField(
-                    label=field.name,
-                    help_text=field.help_text,
-                    required=False,
-                )
-            elif field.field_type == AdvancedField.FieldType.DATE:
-                self.fields[field_name] = forms.DateField(
-                    label=field.name,
-                    help_text=field.help_text,
-                    required=False,
-                    widget=forms.DateInput(attrs={"type": "date"}),
-                )
-            elif field.field_type == AdvancedField.FieldType.URL:
-                self.fields[field_name] = forms.URLField(
-                    label=field.name,
-                    help_text=field.help_text,
-                    required=False,
-                )
-            else:  # TEXT
-                self.fields[field_name] = forms.CharField(
-                    label=field.name,
-                    help_text=field.help_text,
-                    required=False,
-                    max_length=500,
-                )
-            
-            self.fields[field_name].initial = values.get(field.slug, "")
-            self.advanced_field_fields[field_name] = field
-
-    def get_advanced_field_updates(self):
-        updates = {}
-        if not getattr(self, "advanced_field_fields", None):
-            return updates
-        for field_name, field in self.advanced_field_fields.items():
-            if field_name not in self.changed_data:
-                continue
-            value = self.cleaned_data.get(field_name)
-            if field.field_type == AdvancedField.FieldType.BOOLEAN:
-                updates[field.slug] = bool(value)
-            elif field.field_type == AdvancedField.FieldType.NUMBER:
-                updates[field.slug] = value if value is not None else None
-            elif field.field_type == AdvancedField.FieldType.DATE:
-                updates[field.slug] = value.isoformat() if value else None
-            else:
-                updates[field.slug] = (value or "").strip() if value else ""
-        return updates
-
-
-class EditVehicleForm(OperatorVehicleColumnFieldsMixin, AdvancedFieldsMixin, forms.Form):
+class EditVehicleForm(OperatorVehicleColumnFieldsMixin, forms.Form):
     FLEET_SUPPORT_FEATURE_ID = "8"
 
     @property
@@ -443,7 +373,7 @@ link to a picture to prove it. Be polite.""",
 
         return data
 
-    def __init__(self, data, *args, user, vehicle, sibling_vehicles, advanced=False, **kwargs):
+    def __init__(self, data, *args, user, vehicle, sibling_vehicles, **kwargs):
         super().__init__(self._normalize_bound_data(data), *args, **kwargs)
 
         self.fields["operator"].initial = vehicle.operator
@@ -502,23 +432,6 @@ link to a picture to prove it. Be polite.""",
         self.fields["demonstrator"].initial = vehicle.demonstrator
         self.fields["spare_ticket_machine"].initial = vehicle.is_spare_ticket_machine()
         self.add_operator_vehicle_column_fields(vehicle.operator, vehicle.data)
-        
-        # Add advanced fields if in advanced mode
-        if advanced:
-            self.add_advanced_fields(vehicle.advanced or {})
-            
-            # Hide all non-essential fields in advanced mode
-            # Keep only: vehicle_type, fleet_number, colours (livery), reg, summary
-            fields_to_keep = {"vehicle_type", "fleet_number", "colours", "reg", "summary"}
-            for field_name in list(self.fields.keys()):
-                if field_name not in fields_to_keep and not field_name.startswith(self.advanced_field_prefix):
-                    del self.fields[field_name]
-            
-            # Reorder fields: basic fields first, then advanced fields, then summary at bottom
-            basic_fields = ["vehicle_type", "fleet_number", "colours", "reg"]
-            advanced_field_names = [name for name in list(self.fields.keys()) if name.startswith(self.advanced_field_prefix)]
-            new_order = basic_fields + advanced_field_names + ["summary"]
-            self.order_fields(new_order)
 
         if "fleet_support_vehicle" in self.fields and self.fields["fleet_support_vehicle"].initial:
             if "features" in self.fields:
@@ -590,20 +503,80 @@ link to a picture to prove it. Be polite.""",
                 ordered_fields.extend(custom_field_names)
             self.order_fields(ordered_fields)
         
-        if getattr(self, 'advanced_field_fields', None):
-            # Get all current field names
-            current_field_names = list(self.fields.keys())
-            advanced_field_names = list(self.advanced_field_fields.keys())
-            
-            # Build the new order: basic fields first, then advanced fields, then summary
-            basic_fields = [name for name in current_field_names if not name.startswith(self.advanced_field_prefix) and name != "summary"]
-            new_order = basic_fields + advanced_field_names
-            
-            # Add summary at the end if it exists
-            if "summary" in current_field_names:
-                new_order.append("summary")
-            
-            self.order_fields(new_order)
+
+class AdvancedVehicleEditForm(forms.Form):
+    field_order = (
+        "fleet_number",
+        "reg",
+        "vehicle_type",
+        "colours",
+        "engine",
+        "gearbox",
+        "length",
+        "capacity",
+        "emissions_rating",
+        "chassis",
+        "summary",
+    )
+
+    fleet_number = forms.CharField(required=False, max_length=24)
+    reg = RegField(label="Number plate", required=False, max_length=24)
+    vehicle_type = forms.ModelChoiceField(
+        widget=AutocompleteWidget(field=Vehicle.vehicle_type.field),
+        queryset=VehicleType.objects,
+        required=False,
+        empty_label="",
+    )
+    colours = forms.ModelChoiceField(
+        widget=AutocompleteWidget(field=Vehicle.livery.field),
+        label="Current livery",
+        queryset=Livery.objects,
+        required=False,
+        empty_label="",
+    )
+    engine = forms.CharField(required=False, max_length=500)
+    gearbox = forms.CharField(required=False, max_length=500)
+    length = forms.CharField(required=False, max_length=500)
+    capacity = forms.CharField(required=False, max_length=500)
+    emissions_rating = forms.CharField(
+        label="Emissions rating",
+        required=False,
+        max_length=500,
+    )
+    chassis = forms.CharField(required=False, max_length=500)
+    summary = SummaryField(
+        max_length=255,
+        help_text="Explain your changes, if they need explaining.",
+    )
+
+    @property
+    def media(self):
+        return forms.Media(
+            js=(
+                "admin/js/vendor/jquery/jquery.min.js",
+                "admin/js/vendor/select2/select2.full.min.js",
+                "js/edit-vehicle.js",
+            ),
+            css={"screen": ("admin/css/vendor/select2/select2.min.css",)},
+        )
+
+    def __init__(self, data, *args, vehicle, **kwargs):
+        super().__init__(data, *args, **kwargs)
+        self.fields["fleet_number"].initial = vehicle.fleet_code or (
+            str(vehicle.fleet_number) if vehicle.fleet_number is not None else ""
+        )
+        self.fields["reg"].initial = vehicle.reg
+        self.fields["vehicle_type"].initial = vehicle.vehicle_type
+        self.fields["colours"].initial = vehicle.livery_id
+        for field_name in (
+            "engine",
+            "gearbox",
+            "length",
+            "capacity",
+            "emissions_rating",
+            "chassis",
+        ):
+            self.fields[field_name].initial = getattr(vehicle, field_name)
 
 
 class DebuggerForm(forms.Form):

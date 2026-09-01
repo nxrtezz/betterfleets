@@ -5,7 +5,11 @@ from django.core.cache import caches
 from django.conf import settings
 from django.core.cache.backends.base import InvalidCacheBackendError
 
-from .models import VehicleRevision, VehicleRevisionFeature
+from .models import (
+    LEGACY_ADVANCED_FIELD_NAMES,
+    VehicleRevision,
+    VehicleRevisionFeature,
+)
 
 try:
     redis_client = caches["redis"]._cache.get_client()
@@ -153,7 +157,19 @@ def get_revision(vehicle, data):
             f"-{vehicle.prev_registration}\n+{data.pop('previous_reg')}"
         )
 
-    for field in ("reg", "notes", "branding", "rear_advert", "name"):
+    for field in (
+        "reg",
+        "notes",
+        "branding",
+        "rear_advert",
+        "name",
+        "engine",
+        "gearbox",
+        "length",
+        "capacity",
+        "emissions_rating",
+        "chassis",
+    ):
         if field in data:
             from_value = getattr(vehicle, field)
             to_value = data.pop(field)
@@ -216,7 +232,20 @@ def apply_revision(revision, features=None):
         assert to_value[0] == "+"
         to_value = to_value[1:]
 
-        if field in ("reg", "notes", "branding", "rear_advert", "name", "colours"):
+        if field in (
+            "reg",
+            "notes",
+            "branding",
+            "rear_advert",
+            "name",
+            "colours",
+            "engine",
+            "gearbox",
+            "length",
+            "capacity",
+            "emissions_rating",
+            "chassis",
+        ):
             setattr(vehicle, field, to_value)
             changed_fields.append(field)
 
@@ -264,13 +293,18 @@ def apply_revision(revision, features=None):
         elif field.startswith("advanced:"):
             advanced_key = field.split(":", 1)[1]
             advanced_value = json.loads(to_value)
-            advanced = dict(vehicle.advanced or {})
-            if advanced_value is None:
-                advanced.pop(advanced_key, None)
+            technical_field = LEGACY_ADVANCED_FIELD_NAMES.get(advanced_key)
+            if technical_field:
+                setattr(vehicle, technical_field, advanced_value or "")
+                changed_fields.append(technical_field)
             else:
-                advanced[advanced_key] = advanced_value
-            vehicle.advanced = advanced
-            changed_fields.append("advanced")
+                advanced = dict(vehicle.advanced or {})
+                if advanced_value is None:
+                    advanced.pop(advanced_key, None)
+                else:
+                    advanced[advanced_key] = advanced_value
+                vehicle.advanced = advanced
+                changed_fields.append("advanced")
 
         elif field in ("joined_fleet", "left_fleet"):
             setattr(vehicle, field, to_value)

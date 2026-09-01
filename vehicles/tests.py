@@ -20,7 +20,6 @@ from busstops.models import (
 )
 
 from .models import (
-    AdvancedField,
     Livery,
     Vehicle,
     VehicleFeature,
@@ -31,6 +30,7 @@ from .models import (
     VehicleType,
     PreservationGroup,
 )
+from .utils import apply_revision
 
 
 @patch(
@@ -832,7 +832,6 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
         )
         self.vehicle_1.garage = garage
         self.vehicle_1.save(update_fields=["garage"])
-        AdvancedField.objects.create(name="Engine", slug="engine")
         self.client.force_login(self.trusted_user)
 
         response = self.client.post(
@@ -842,7 +841,12 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
                 "reg": "FD54JYA",
                 "vehicle_type": self.vehicle_1.vehicle_type_id,
                 "colours": "",
-                "advanced_engine": "Cummins ISB",
+                "engine": "Cummins ISB",
+                "gearbox": "ZF EcoLife",
+                "length": "10.8 m",
+                "capacity": "75",
+                "emissions_rating": "Euro VI",
+                "chassis": "Volvo B8RLE",
                 "summary": "Added engine details.",
                 "operator": "",
                 "garage": "",
@@ -853,14 +857,34 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
         self.assertIsNone(response.context["form"])
         revision = response.context["revision"]
         self.assertFalse(revision.pending)
-        self.assertEqual(revision.changes["advanced:engine"], '-null\n+"Cummins ISB"')
+        self.assertEqual(revision.changes["engine"], "-\n+Cummins ISB")
+        self.assertIsNone(revision.from_operator)
+        self.assertIsNone(revision.to_operator)
+        self.assertIsNone(revision.from_garage)
+        self.assertIsNone(revision.to_garage)
 
         self.vehicle_1.refresh_from_db()
-        self.assertEqual(self.vehicle_1.advanced, {"engine": "Cummins ISB"})
+        self.assertEqual(self.vehicle_1.engine, "Cummins ISB")
+        self.assertEqual(self.vehicle_1.gearbox, "ZF EcoLife")
+        self.assertEqual(self.vehicle_1.length, "10.8 m")
+        self.assertEqual(self.vehicle_1.capacity, "75")
+        self.assertEqual(self.vehicle_1.emissions_rating, "Euro VI")
+        self.assertEqual(self.vehicle_1.chassis, "Volvo B8RLE")
         self.assertEqual(self.vehicle_1.operator, self.lynx)
         self.assertEqual(self.vehicle_1.garage, garage)
         self.assertFalse(self.vehicle_1.withdrawn)
         self.assertFalse(self.vehicle_1.preserved)
+
+        list(revision.revert())
+        self.vehicle_1.refresh_from_db()
+        self.assertEqual(self.vehicle_1.engine, "")
+        self.assertEqual(self.vehicle_1.gearbox, "")
+        self.assertEqual(self.vehicle_1.length, "")
+        self.assertEqual(self.vehicle_1.capacity, "")
+        self.assertEqual(self.vehicle_1.emissions_rating, "")
+        self.assertEqual(self.vehicle_1.chassis, "")
+        self.assertEqual(self.vehicle_1.operator, self.lynx)
+        self.assertEqual(self.vehicle_1.garage, garage)
 
     def test_advanced_vehicle_edit_with_pending_type_change_renders_form_error(self):
         replacement_type = VehicleType.objects.create(name="Replacement Type")
@@ -887,6 +911,24 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "There's already a pending edit for that")
 
+    def test_legacy_advanced_revision_updates_technical_field(self):
+        self.vehicle_1.engine = "Cummins ISB"
+        self.vehicle_1.save(update_fields=["engine"])
+        revision = VehicleRevision.objects.create(
+            vehicle=self.vehicle_1,
+            changes={"advanced:engine": '-"Cummins ISB"\n+"Cummins B6.7"'},
+            pending=True,
+            created_at=timezone.now(),
+        )
+
+        apply_revision(revision)
+        self.vehicle_1.refresh_from_db()
+        self.assertEqual(self.vehicle_1.engine, "Cummins B6.7")
+
+        list(revision.revert())
+        self.vehicle_1.refresh_from_db()
+        self.assertEqual(self.vehicle_1.engine, "Cummins ISB")
+
     def test_user_can_cancel_own_pending_vehicle_edit(self):
         revision = VehicleRevision.objects.create(
             vehicle=self.vehicle_1,
@@ -901,6 +943,7 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["HX-Refresh"], "true")
         self.assertFalse(VehicleRevision.objects.filter(pk=revision.pk).exists())
 
     def test_remove_fleet_number(self):

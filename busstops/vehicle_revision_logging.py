@@ -25,6 +25,12 @@ TRACKED_FIELDS = (
     "notes",
     "colours",
     "data",
+    "engine",
+    "gearbox",
+    "length",
+    "capacity",
+    "emissions_rating",
+    "chassis",
 )
 
 
@@ -88,7 +94,19 @@ def build_vehicle_revision(vehicle, before, *, user=None, message="Vehicle data 
     if text_value(before_fleet) != text_value(after_fleet):
         revision.changes["fleet number"] = changed_text(before_fleet, after_fleet)
 
-    for field in ("reg", "notes", "branding", "name", "colours"):
+    for field in (
+        "reg",
+        "notes",
+        "branding",
+        "name",
+        "colours",
+        "engine",
+        "gearbox",
+        "length",
+        "capacity",
+        "emissions_rating",
+        "chassis",
+    ):
         if text_value(before.get(field)) != text_value(after.get(field)):
             revision.changes[field] = changed_text(before.get(field), after.get(field))
 

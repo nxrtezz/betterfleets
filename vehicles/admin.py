@@ -598,6 +598,12 @@ class VehicleAdmin(admin.ModelAdmin):
             "Advanced",
             {
                 "fields": (
+                    "engine",
+                    "gearbox",
+                    "length",
+                    "capacity",
+                    "emissions_rating",
+                    "chassis",
                     "advanced",
                 ),
                 "classes": ("collapse",),

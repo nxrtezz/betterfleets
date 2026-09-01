@@ -51,7 +51,7 @@ def build_basic_fleet_workbook(operator, vehicles, advanced=False) -> Workbook:
     Args:
         operator: Operator object with noc, slug, aka, slogan, organisation, group, government_authority
         vehicles: QuerySet of Vehicle objects
-        advanced: If True, include advanced fields (engine, seating-capacity, gearbox)
+        advanced: If True, include vehicle technical specifications.
     
     Returns:
         Workbook object with formatted sheets
@@ -88,7 +88,9 @@ def build_basic_fleet_workbook(operator, vehicles, advanced=False) -> Workbook:
     # Row 4: Column headers
     headers = ["Fleet Number", "Registration", "Vehicle type", "Livery", "Branding", "Features"]
     if advanced:
-        headers.extend(["Engine", "Seating Capacity", "Gearbox"])
+        headers.extend(
+            ["Engine", "Gearbox", "Length", "Capacity", "Emissions Rating", "Chassis"]
+        )
     worksheet.append(headers)
     
     # Make headers bold
@@ -117,14 +119,13 @@ def build_basic_fleet_workbook(operator, vehicles, advanced=False) -> Workbook:
         ]
         
         if advanced:
-            # Get advanced fields from the advanced JSON field
-            advanced_data = getattr(vehicle, "advanced", {}) or {}
-            if not isinstance(advanced_data, dict):
-                advanced_data = {}
             row.extend([
-                advanced_data.get("engine", "") or "",
-                advanced_data.get("seating-capacity", "") or "",
-                advanced_data.get("gearbox", "") or "",
+                vehicle.engine,
+                vehicle.gearbox,
+                vehicle.length,
+                vehicle.capacity,
+                vehicle.emissions_rating,
+                vehicle.chassis,
             ])
         
         worksheet.append(row)

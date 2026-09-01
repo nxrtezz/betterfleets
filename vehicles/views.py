@@ -2102,9 +2102,6 @@ class VehicleDetailView(DetailView):
             show_advanced = True
         
         if show_advanced:
-            from .models import AdvancedField
-            advanced_fields = AdvancedField.objects.all().order_by("display_order", "name")
-            context["advanced_fields"] = advanced_fields
             context["show_advanced"] = True
 
         # Get previous operators from vehicle field or vehicle history events
@@ -3433,13 +3430,15 @@ def edit_vehicle(request, **kwargs):
     # Check if advanced mode is requested via query parameter
     advanced_mode = "advanced" in request.GET
 
-    form = forms.EditVehicleForm(
-        form_data,
-        vehicle=vehicle,
-        user=request.user,
-        sibling_vehicles=(context["previous"], context["next"]),
-        advanced=advanced_mode,
-    )
+    if advanced_mode:
+        form = forms.AdvancedVehicleEditForm(form_data, vehicle=vehicle)
+    else:
+        form = forms.EditVehicleForm(
+            form_data,
+            vehicle=vehicle,
+            user=request.user,
+            sibling_vehicles=(context["previous"], context["next"]),
+        )
 
     context["livery"] = vehicle.livery
 
@@ -3454,6 +3453,12 @@ def edit_vehicle(request, **kwargs):
                     "fleet_number",
                     "colours",
                     "reg",
+                    "engine",
+                    "gearbox",
+                    "length",
+                    "capacity",
+                    "emissions_rating",
+                    "chassis",
                     "summary",
                 }
                 changed_fields = [
@@ -3473,10 +3478,6 @@ def edit_vehicle(request, **kwargs):
             )
             if custom_column_updates:
                 data["operator_vehicle_columns"] = custom_column_updates
-            
-            advanced_field_updates = form.get_advanced_field_updates()
-            if advanced_field_updates:
-                data["advanced"] = advanced_field_updates
 
             # Check for existing pending revisions before creating new one
             has_pending = False
@@ -4282,7 +4283,9 @@ def vehicle_revision_action(request, revision_id, action):
 
     if action == "disapprove" and request.user.id == revision.user_id:
         revision.delete()  # cancel one's own edit
-        return HttpResponse("")
+        response = HttpResponse("")
+        response["HX-Refresh"] = "true"
+        return response
     else:
         # Allow superusers to approve their own requests
         if request.user.id == revision.user_id and not request.user.is_superuser:

@@ -29,6 +29,20 @@ from bustimes.utils import get_trip
 from .fields import ColourField, ColoursField, CSSField
 
 
+LEGACY_ADVANCED_FIELD_NAMES = {
+    "engine": "engine",
+    "gearbox": "gearbox",
+    "length": "length",
+    "capacity": "capacity",
+    "seating-capacity": "capacity",
+    "seating_capacity": "capacity",
+    "emissions_rating": "emissions_rating",
+    "emissions-rating": "emissions_rating",
+    "emissions": "emissions_rating",
+    "chassis": "chassis",
+}
+
+
 def validate_livery_image_file(file):
     if not file.name.lower().endswith(('.svg', '.png')):
         raise ValidationError('Only SVG and PNG files are allowed')
@@ -719,8 +733,14 @@ class Vehicle(models.Model):
         null=True,
         blank=True,
         default=dict,
-        help_text="Advanced metadata for power users (historic owners, internal notes, etc.)"
+        help_text="Legacy advanced metadata.",
     )
+    engine = models.CharField(max_length=500, blank=True)
+    gearbox = models.CharField(max_length=500, blank=True)
+    length = models.CharField(max_length=500, blank=True)
+    capacity = models.CharField(max_length=500, blank=True)
+    emissions_rating = models.CharField(max_length=500, blank=True)
+    chassis = models.CharField(max_length=500, blank=True)
 
     @classmethod
     def missing_db_fields(cls):
@@ -1455,10 +1475,29 @@ class VehicleRevision(models.Model):
                     else:
                         vehicle.fleet_number = None
                     fields += ["fleet_number", "fleet_code"]
+                elif key in (
+                    "engine",
+                    "gearbox",
+                    "length",
+                    "capacity",
+                    "emissions_rating",
+                    "chassis",
+                ):
+                    if getattr(vehicle, key) == after:
+                        setattr(vehicle, key, before)
+                        fields.append(key)
                 elif key.startswith("advanced:"):
                     advanced_key = key.split(":", 1)[1]
-                    advanced = dict(vehicle.advanced or {})
-                    if json.loads(after) == advanced.get(advanced_key):
+                    technical_field = LEGACY_ADVANCED_FIELD_NAMES.get(advanced_key)
+                    if technical_field:
+                        if json.loads(after) == getattr(vehicle, technical_field):
+                            before_value = json.loads(before)
+                            setattr(vehicle, technical_field, before_value or "")
+                            fields.append(technical_field)
+                    else:
+                        advanced = dict(vehicle.advanced or {})
+                        if json.loads(after) != advanced.get(advanced_key):
+                            continue
                         before_value = json.loads(before)
                         if before_value is None:
                             advanced.pop(advanced_key, None)

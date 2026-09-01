@@ -36,11 +36,8 @@ HEADER_ALIASES = {
     "historical_fleet_operator_code": "historical_fleet",
     "historical_year": "year",
     "fleet_year": "year",
-    # Advanced field aliases
-    "engine": "advanced_engine",
-    "seating_capacity": "advanced_seating_capacity",
-    "seating-capacity": "advanced_seating_capacity",
-    "gearbox": "advanced_gearbox",
+    "seating_capacity": "capacity",
+    "seating-capacity": "capacity",
 }
 
 
@@ -621,23 +618,16 @@ def parse_mass_rows(
             except ValueError as exc:
                 row["errors"].append(str(exc))
         
-        # Handle advanced fields (engine, seating-capacity, gearbox)
-        advanced_fields = {}
-        if mapped.get("advanced_engine"):
-            advanced_fields["engine"] = mapped.get("advanced_engine")
-        if mapped.get("advanced_seating_capacity"):
-            advanced_fields["seating-capacity"] = mapped.get("advanced_seating_capacity")
-        if mapped.get("advanced_gearbox"):
-            advanced_fields["gearbox"] = mapped.get("advanced_gearbox")
-        
-        if advanced_fields:
-            # Merge with existing advanced data if any
-            existing_advanced = row["values"].get("advanced", {})
-            if isinstance(existing_advanced, dict):
-                existing_advanced.update(advanced_fields)
-                row["values"]["advanced"] = existing_advanced
-            else:
-                row["values"]["advanced"] = advanced_fields
+        for field_name in (
+            "engine",
+            "gearbox",
+            "length",
+            "capacity",
+            "emissions_rating",
+            "chassis",
+        ):
+            if mapped.get(field_name):
+                row["values"][field_name] = mapped[field_name]
 
         if mapped.get("features"):
             row["has_features"] = True

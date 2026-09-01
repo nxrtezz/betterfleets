@@ -147,27 +147,13 @@
         </div>
     {% endif %}
 
-    {% if show_advanced and advanced_fields %}
-        {% for field in advanced_fields %}
-            {% if vehicle.advanced %}
-                {% for key, value in vehicle.advanced.items %}
-                    {% if key == field.slug and value %}
-                        <div>
-                            <dt>{{ field.name }}</dt>
-                            <dd>
-                                {% if field.field_type == 'boolean' %}
-                                    {{ value|yesno:"Yes,No" }}
-                                {% elif field.field_type == 'url' %}
-                                    <a href="{{ value }}" target="_blank" rel="noopener">{{ value }}</a>
-                                {% else %}
-                                    {{ value }}
-                                {% endif %}
-                            </dd>
-                        </div>
-                    {% endif %}
-                {% endfor %}
-            {% endif %}
-        {% endfor %}
+    {% if show_advanced %}
+        {% if vehicle.engine %}<div><dt>Engine</dt><dd>{{ vehicle.engine }}</dd></div>{% endif %}
+        {% if vehicle.gearbox %}<div><dt>Gearbox</dt><dd>{{ vehicle.gearbox }}</dd></div>{% endif %}
+        {% if vehicle.length %}<div><dt>Length</dt><dd>{{ vehicle.length }}</dd></div>{% endif %}
+        {% if vehicle.capacity %}<div><dt>Capacity</dt><dd>{{ vehicle.capacity }}</dd></div>{% endif %}
+        {% if vehicle.emissions_rating %}<div><dt>Emissions rating</dt><dd>{{ vehicle.emissions_rating }}</dd></div>{% endif %}
+        {% if vehicle.chassis %}<div><dt>Chassis</dt><dd>{{ vehicle.chassis }}</dd></div>{% endif %}
     {% endif %}
 </dl>
 
