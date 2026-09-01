@@ -471,7 +471,6 @@ class VehicleAdmin(admin.ModelAdmin):
         "name",
         "notes",
         "data",
-        "advanced",
     )
     list_filter = (
         DuplicateVehicleFilter,
@@ -604,7 +603,6 @@ class VehicleAdmin(admin.ModelAdmin):
                     "capacity",
                     "emissions_rating",
                     "chassis",
-                    "advanced",
                 ),
                 "classes": ("collapse",),
             },
