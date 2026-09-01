@@ -165,6 +165,16 @@ def change_status(request, request_id):
             if req.status == RequestStatus.RESOLVED:
                 req.resolved_by = request.user
                 req.save(update_fields=["resolved_by"])
+                
+                # Handle photo request approval
+                if req.category == RequestCategory.PHOTO and req.photo_url and req.vehicle:
+                    try:
+                        from photos.utils import add_flickr_photo
+                        add_flickr_photo(req.photo_url, req.vehicle, request)
+                        messages.success(request, f"Request status changed to {new_status}. Photo added successfully.")
+                    except Exception as e:
+                        messages.error(request, f"Request status changed to {new_status}, but failed to add photo: {str(e)}")
+                    return redirect("service_requests:detail", id=request_id)
             
             # Create history entry
             RequestHistory.objects.create(
