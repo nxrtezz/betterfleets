@@ -844,6 +844,8 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
                 "colours": "",
                 "advanced_engine": "Cummins ISB",
                 "summary": "Added engine details.",
+                "operator": "",
+                "garage": "",
             },
         )
 
@@ -884,6 +886,22 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "There's already a pending edit for that")
+
+    def test_user_can_cancel_own_pending_vehicle_edit(self):
+        revision = VehicleRevision.objects.create(
+            vehicle=self.vehicle_1,
+            user=self.user,
+            pending=True,
+            created_at=timezone.now(),
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            f"/vehicles/revisions/{revision.pk}/disapprove",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(VehicleRevision.objects.filter(pk=revision.pk).exists())
 
     def test_remove_fleet_number(self):
         self.client.force_login(self.staff_user)

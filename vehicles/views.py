@@ -3448,8 +3448,29 @@ def edit_vehicle(request, **kwargs):
             form.add_error(None, "You haven't changed anything")
 
         if form.is_valid():
-            data = {key: form.cleaned_data[key] for key in form.changed_data if key not in {"add_previous_operator", "add_previous_operator_joined_fleet"}}
-            custom_column_updates = form.get_operator_vehicle_column_updates()
+            if advanced_mode:
+                advanced_edit_fields = {
+                    "vehicle_type",
+                    "fleet_number",
+                    "colours",
+                    "reg",
+                    "summary",
+                }
+                changed_fields = [
+                    key for key in form.changed_data if key in advanced_edit_fields
+                ]
+            else:
+                changed_fields = [
+                    key
+                    for key in form.changed_data
+                    if key
+                    not in {"add_previous_operator", "add_previous_operator_joined_fleet"}
+                ]
+
+            data = {key: form.cleaned_data[key] for key in changed_fields}
+            custom_column_updates = (
+                form.get_operator_vehicle_column_updates() if not advanced_mode else {}
+            )
             if custom_column_updates:
                 data["operator_vehicle_columns"] = custom_column_updates
             

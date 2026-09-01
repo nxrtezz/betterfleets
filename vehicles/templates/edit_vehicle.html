@@ -1,8 +1,10 @@
 {% extends 'page.html' %}
+{% load static %}
 
 {% block title %}Edit details – {{ vehicle }} – bustimes.org{% endblock %}
 
 {% block head %}
+    <script src="{% static 'js/htmx.min.js' %}"></script>
     {% if form and livery %}
         <style>{% for css in livery.get_styles %}{{ css|safe }}{% endfor %}</style>
     {% endif %}
@@ -34,7 +36,7 @@
                 Show only advanced edits
             </label>
         </p>
-        <ul class="revisions-list" id="pending-edits-list">
+        <ul class="revisions-list" id="pending-edits-list" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
             {% for revision in pending_edits %}
                 {% include "vehicle_revision.html" with revision=revision %}
             {% endfor %}
