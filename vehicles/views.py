@@ -4276,27 +4276,20 @@ def vehicle_revision_action(request, revision_id, action):
 
 @require_safe
 def vehicle_edits(request):
-    revisions = (
-        apply_vehicle_schema_compat(
-            VehicleRevision.objects.select_related(
-                *revision_display_related_fields, "user", "vehicle"
-            ),
-            prefix="vehicle__",
-        )
-        .prefetch_related("vehiclerevisionfeature_set__feature")
-        .order_by("-id")
-    )
-
-    default_status = (
-        "pending"
-        if request.user.is_authenticated
+    is_trusted_or_superuser = (
+        request.user.is_authenticated
         and (request.user.trusted or request.user.is_superuser)
-        else "approved"
     )
+    
+    default_status = "pending" if is_trusted_or_superuser else "approved"
+    default_show = "all" if is_trusted_or_superuser else "edits"
+    
     vehicle = None
     f = filters.VehicleRevisionFilter(
-        request.GET or {"status": default_status, "show": "all"}, queryset=revisions
+        request.GET or {"status": default_status, "show": default_show}, 
+        queryset=VehicleRevision.objects.none()
     )
+    
     if request.user.is_anonymous or not (
         request.user.trusted
         or request.user.is_superuser
@@ -4304,6 +4297,8 @@ def vehicle_edits(request):
     ):
         f.filters["status"].field.choices = [("approved", "approved")]
         f.form.fields["status"].choices = [("approved", "approved")]
+        f.filters["show"].field.choices = [("edits", "Edits only")]
+        f.form.fields["show"].choices = [("edits", "Edits only")]
 
     if f.is_valid():
         vehicle_id = f.form.cleaned_data.get("vehicle")
@@ -4311,6 +4306,26 @@ def vehicle_edits(request):
             vehicle = (
                 Vehicle.objects.select_related("operator").filter(pk=vehicle_id).first()
             )
+        
+        # Limit revisions for non-trusted/superuser users to improve performance
+        revisions_limit = None if is_trusted_or_superuser else 10
+        
+        revisions = (
+            apply_vehicle_schema_compat(
+                VehicleRevision.objects.select_related(
+                    *revision_display_related_fields, "user", "vehicle"
+                ),
+                prefix="vehicle__",
+            )
+            .prefetch_related("vehiclerevisionfeature_set__feature")
+            .order_by("-id")
+        )
+        
+        # Apply filter first, then limit
+        f.qs = f.filter(revisions)
+        if revisions_limit:
+            f.qs = f.qs[:revisions_limit]
+        
         request_logs = filter_request_logs(get_request_logs_queryset(), f.form, request)
         show = f.form.cleaned_data.get("show") or "all"
         entries = []
@@ -4330,7 +4345,7 @@ def vehicle_edits(request):
         {
             "filter": f,
             "entries": page,
-            "reset_query": f"status={default_status}&show=all",
+            "reset_query": f"status={default_status}&show={default_show}",
             "vehicle": vehicle,
         },
     )
