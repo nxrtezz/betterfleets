@@ -5,9 +5,37 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import ListView, DetailView, CreateView, UpdateView
 from django.urls import reverse
+import requests
+import re
+import hashlib
+from django.core.files.base import ContentFile
 
 from .models import Request, RequestComment, RequestHistory, RequestCategory, RequestStatus
 from .forms import RequestForm, RequestCommentForm, RequestStatusForm
+
+
+def get_flickr_image_url(flickr_url):
+    """Extract the actual image URL from a Flickr photo page."""
+    try:
+        response = requests.get(flickr_url, timeout=10)
+        response.raise_for_status()
+        
+        # Use regex to find the image URL in the noscript tag
+        # Pattern to match: src="//live.staticflickr.com/..."
+        pattern = r'src=["\']([^"\']*staticflickr[^"\']*)["\']'
+        matches = re.findall(pattern, response.text)
+        
+        if matches:
+            image_url = matches[0]
+            # Ensure it has the protocol
+            if image_url.startswith('//'):
+                image_url = 'https:' + image_url
+            return image_url
+        
+        return None
+    except Exception as e:
+        print(f"Error extracting Flickr image URL: {e}")
+        return None
 
 
 class RequestListView(ListView):
@@ -169,8 +197,38 @@ def change_status(request, request_id):
                 # Handle photo request approval
                 if req.category == RequestCategory.PHOTO and req.photo_url and req.vehicle:
                     try:
-                        from photos.utils import add_flickr_photo
-                        add_flickr_photo(req.photo_url, req.vehicle, request)
+                        from photos.models import Photo
+                        
+                        # Extract the actual image URL from Flickr page
+                        image_url = get_flickr_image_url(req.photo_url)
+                        if not image_url:
+                            messages.error(request, f"Request status changed to {new_status}, but could not extract image URL from Flickr page.")
+                            return redirect("service_requests:detail", id=request_id)
+                        
+                        # Download the image
+                        image_response = requests.get(image_url, timeout=10)
+                        image_response.raise_for_status()
+                        
+                        # Create the photo
+                        photo = Photo()
+                        photo.user = request.user
+                        photo.flickr_url = req.photo_url
+                        
+                        # Extract photo ID for caption if possible
+                        photo_id_match = re.search(r'/photos/[^/]+/(\d+)', req.photo_url)
+                        if photo_id_match:
+                            photo_id = photo_id_match.group(1)
+                            photo.caption = f"Photo {photo_id}"
+                        
+                        # Save the image
+                        sha1 = hashlib.sha1()
+                        sha1.update(image_response.content)
+                        photo.image.save(f"{sha1.hexdigest()}.jpg", ContentFile(image_response.content))
+                        photo.save()
+                        
+                        # Add to vehicle
+                        photo.vehicles.add(req.vehicle)
+                        
                         messages.success(request, f"Request status changed to {new_status}. Photo added successfully.")
                     except Exception as e:
                         messages.error(request, f"Request status changed to {new_status}, but failed to add photo: {str(e)}")
