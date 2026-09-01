@@ -290,23 +290,36 @@
         }
 
         /* Place vehicle photo to the right in the hero card */
-        .vehicle-hero .vehicle-photo {
+        .vehicle-hero .vehicle-photo-container {
             flex: 0 0 220px;
             width: 220px;
             margin-left: 1rem;
             margin-top: 0;
             align-self: start;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .vehicle-photo__author--below {
+            margin-top: 0.35rem;
+            font-size: 0.75rem;
+            color: var(--secondary-text-color);
+            font-style: italic;
         }
 
         @media (max-width: 480px) {
             .vehicle-hero {
                 flex-direction: column;
             }
-            .vehicle-hero .vehicle-photo {
+            .vehicle-hero .vehicle-photo-container {
                 width: 100%;
                 flex: none;
                 order: -1; /* show above the info on small screens */
                 margin: 0 0 1rem 0;
+            }
+            .vehicle-photo__author--below {
+                margin-top: 0.5rem;
             }
         }
     </style>
@@ -377,19 +390,19 @@
             {% include 'vehicle_info.html' %}
         </div>
         {% with photos=vehicle.photo_set.all %}{% if photos %}
-        <figure class="vehicle-photo">
-            <img src="{{ photos.0.get_display_url }}" alt="{{ vehicle }}" loading="lazy">
-            {% if photos.0.caption or photos.0.credit %}
-                <figcaption>
-                    {% if photos.0.caption %}
+        <div class="vehicle-photo-container">
+            <figure class="vehicle-photo">
+                <img src="{{ photos.0.get_display_url }}" alt="{{ vehicle }}" loading="lazy">
+                {% if photos.0.caption %}
+                    <figcaption>
                         <div class="vehicle-photo__title">{{ photos.0.caption }}</div>
-                    {% endif %}
-                    {% if photos.0.credit %}
-                        <div class="vehicle-photo__author">by {{ photos.0.credit }}</div>
-                    {% endif %}
-                </figcaption>
+                    </figcaption>
+                {% endif %}
+            </figure>
+            {% if photos.0.credit %}
+                <div class="vehicle-photo__author vehicle-photo__author--below">by {{ photos.0.credit }}</div>
             {% endif %}
-        </figure>
+        </div>
         {% endif %}{% endwith %}
     </div>
 
