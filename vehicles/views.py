@@ -4287,7 +4287,7 @@ def vehicle_edits(request):
     vehicle = None
     f = filters.VehicleRevisionFilter(
         request.GET or {"status": default_status, "show": default_show}, 
-        queryset=VehicleRevision.objects.none()
+        queryset=VehicleRevision.objects.all()
     )
     
     if request.user.is_anonymous or not (
