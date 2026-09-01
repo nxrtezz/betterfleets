@@ -1,15 +1,50 @@
 from __future__ import annotations
 
 import datetime
+import hashlib
+import re
 from decimal import Decimal
 from typing import Any
 
+import requests
 from django.apps import apps
 from django.contrib.gis.geos import GEOSGeometry
+from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
 from .models import DataChangeLog
+from photos.models import Photo
+
+
+def _get_flickr_image_info(flickr_url):
+    """Extract the actual image URL and author from a Flickr photo page."""
+    try:
+        response = requests.get(flickr_url, timeout=10)
+        response.raise_for_status()
+        
+        # Use regex to find the image URL and alt text in the noscript tag
+        # Pattern to match: <img src="..." alt="...">
+        pattern = r'<img[^>]*src=["\']([^"\']*staticflickr[^"\']*)["\'][^>]*alt=["\']([^"\']*)["\']'
+        matches = re.findall(pattern, response.text)
+        
+        if matches:
+            image_url, alt_text = matches[0]
+            # Ensure it has the protocol
+            if image_url.startswith('//'):
+                image_url = 'https:' + image_url
+            
+            # Extract author from alt text (format: "... | by author")
+            author = None
+            if alt_text and '| by' in alt_text:
+                author = alt_text.split('| by')[-1].strip()
+            
+            return image_url, author
+        
+        return None, None
+    except Exception as e:
+        print(f"Error extracting Flickr image info: {e}")
+        return None, None
 
 
 def target_model_label(instance: Any) -> str:
@@ -125,16 +160,34 @@ def apply_pending_change(log: DataChangeLog, *, user=None) -> DataChangeLog:
 
     # Handle photo suggestions specially
     if log.operation == "add_photo" and log.source == "photo_suggestion":
-        from photos.models import Photo
-        
         model = apps.get_model(log.target_model)
         instance = model._default_manager.select_for_update().get(pk=log.target_pk)
         flickr_url = (log.payload or {}).get("flickr_url")
         
         if flickr_url:
             try:
-                photo = Photo(flickr_url=flickr_url)
+                # Extract image URL and author from Flickr page
+                image_url, author = _get_flickr_image_info(flickr_url)
+                if not image_url:
+                    log.reason = "Could not extract image URL from Flickr page"
+                    log.status = DataChangeLog.STATUS_REJECTED
+                    log.save(update_fields=["status", "reason"])
+                    return log
+                
+                # Download the image
+                image_response = requests.get(image_url, timeout=10)
+                image_response.raise_for_status()
+                
+                # Create the photo
+                photo = Photo()
                 photo.user = user
+                photo.flickr_url = flickr_url
+                photo.author = author  # Set the author from Flickr page
+                
+                # Save the image
+                sha1 = hashlib.sha1(usedforsecurity=False)
+                sha1.update(image_response.content)
+                photo.image.save(f"{sha1.hexdigest()}.jpg", ContentFile(image_response.content))
                 photo.save()
                 photo.vehicles.add(instance)
             except Exception as e:
