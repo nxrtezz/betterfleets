@@ -39,7 +39,7 @@ from django.core.exceptions import PermissionDenied, BadRequest
 from django.core.paginator import Paginator
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError, connection, transaction
-from django.db.models import Avg, Case, CharField, Count, F, Max, Prefetch, Q, When, Value
+from django.db.models import Avg, Case, CharField, Count, F, Max, OuterRef, Prefetch, Q, When, Value
 from django.db.models.aggregates import StringAgg
 from django.db.models.functions import Coalesce, Now
 from django.http import Http404, HttpResponse, JsonResponse
