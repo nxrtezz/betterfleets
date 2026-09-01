@@ -177,6 +177,8 @@ def apply_pending_change(log: DataChangeLog, *, user=None) -> DataChangeLog:
             try:
                 # Extract image URL and author from Flickr page
                 image_url, author = _get_flickr_image_info(flickr_url)
+                print(f"DEBUG: Extracted image_url: {image_url}, author: {author}")
+                
                 if not image_url:
                     log.reason = "Could not extract image URL from Flickr page"
                     log.status = DataChangeLog.STATUS_REJECTED
@@ -191,12 +193,19 @@ def apply_pending_change(log: DataChangeLog, *, user=None) -> DataChangeLog:
                 photo = Photo()
                 photo.user = user
                 photo.flickr_url = flickr_url
-                photo.author = author  # Set the author from Flickr page
+                photo.author = author or "Unknown"  # Ensure author is never null
+                print(f"DEBUG: Setting photo author to: {photo.author}")
                 
                 # Save the image
                 sha1 = hashlib.sha1(usedforsecurity=False)
                 sha1.update(image_response.content)
                 photo.image.save(f"{sha1.hexdigest()}.jpg", ContentFile(image_response.content))
+                
+                # Double-check author is set before saving
+                if not photo.author:
+                    photo.author = "Unknown"
+                    print(f"DEBUG: Author was null, setting to Unknown")
+                
                 photo.save()
                 photo.vehicles.add(instance)
             except Exception as e:
