@@ -4328,15 +4328,15 @@ def vehicle_edits(request):
                 Vehicle.objects.select_related("operator").filter(pk=vehicle_id).first()
             )
         
-        # Limit revisions for non-trusted/superuser users to improve performance
-        if not is_trusted_or_superuser:
-            f.qs = f.qs[:10]
-        
         request_logs = filter_request_logs(get_request_logs_queryset(), f.form, request)
         show = f.form.cleaned_data.get("show") or "all"
         entries = []
         if show != "requests" and not show.endswith("_request"):
-            entries = [wrap_vehicle_revision(revision) for revision in f.qs]
+            # Limit revisions for non-trusted/superuser users to improve performance
+            revisions_qs = f.qs
+            if not is_trusted_or_superuser:
+                revisions_qs = revisions_qs[:10]
+            entries = [wrap_vehicle_revision(revision) for revision in revisions_qs]
         entries += [wrap_request_log_for_user(log, request.user) for log in request_logs]
         entries.sort(key=lambda entry: entry.created_at, reverse=True)
 
