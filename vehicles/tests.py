@@ -30,7 +30,6 @@ from .models import (
     VehicleType,
     PreservationGroup,
 )
-from .utils import apply_revision
 
 
 @patch(
@@ -910,24 +909,6 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "There's already a pending edit for that")
-
-    def test_legacy_advanced_revision_updates_technical_field(self):
-        self.vehicle_1.engine = "Cummins ISB"
-        self.vehicle_1.save(update_fields=["engine"])
-        revision = VehicleRevision.objects.create(
-            vehicle=self.vehicle_1,
-            changes={"advanced:engine": '-"Cummins ISB"\n+"Cummins B6.7"'},
-            pending=True,
-            created_at=timezone.now(),
-        )
-
-        apply_revision(revision)
-        self.vehicle_1.refresh_from_db()
-        self.assertEqual(self.vehicle_1.engine, "Cummins B6.7")
-
-        list(revision.revert())
-        self.vehicle_1.refresh_from_db()
-        self.assertEqual(self.vehicle_1.engine, "Cummins ISB")
 
     def test_user_can_cancel_own_pending_vehicle_edit(self):
         revision = VehicleRevision.objects.create(

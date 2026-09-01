@@ -1,6 +1,5 @@
 import datetime
 from decimal import Decimal
-import json
 import re
 import subprocess
 import struct
@@ -27,20 +26,6 @@ from busstops.fields import AutoSlugField
 from busstops.models import DataSource, Operator, PreservationGroup, Service
 from bustimes.utils import get_trip
 from .fields import ColourField, ColoursField, CSSField
-
-
-LEGACY_ADVANCED_FIELD_NAMES = {
-    "engine": "engine",
-    "gearbox": "gearbox",
-    "length": "length",
-    "capacity": "capacity",
-    "seating-capacity": "capacity",
-    "seating_capacity": "capacity",
-    "emissions_rating": "emissions_rating",
-    "emissions-rating": "emissions_rating",
-    "emissions": "emissions_rating",
-    "chassis": "chassis",
-}
 
 
 def validate_livery_image_file(file):
@@ -437,32 +422,6 @@ class VehicleFeature(models.Model):
         ordering = ("category", "name")
 
 
-class AdvancedField(models.Model):
-    class FieldType(models.TextChoices):
-        BOOLEAN = "boolean", "Boolean (true/false)"
-        NUMBER = "number", "Number"
-        TEXT = "text", "Text"
-        DATE = "date", "Date"
-        URL = "url", "URL"
-
-    name = models.CharField(max_length=255, unique=True)
-    slug = models.SlugField(max_length=255, unique=True)
-    field_type = models.CharField(
-        max_length=20,
-        choices=FieldType.choices,
-        default=FieldType.TEXT,
-    )
-    help_text = models.CharField(max_length=500, blank=True)
-    display_order = models.PositiveIntegerField(default=0)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        app_label = "vehicles"
-        ordering = ("display_order", "name")
-
-
 class VehicleNamePage(models.Model):
     name = models.CharField(max_length=255, unique=True, db_index=True)
     slug = AutoSlugField(populate_from="name", editable=True, unique=True)
@@ -729,12 +688,6 @@ class Vehicle(models.Model):
         "bustimes.Garage", models.SET_NULL, null=True, blank=True
     )
     locked = models.BooleanField(default=False)
-    advanced = models.JSONField(
-        null=True,
-        blank=True,
-        default=dict,
-        help_text="Legacy advanced metadata.",
-    )
     engine = models.CharField(max_length=500, blank=True)
     gearbox = models.CharField(max_length=500, blank=True)
     length = models.CharField(max_length=500, blank=True)
@@ -1424,12 +1377,6 @@ class VehicleRevision(models.Model):
                         yield ("marked preserved", "", "")
                     else:
                         yield ("cleared preserved", "", "")
-                elif key.startswith("advanced:"):
-                    yield (
-                        f"advanced: {key.split(':', 1)[1]}",
-                        json.loads(before),
-                        json.loads(after),
-                    )
                 else:
                     yield (key, before, after)
 
@@ -1486,25 +1433,6 @@ class VehicleRevision(models.Model):
                     if getattr(vehicle, key) == after:
                         setattr(vehicle, key, before)
                         fields.append(key)
-                elif key.startswith("advanced:"):
-                    advanced_key = key.split(":", 1)[1]
-                    technical_field = LEGACY_ADVANCED_FIELD_NAMES.get(advanced_key)
-                    if technical_field:
-                        if json.loads(after) == getattr(vehicle, technical_field):
-                            before_value = json.loads(before)
-                            setattr(vehicle, technical_field, before_value or "")
-                            fields.append(technical_field)
-                    else:
-                        advanced = dict(vehicle.advanced or {})
-                        if json.loads(after) != advanced.get(advanced_key):
-                            continue
-                        before_value = json.loads(before)
-                        if before_value is None:
-                            advanced.pop(advanced_key, None)
-                        else:
-                            advanced[advanced_key] = before_value
-                        vehicle.advanced = advanced
-                        fields.append("advanced")
                 else:
                     yield f"vehicle {vehicle.id} {key} not reverted"
 

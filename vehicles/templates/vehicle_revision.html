@@ -1,5 +1,5 @@
 {% load humanize %}
-<li id="revision-{{ revision.id }}" data-has-advanced="{% if revision.changes.engine or revision.changes.gearbox or revision.changes.length or revision.changes.capacity or revision.changes.emissions_rating or revision.changes.chassis or revision.changes.advanced %}true{% else %}false{% endif %}">
+<li id="revision-{{ revision.id }}" data-has-advanced="{% if revision.changes.engine or revision.changes.gearbox or revision.changes.length or revision.changes.capacity or revision.changes.emissions_rating or revision.changes.chassis %}true{% else %}false{% endif %}">
     <form method="GET" action="/contact"><p>
         {% if not vehicle %}
             <a href="{{ revision.vehicle.get_absolute_url }}">{{ revision.vehicle }}</a> &centerdot;
