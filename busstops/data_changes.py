@@ -182,21 +182,25 @@ def apply_pending_change(log: DataChangeLog, *, user=None) -> DataChangeLog:
                 image_response = requests.get(image_url, timeout=10)
                 image_response.raise_for_status()
                 
-                # Create the photo
-                photo = Photo()
-                photo.user = user
-                photo.credit = credit or ""
-                
-                # Save the image first to prevent automatic Flickr download
-                sha1 = hashlib.sha1(usedforsecurity=False)
-                sha1.update(image_response.content)
-                photo.image.save(f"{sha1.hexdigest()}.jpg", ContentFile(image_response.content))
-                
-                # Now set the flickr_url after image is saved to prevent automatic download
-                photo.flickr_url = flickr_url
-                
-                photo.save()
-                photo.vehicles.add(instance)
+                with transaction.atomic():
+                    # Create the photo
+                    photo = Photo()
+                    photo.user = user
+                    photo.credit = credit or ""
+
+                    # Save the image first to prevent automatic Flickr download
+                    sha1 = hashlib.sha1(usedforsecurity=False)
+                    sha1.update(image_response.content)
+                    photo.image.save(
+                        f"{sha1.hexdigest()}.jpg",
+                        ContentFile(image_response.content),
+                    )
+
+                    # Now set the flickr_url after image is saved to prevent automatic download
+                    photo.flickr_url = flickr_url
+
+                    photo.save()
+                    photo.vehicles.add(instance)
             except Exception as e:
                 # Log the error but don't fail the entire transaction
                 log.reason = f"Failed to download photo: {str(e)}"

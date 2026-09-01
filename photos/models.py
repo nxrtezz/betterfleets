@@ -80,6 +80,7 @@ class Photo(models.Model):
         help_text="Enter a Flickr photo URL to download the image"
     )
     credit = models.CharField(max_length=255, blank=True)
+    author = models.CharField(max_length=255, blank=True, null=True)
     caption = models.CharField(max_length=255, blank=True)
     url = models.URLField(blank=True, verbose_name="URL")
     created_at = models.DateTimeField(null=True, blank=True)
