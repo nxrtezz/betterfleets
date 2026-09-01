@@ -4294,9 +4294,27 @@ def vehicle_edits(request):
         if filter_params.get("status") not in ["approved", None]:
             filter_params["status"] = "approved"
     
+    # Limit revisions for non-trusted/superuser users to improve performance
+    revisions_limit = None if is_trusted_or_superuser else 10
+    
+    revisions = (
+        apply_vehicle_schema_compat(
+            VehicleRevision.objects.select_related(
+                *revision_display_related_fields, "user", "vehicle"
+            ),
+            prefix="vehicle__",
+        )
+        .prefetch_related("vehiclerevisionfeature_set__feature")
+        .order_by("-id")
+    )
+    
+    # Apply limit before filter for performance
+    if revisions_limit:
+        revisions = revisions[:revisions_limit]
+    
     f = filters.VehicleRevisionFilter(
         filter_params or {"status": default_status, "show": default_show}, 
-        queryset=VehicleRevision.objects.all()
+        queryset=revisions
     )
     
     if request.user.is_anonymous or not (
@@ -4315,25 +4333,6 @@ def vehicle_edits(request):
             vehicle = (
                 Vehicle.objects.select_related("operator").filter(pk=vehicle_id).first()
             )
-        
-        # Limit revisions for non-trusted/superuser users to improve performance
-        revisions_limit = None if is_trusted_or_superuser else 10
-        
-        revisions = (
-            apply_vehicle_schema_compat(
-                VehicleRevision.objects.select_related(
-                    *revision_display_related_fields, "user", "vehicle"
-                ),
-                prefix="vehicle__",
-            )
-            .prefetch_related("vehiclerevisionfeature_set__feature")
-            .order_by("-id")
-        )
-        
-        # Apply filter first, then limit
-        f.qs = f.filter(revisions)
-        if revisions_limit:
-            f.qs = f.qs[:revisions_limit]
         
         request_logs = filter_request_logs(get_request_logs_queryset(), f.form, request)
         show = f.form.cleaned_data.get("show") or "all"
