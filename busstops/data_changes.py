@@ -192,14 +192,16 @@ def apply_pending_change(log: DataChangeLog, *, user=None) -> DataChangeLog:
                 # Create the photo
                 photo = Photo()
                 photo.user = user
-                photo.flickr_url = flickr_url
                 photo.author = author or "Unknown"  # Ensure author is never null
                 print(f"DEBUG: Setting photo author to: {photo.author}")
                 
-                # Save the image
+                # Save the image first to prevent automatic Flickr download
                 sha1 = hashlib.sha1(usedforsecurity=False)
                 sha1.update(image_response.content)
                 photo.image.save(f"{sha1.hexdigest()}.jpg", ContentFile(image_response.content))
+                
+                # Now set the flickr_url after image is saved to prevent automatic download
+                photo.flickr_url = flickr_url
                 
                 # Double-check author is set before saving
                 if not photo.author:

@@ -227,7 +227,6 @@ def change_status(request, request_id):
                         # Create the photo
                         photo = Photo()
                         photo.user = request.user
-                        photo.flickr_url = req.photo_url
                         photo.author = author  # Set the author from alt text
                         
                         # Extract photo ID for caption if possible
@@ -236,10 +235,14 @@ def change_status(request, request_id):
                             photo_id = photo_id_match.group(1)
                             photo.caption = f"Photo {photo_id}"
                         
-                        # Save the image
+                        # Save the image first to prevent automatic Flickr download
                         sha1 = hashlib.sha1(usedforsecurity=False)
                         sha1.update(image_response.content)
                         photo.image.save(f"{sha1.hexdigest()}.jpg", ContentFile(image_response.content))
+                        
+                        # Now set the flickr_url after image is saved to prevent automatic download
+                        photo.flickr_url = req.photo_url
+                        
                         photo.save()
                         
                         # Add to vehicle
