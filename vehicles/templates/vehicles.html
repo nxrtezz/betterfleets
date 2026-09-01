@@ -24,84 +24,70 @@
 
 <h2>Operators</h2>
 
-<div class="filters">
-    <form method="get" action="" class="filter-form">
-        <div class="filter-group">
-            <label for="search">Search operators:</label>
-            <input type="text" id="search" name="search" value="{{ search_query }}" placeholder="Search operator name...">
+<div class="filters-card">
+    <form method="get">
+        <div class="filters-grid">
+            <p>
+                <label for="search">Search operators:</label>
+                <input type="text" id="search" name="search" value="{{ search_query }}" placeholder="Search operator name...">
+            </p>
+            <p>
+                <label for="vehicle_mode">Vehicle mode:</label>
+                <select id="vehicle_mode" name="vehicle_mode">
+                    <option value="">All modes</option>
+                    {% for mode in vehicle_modes %}
+                        <option value="{{ mode }}" {% if vehicle_mode_filter == mode %}selected{% endif %}>{{ mode }}</option>
+                    {% endfor %}
+                </select>
+            </p>
         </div>
-        <div class="filter-group">
-            <label for="vehicle_mode">Vehicle mode:</label>
-            <select id="vehicle_mode" name="vehicle_mode">
-                <option value="">All modes</option>
-                {% for mode in vehicle_modes %}
-                    <option value="{{ mode }}" {% if vehicle_mode_filter == mode %}selected{% endif %}>{{ mode }}</option>
-                {% endfor %}
-            </select>
+        <div class="filters-actions">
+            <input type="submit" value="Filter">
+            {% if search_query or vehicle_mode_filter %}
+                <a href="/vehicles">Clear filters</a>
+            {% endif %}
         </div>
-        <button type="submit" class="filter-button">Filter</button>
-        {% if search_query or vehicle_mode_filter %}
-            <a href="/vehicles" class="clear-filters">Clear filters</a>
-        {% endif %}
     </form>
 </div>
 
 <style>
-    .filters {
-        margin: 20px 0;
-        padding: 20px;
-        background: var(--theme-card-background, #f5f5f5);
-        border: 1px solid var(--border-color, #ddd);
-        border-radius: 8px;
+    .filters-card {
+        background: var(--background-color);
+        border: 1px solid var(--border-color);
+        border-radius: 1rem;
+        padding: 1rem 1.1rem;
+        margin-bottom: 1.25rem;
     }
-    .filter-form {
+
+    .filters-grid {
+        display: grid;
+        gap: 0.85rem 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+        align-items: end;
+    }
+
+    .filters-grid p {
+        margin: 0;
+    }
+
+    .filters-grid label {
+        display: block;
+        font-weight: 700;
+        margin-bottom: 0.3rem;
+    }
+
+    .filters-grid input,
+    .filters-grid select {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .filters-actions {
         display: flex;
         flex-wrap: wrap;
-        gap: 15px;
-        align-items: flex-end;
-    }
-    .filter-group {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-    }
-    .filter-group label {
-        font-weight: 600;
-        font-size: 0.9em;
-    }
-    .filter-group input,
-    .filter-group select {
-        padding: 8px 12px;
-        border: 1px solid var(--border-color, #ddd);
-        border-radius: 4px;
-        font-size: 14px;
-        min-width: 200px;
-    }
-    .filter-button {
-        padding: 8px 20px;
-        background: var(--button-background, var(--brand-color, #007bff));
-        color: var(--button-foreground, var(--header-text-color, white));
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 600;
-    }
-    .filter-button:hover {
-        background: var(--brand-color-darker, #0056b3);
-    }
-    .clear-filters {
-        padding: 8px 20px;
-        background: var(--border-color-darker, #6c757d);
-        color: var(--header-text-color, white);
-        border: none;
-        border-radius: 4px;
-        text-decoration: none;
-        font-size: 14px;
-        font-weight: 600;
-    }
-    .clear-filters:hover {
-        background: var(--brand-color-darker-darker, #545b62);
+        gap: 0.75rem;
+        align-items: center;
+        margin-top: 1rem;
     }
 </style>
 
