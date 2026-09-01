@@ -4285,8 +4285,17 @@ def vehicle_edits(request):
     default_show = "all" if is_trusted_or_superuser else "edits"
     
     vehicle = None
+    
+    # Sanitize request parameters for non-trusted users
+    filter_params = request.GET.copy()
+    if not is_trusted_or_superuser:
+        if filter_params.get("show") not in ["edits", None]:
+            filter_params["show"] = "edits"
+        if filter_params.get("status") not in ["approved", None]:
+            filter_params["status"] = "approved"
+    
     f = filters.VehicleRevisionFilter(
-        request.GET or {"status": default_status, "show": default_show}, 
+        filter_params or {"status": default_status, "show": default_show}, 
         queryset=VehicleRevision.objects.all()
     )
     
