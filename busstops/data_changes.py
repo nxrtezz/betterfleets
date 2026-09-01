@@ -18,7 +18,7 @@ from photos.models import Photo
 
 
 def _get_flickr_image_info(flickr_url):
-    """Extract the actual image URL and author from a Flickr photo page."""
+    """Extract the actual image URL and optional credit from a Flickr photo page."""
     try:
         response = requests.get(flickr_url, timeout=10)
         response.raise_for_status()
@@ -34,21 +34,15 @@ def _get_flickr_image_info(flickr_url):
             if image_url.startswith('//'):
                 image_url = 'https:' + image_url
             
-            # Extract author from alt text (format: "... | by author")
-            author = None
+            # Extract credit from alt text (format: "... | by author")
+            credit = ""
             if alt_text and '| by' in alt_text:
-                author = alt_text.split('| by')[-1].strip()
+                credit = alt_text.split('| by')[-1].strip()
             elif alt_text:
                 # Fallback: use the entire alt text if no "| by" pattern
-                author = alt_text.strip()
+                credit = alt_text.strip()
             
-            # If still no author, try to extract from URL
-            if not author:
-                url_match = re.search(r'/photos/([^/]+)/', flickr_url)
-                if url_match:
-                    author = url_match.group(1)
-            
-            return image_url, author or "Unknown"
+            return image_url, credit
         
         return None, None
     except Exception as e:
@@ -175,9 +169,8 @@ def apply_pending_change(log: DataChangeLog, *, user=None) -> DataChangeLog:
         
         if flickr_url:
             try:
-                # Extract image URL and author from Flickr page
-                image_url, author = _get_flickr_image_info(flickr_url)
-                print(f"DEBUG: Extracted image_url: {image_url}, author: {author}")
+                # Extract image URL and optional credit from Flickr page
+                image_url, credit = _get_flickr_image_info(flickr_url)
                 
                 if not image_url:
                     log.reason = "Could not extract image URL from Flickr page"
@@ -192,8 +185,7 @@ def apply_pending_change(log: DataChangeLog, *, user=None) -> DataChangeLog:
                 # Create the photo
                 photo = Photo()
                 photo.user = user
-                photo.author = author or "Unknown"  # Ensure author is never null
-                print(f"DEBUG: Setting photo author to: {photo.author}")
+                photo.credit = credit or ""
                 
                 # Save the image first to prevent automatic Flickr download
                 sha1 = hashlib.sha1(usedforsecurity=False)
@@ -202,11 +194,6 @@ def apply_pending_change(log: DataChangeLog, *, user=None) -> DataChangeLog:
                 
                 # Now set the flickr_url after image is saved to prevent automatic download
                 photo.flickr_url = flickr_url
-                
-                # Double-check author is set before saving
-                if not photo.author:
-                    photo.author = "Unknown"
-                    print(f"DEBUG: Author was null, setting to Unknown")
                 
                 photo.save()
                 photo.vehicles.add(instance)

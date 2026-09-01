@@ -2307,7 +2307,10 @@ class VehicleDetailView(DetailView):
                 vehicle=vehicle,
             )
             review.delete()
-        elif self.request.user.has_perm("photos.add_photo"):
+        elif (
+            self.request.user.has_perm("photos.add_photo")
+            or getattr(self.request.user, "trusted", False)
+        ) and "flickr_url" in self.request.POST:
             form = PhotoForm(self.request.POST)
             if form.is_valid():
                 try:
@@ -2316,7 +2319,6 @@ class VehicleDetailView(DetailView):
                     photo.flickr_url = form.cleaned_data["flickr_url"]
                     photo.credit = form.cleaned_data.get("credit", "")
                     photo.caption = form.cleaned_data.get("caption", "")
-                    photo.author = form.cleaned_data.get("author", "")
                     photo.save()  # This will trigger automatic download
                     photo.vehicles.add(vehicle)
                     messages.success(self.request, "Photo added successfully.")

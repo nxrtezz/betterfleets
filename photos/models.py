@@ -144,10 +144,6 @@ class Photo(models.Model):
             )
 
     def save(self, *args, **kwargs):
-        # Ensure author is never null
-        if not self.author:
-            self.author = "Unknown"
-        
         # Download from Flickr if URL is provided and no image exists
         should_download = self.flickr_url and not self.image
         super().save(*args, **kwargs)

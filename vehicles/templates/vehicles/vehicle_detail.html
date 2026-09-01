@@ -291,7 +291,7 @@
     </style>
     <script>
         function suggestPhoto() {
-            const flickrUrl = prompt("Enter Flickr photo URL:");
+            const flickrUrl = prompt("Requesting a photo that you do not have permission to use will result in a photo request ban. Please only request photos you either took yourself or have explicit permission to use. We will remove any photos that the Flickr poster asks us to.\n\nEnter Flickr photo URL:");
             if (flickrUrl) {
                 const formData = new FormData();
                 formData.append('suggest_photo', '1');
@@ -642,6 +642,11 @@
     {% endwith %}
 
     <h3 style="margin: 1rem 0 0.5rem;">Add photo (Flickr URL)</h3>
+    <p>
+        Requesting a photo that you do not have permission to use will result in a photo request ban.
+        Please only request photos you either took yourself or have explicit permission to use.
+        We will remove any photos that the Flickr poster asks us to.
+    </p>
     <form action="{{ request.path }}" method="POST" style="margin: 1rem 0;">
         {{ photo_form.as_p }}
         {% csrf_token %}
@@ -649,6 +654,11 @@
     </form>
     {% elif request.user.is_authenticated and request.user.trusted %}
     <h3 style="margin: 1rem 0 0.5rem;">Add photo (Flickr URL)</h3>
+    <p>
+        Requesting a photo that you do not have permission to use will result in a photo request ban.
+        Please only request photos you either took yourself or have explicit permission to use.
+        We will remove any photos that the Flickr poster asks us to.
+    </p>
     <form action="{{ request.path }}" method="POST" style="margin: 1rem 0;">
         <p>
             <label style="font-weight: bold;">Flickr URL:</label><br>

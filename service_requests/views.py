@@ -15,7 +15,7 @@ from .forms import RequestForm, RequestCommentForm, RequestStatusForm
 
 
 def get_flickr_image_url(flickr_url):
-    """Extract the actual image URL and author from a Flickr photo page."""
+    """Extract the actual image URL and optional credit from a Flickr photo page."""
     try:
         response = requests.get(flickr_url, timeout=10)
         response.raise_for_status()
@@ -31,21 +31,15 @@ def get_flickr_image_url(flickr_url):
             if image_url.startswith('//'):
                 image_url = 'https:' + image_url
             
-            # Extract author from alt text (format: "... | by author")
-            author = None
+            # Extract credit from alt text (format: "... | by author")
+            credit = ""
             if alt_text and '| by' in alt_text:
-                author = alt_text.split('| by')[-1].strip()
+                credit = alt_text.split('| by')[-1].strip()
             elif alt_text:
                 # Fallback: use the entire alt text if no "| by" pattern
-                author = alt_text.strip()
+                credit = alt_text.strip()
             
-            # If still no author, try to extract from URL
-            if not author:
-                url_match = re.search(r'/photos/([^/]+)/', flickr_url)
-                if url_match:
-                    author = url_match.group(1)
-            
-            return image_url, author or "Unknown"
+            return image_url, credit
         
         return None, None
     except Exception as e:
@@ -214,8 +208,8 @@ def change_status(request, request_id):
                     try:
                         from photos.models import Photo
                         
-                        # Extract the actual image URL and author from Flickr page
-                        image_url, author = get_flickr_image_url(req.photo_url)
+                        # Extract the actual image URL and optional credit from Flickr page
+                        image_url, credit = get_flickr_image_url(req.photo_url)
                         if not image_url:
                             messages.error(request, f"Request status changed to {new_status}, but could not extract image URL from Flickr page.")
                             return redirect("service_requests:detail", id=request_id)
@@ -227,7 +221,7 @@ def change_status(request, request_id):
                         # Create the photo
                         photo = Photo()
                         photo.user = request.user
-                        photo.author = author  # Set the author from alt text
+                        photo.credit = credit or ""
                         
                         # Extract photo ID for caption if possible
                         photo_id_match = re.search(r'/photos/[^/]+/(\d+)', req.photo_url)
