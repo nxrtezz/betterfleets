@@ -4,20 +4,33 @@
 
 {% block head %}
 <style>
-.request-shell { display:grid; gap:1.25rem; }
-.request-card { background:var(--background-color); border:1px solid var(--border-color); border-radius:1rem; padding:1.25rem; }
+.request-shell { display:grid; gap:1.5rem; }
+.request-card { background:var(--background-color); border:1px solid var(--border-color); border-radius:1rem; padding:1.5rem; }
 .request-tabs { display:flex; flex-wrap:wrap; gap:.65rem; padding:0; list-style:none; margin:0; }
 .request-tabs a, .request-tabs span { display:inline-flex; padding:.45rem .85rem; border-radius:999px; border:1px solid var(--border-color); text-decoration:none; color:var(--text-color); }
 .request-tabs a:hover { background:var(--brand-color-darker); }
-.request-form { display:grid; gap:1rem; }
-.request-form label { display:grid; gap:.35rem; font-weight:600; color:var(--text-color); }
-.request-form input, .request-form select, .request-form textarea { width:100%; max-width:100%; background:var(--background-color); color:var(--text-color); border:1px solid var(--border-color); }
-.request-list { list-style:none; padding:0; margin:0; display:grid; gap:.75rem; }
-.request-list li { border:1px solid var(--border-color); border-radius:.85rem; padding:1rem; background:var(--background-color); }
-.status-chip { display:inline-flex; padding:.2rem .6rem; border-radius:999px; background:var(--brand-color-darker); color:var(--button-foreground); }
+.request-form { display:grid; gap:1.25rem; }
+.request-form label { display:grid; gap:.5rem; font-weight:600; color:var(--text-color); }
+.request-form input[type="text"], .request-form input[type="number"], .request-form select, .request-form textarea { width:100%; padding:.75rem; border:1px solid var(--border-color); border-radius:.5rem; background:var(--background-color); color:var(--text-color); font-size:1rem; }
+.request-form input[type="text"]:focus, .request-form input[type="number"]:focus, .request-form select:focus, .request-form textarea:focus { outline:2px solid var(--brand-color); border-color:transparent; }
+.request-form small { font-weight:400; color:var(--text-color); opacity:0.7; font-size:0.875rem; }
+.request-form .checkbox-group { display:grid; gap:.75rem; }
+.request-form .checkbox-group > label { margin-bottom:.5rem; }
+.request-form .checkbox-group ul { list-style:none; padding:0; margin:0; display:grid; gap:.5rem; }
+.request-form .checkbox-group li { display:flex; align-items:center; gap:.75rem; padding:.75rem; border:1px solid var(--border-color); border-radius:.5rem; background:var(--background-color); }
+.request-form .checkbox-group li:hover { background:var(--brand-color-darker); }
+.request-form .checkbox-group input[type="checkbox"] { width:auto; margin:0; cursor:pointer; flex-shrink:0; }
+.request-form .checkbox-group li label { font-weight:500; margin:0; cursor:pointer; }
+.request-form button { padding:.75rem 1.5rem; font-size:1rem; }
+.request-form .field-error { color:var(--error-text); font-size:0.875rem; margin-top:.25rem; }
+.form-section { padding:1.25rem; border:1px solid var(--border-color); border-radius:.75rem; background:var(--background-color); }
+.form-section h3 { margin:0 0 1rem 0; font-size:1.1rem; color:var(--text-color); }
 
 @media (min-width: 48em) {
   .request-shell { grid-template-columns:minmax(0,1.15fr) minmax(18rem,.85fr); }
+  .request-form { grid-template-columns:1fr 1fr; gap:1.25rem; }
+  .request-form .full-width { grid-column:1 / -1; }
+  .request-form .checkbox-group { grid-column:1 / -1; }
 }
 </style>
 {% endblock %}
@@ -35,13 +48,66 @@
             </div>
         {% else %}
             <form method="POST" class="request-form">
-                {{ form.as_p }}
                 {% csrf_token %}
-                <div>
+                {% for field in form %}
+                    {% if field.name == 'features' or field.name == 'accessibility_features' %}
+                        <div class="checkbox-group full-width">
+                            <label>{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                        </div>
+                    {% elif field.name == 'operator' or field.name == 'vehicle_type' or field.name == 'colours' %}
+                        <div class="full-width">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                            {% if field.errors %}<div class="field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                    {% elif field.name == 'summary' %}
+                        <div class="full-width">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                            {% if field.errors %}<div class="field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                    {% else %}
+                        <div>
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                            {% if field.errors %}<div class="field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+                <div class="full-width">
                     <button type="submit" class="button">{{ submit_label }}</button>
                 </div>
             </form>
             {{ form.media }}
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Style checkboxes in CheckboxSelectMultiple widgets
+                    const checkboxGroups = document.querySelectorAll('.checkbox-group');
+                    checkboxGroups.forEach(group => {
+                        const checkboxList = group.querySelector('ul');
+                        if (checkboxList) {
+                            const checkboxes = checkboxList.querySelectorAll('li');
+                            checkboxes.forEach(li => {
+                                li.className = 'checkbox-item';
+                                const checkbox = li.querySelector('input[type="checkbox"]');
+                                const label = li.querySelector('label');
+                                if (checkbox && label) {
+                                    checkbox.style.width = 'auto';
+                                    checkbox.style.margin = '0';
+                                    checkbox.style.cursor = 'pointer';
+                                    label.style.margin = '0';
+                                    label.style.cursor = 'pointer';
+                                }
+                            });
+                        }
+                    });
+                });
+            </script>
         {% endif %}
     </section>
 </div>

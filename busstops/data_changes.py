@@ -1,15 +1,57 @@
 from __future__ import annotations
 
 import datetime
+import hashlib
+import re
 from decimal import Decimal
 from typing import Any
 
+import requests
 from django.apps import apps
 from django.contrib.gis.geos import GEOSGeometry
+from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
 from .models import DataChangeLog
+from photos.models import Photo, truncate_photo_text
+
+
+def _short_reason(message: str) -> str:
+    return str(message)[: DataChangeLog._meta.get_field("reason").max_length]
+
+
+def _get_flickr_image_info(flickr_url):
+    """Extract the actual image URL and optional credit from a Flickr photo page."""
+    try:
+        response = requests.get(flickr_url, timeout=10)
+        response.raise_for_status()
+        
+        # Use regex to find the image URL and alt text in the noscript tag
+        # Pattern to match: <img src="..." alt="...">
+        pattern = r'<img[^>]*src=["\']([^"\']*staticflickr[^"\']*)["\'][^>]*alt=["\']([^"\']*)["\']'
+        matches = re.findall(pattern, response.text)
+        
+        if matches:
+            image_url, alt_text = matches[0]
+            # Ensure it has the protocol
+            if image_url.startswith('//'):
+                image_url = 'https:' + image_url
+            
+            # Extract credit from alt text (format: "... | by author")
+            credit = ""
+            if alt_text and '| by' in alt_text:
+                credit = alt_text.split('| by')[-1].strip()
+            elif alt_text:
+                # Fallback: use the entire alt text if no "| by" pattern
+                credit = alt_text.strip()
+            
+            return image_url, credit
+        
+        return None, None
+    except Exception as e:
+        print(f"Error extracting Flickr image info: {e}")
+        return None, None
 
 
 def target_model_label(instance: Any) -> str:
@@ -121,6 +163,62 @@ def _coerce_field_value(instance: Any, field_name: str, value: Any) -> tuple[str
 @transaction.atomic
 def apply_pending_change(log: DataChangeLog, *, user=None) -> DataChangeLog:
     if log.status != DataChangeLog.STATUS_PENDING:
+        return log
+
+    # Handle photo suggestions specially
+    if log.operation == "add_photo" and log.source == "photo_suggestion":
+        model = apps.get_model(log.target_model)
+        instance = model._default_manager.select_for_update().get(pk=log.target_pk)
+        flickr_url = (log.payload or {}).get("flickr_url")
+        
+        if flickr_url:
+            try:
+                # Extract image URL and optional credit from Flickr page
+                image_url, credit = _get_flickr_image_info(flickr_url)
+                
+                if not image_url:
+                    log.reason = _short_reason(
+                        "Could not extract image URL from Flickr page"
+                    )
+                    log.status = DataChangeLog.STATUS_REJECTED
+                    log.save(update_fields=["status", "reason"])
+                    return log
+                
+                # Download the image
+                image_response = requests.get(image_url, timeout=10)
+                image_response.raise_for_status()
+                
+                with transaction.atomic():
+                    # Create the photo
+                    photo = Photo()
+                    photo.user = user
+                    photo.author = ""
+                    photo.credit = truncate_photo_text(credit)
+
+                    # Save the image first to prevent automatic Flickr download
+                    sha1 = hashlib.sha1(usedforsecurity=False)
+                    sha1.update(image_response.content)
+                    photo.image.save(
+                        f"{sha1.hexdigest()}.jpg",
+                        ContentFile(image_response.content),
+                    )
+
+                    # Now set the flickr_url after image is saved to prevent automatic download
+                    photo.flickr_url = flickr_url
+
+                    photo.save()
+                    photo.vehicles.add(instance)
+            except Exception as e:
+                # Log the error but don't fail the entire transaction
+                log.reason = _short_reason(f"Failed to download photo: {e}")
+                log.status = DataChangeLog.STATUS_REJECTED
+                log.save(update_fields=["status", "reason"])
+                return log
+        
+        log.status = DataChangeLog.STATUS_APPLIED
+        log.approved_by = user
+        log.applied_at = timezone.now()
+        log.save(update_fields=["status", "approved_by", "applied_at"])
         return log
 
     model = apps.get_model(log.target_model)

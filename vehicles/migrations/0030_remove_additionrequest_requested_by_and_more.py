@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('busstops', '0028_routenotice'),
+        ('busstops', '0028_route_notice'),
         ('bustimes', '0014_garage_fleet_metadata'),
         ('vehicles', '0029_historicalvehicle_alter_additionrequest_id_and_more'),
     ]

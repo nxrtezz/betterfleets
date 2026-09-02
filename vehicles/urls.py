@@ -2,16 +2,13 @@ from django.urls import path
 from django.views.generic.base import TemplateView
 
 from . import views
+from . import management_views
 from fleet import views as fleet_views
 
 urlpatterns = [
     path("dashboard", views.dashboard_home, name="dashboard_home"),
+    path("events", views.events, name="events"),
     path("bus-groups/<slug:slug>", views.bus_group_detail, name="bus_group_detail"),
-    path(
-        "bus-groups/<slug:slug>/vehicle-search",
-        views.bus_group_vehicle_search,
-        name="bus_group_vehicle_search",
-    ),
     path("staff/reviews", views.review_moderation, name="review_moderation"),
     path(
         "dashboard/add/<str:app_label>/<str:model_name>",
@@ -19,6 +16,12 @@ urlpatterns = [
         name="dashboard_add_model",
     ),
     path("requests", views.requests_home, name="requests_home"),
+    path("requests/report-bug", views.report_bug, name="report_bug"),
+    path("requests/generic", views.generic_request_page, name="generic_request_page"),
+    # AdditionRequest model was removed - these URL patterns are no longer functional
+    # path("requests/hub", management_views.request_hub, name="request_hub"),
+    # path("requests/<str:request_type>", management_views.addition_request_page, name="addition_request_page"),
+    # path("requests/review", management_views.addition_request_review, name="addition_request_review"),
     path("requests/vehicle", views.request_new_vehicle, name="request_vehicle"),
     path("requests/service", views.request_new_service, name="request_service"),
     path("requests/operator", views.request_new_operator, name="request_operator"),

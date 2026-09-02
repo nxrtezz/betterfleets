@@ -42,17 +42,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="garage",
-            name="address",
-            field=models.CharField(blank=True, max_length=255),
-        ),
-        migrations.AddField(
-            model_name="garage",
-            name="location",
-            field=django.contrib.gis.db.models.fields.PointField(
-                blank=True, null=True, srid=4326
-            ),
-        ),
         migrations.RunPython(copy_legacy_depots_to_garages, migrations.RunPython.noop),
     ]

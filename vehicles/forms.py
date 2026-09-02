@@ -4,7 +4,7 @@ from django.contrib.admin.widgets import AutocompleteSelect
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 
-from busstops.models import Manufacturer, Operator, OperatorVehicleColumn
+from busstops.models import Manufacturer, Operator, OperatorGroup, OperatorVehicleColumn, Region
 from bustimes.models import Garage
 
 from .fields import validate_colours
@@ -30,12 +30,6 @@ class PhotoForm(forms.Form):
         max_length=255,
         required=False,
         help_text="Photo caption (optional, will be auto-filled from Flickr if not provided)"
-    )
-    author = forms.CharField(
-        label="Author",
-        max_length=255,
-        required=False,
-        help_text="Photo author (optional, will be auto-filled from Flickr if not provided)"
     )
 
     def clean_flickr_url(self):
@@ -259,7 +253,7 @@ class EditVehicleForm(OperatorVehicleColumnFieldsMixin, AdvancedFieldsMixin, for
         widget=AutocompleteWidget(field=Vehicle.operated_by.field),
         required=False,
         empty_label="",
-        help_text="Operator that operates this vehicle (if different from the owner)",
+        help_text="Loan operator (if this vehicle is on loan to a different operator)",
     )
     garage = forms.ModelChoiceField(
         queryset=Garage.objects,
@@ -535,7 +529,7 @@ link to a picture to prove it. Be polite.""",
         if vehicle.fleet_code:
             self.fields["fleet_number"].initial = vehicle.fleet_code
         elif vehicle.fleet_number is not None:
-            self.fields["fleet_number"].intial = str(vehicle.fleet_number)
+            self.fields["fleet_number"].initial = str(vehicle.fleet_number)
 
         if vehicle.vehicle_type_id and not vehicle.is_spare_ticket_machine():
             if "spare_ticket_machine" in self.fields:
@@ -597,15 +591,19 @@ link to a picture to prove it. Be polite.""",
             self.order_fields(ordered_fields)
         
         if getattr(self, 'advanced_field_fields', None):
-            ordered_fields = [name for name in self.field_order if name in self.fields]
-            advanced_field_names = list(self.advanced_field_fields)
-            if "summary" in ordered_fields:
-                ordered_fields.remove("summary")
-                ordered_fields.extend(advanced_field_names)
-                ordered_fields.append("summary")
-            else:
-                ordered_fields.extend(advanced_field_names)
-            self.order_fields(ordered_fields)
+            # Get all current field names
+            current_field_names = list(self.fields.keys())
+            advanced_field_names = list(self.advanced_field_fields.keys())
+            
+            # Build the new order: basic fields first, then advanced fields, then summary
+            basic_fields = [name for name in current_field_names if not name.startswith(self.advanced_field_prefix) and name != "summary"]
+            new_order = basic_fields + advanced_field_names
+            
+            # Add summary at the end if it exists
+            if "summary" in current_field_names:
+                new_order.append("summary")
+            
+            self.order_fields(new_order)
 
 
 class DebuggerForm(forms.Form):
@@ -860,6 +858,32 @@ class NewServiceRequestForm(forms.Form):
 class NewOperatorRequestForm(forms.Form):
     noc = forms.CharField(label="Operator code (NOC)", max_length=10)
     name = forms.CharField(max_length=100, label="Operator name")
+    logo = forms.URLField(required=False, label="Logo URL", help_text="URL to operator logo image")
+    vehicle_mode = forms.ChoiceField(
+        required=False,
+        choices=[
+            ("", "Select vehicle mode"),
+            ("bus", "Bus"),
+            ("coach", "Coach"),
+            ("tram", "Tram"),
+            ("train", "Train"),
+            ("ferry", "Ferry"),
+            ("other", "Other"),
+        ],
+        label="Vehicle mode"
+    )
+    group = forms.ModelChoiceField(
+        queryset=OperatorGroup.objects.order_by("name"),
+        required=False,
+        empty_label="Select operator group",
+        label="Operator group"
+    )
+    region = forms.ModelChoiceField(
+        queryset=Region.objects.order_by("name"),
+        required=False,
+        empty_label="Select region",
+        label="Region"
+    )
     summary = SummaryField(
         max_length=255,
         help_text="Explain what should be added and provide any useful evidence.",
@@ -882,6 +906,38 @@ class NewVehicleModelRequestForm(forms.Form):
     summary = SummaryField(
         max_length=255,
         help_text="Explain the model that should be added and any supporting details.",
+    )
+
+
+class GenericRequestForm(forms.Form):
+    category = forms.ChoiceField(
+        choices=[
+            ("", "Select category"),
+            ("feature", "Feature Request"),
+            ("improvement", "Improvement"),
+            ("correction", "Data Correction"),
+            ("other", "Other"),
+        ],
+        required=True,
+        label="Category"
+    )
+    title = forms.CharField(max_length=255, label="Title", required=True)
+    description = forms.CharField(
+        widget=forms.Textarea,
+        label="Description",
+        required=True,
+        help_text="Please provide details about your request"
+    )
+    priority = forms.ChoiceField(
+        choices=[
+            ("", "Select priority"),
+            ("low", "Low"),
+            ("medium", "Medium"),
+            ("high", "High"),
+            ("urgent", "Urgent"),
+        ],
+        required=True,
+        label="Priority"
     )
 
 
@@ -922,3 +978,50 @@ class SornVehicleFilterForm(forms.Form):
         label="Awaiting delivery only", required=False
     )
     demonstrator_only = forms.BooleanField(label="Demonstrator only", required=False)
+
+
+# Aliases for management_views.py compatibility
+VehicleRequestForm = NewVehicleRequestForm
+OperatorRequestForm = NewOperatorRequestForm
+VehicleTypeRequestForm = NewVehicleModelRequestForm
+
+
+class LiveryRequestForm(forms.Form):
+    name = forms.CharField(max_length=255, label="Livery name")
+    colour = forms.CharField(max_length=7, label="Primary colour", help_text="Hex code e.g. #0055aa")
+    colours = forms.CharField(max_length=255, label="Colours", help_text="Space-separated hex codes e.g. #0055aa #ffffff")
+    summary = SummaryField(
+        max_length=255,
+        help_text="Explain the livery that should be added and any supporting details.",
+    )
+
+
+class GarageRequestForm(forms.Form):
+    operator = forms.ModelChoiceField(
+        queryset=Operator.objects.order_by("name"),
+        required=True,
+        label="Operator",
+    )
+    name = forms.CharField(max_length=255, label="Garage name")
+    code = forms.CharField(max_length=10, label="Garage code")
+    summary = SummaryField(
+        max_length=255,
+        help_text="Explain the garage that should be added and any supporting details.",
+    )
+
+
+class LiveFleetBulkImportForm(forms.Form):
+    operator = forms.ModelChoiceField(
+        queryset=Operator.objects.order_by("name"),
+        required=True,
+        label="Operator",
+    )
+    bulk_text = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 10, "placeholder": "Paste tab-separated vehicle data here..."}),
+        help_text="Paste vehicle data from the template or export",
+    )
+    workbook = forms.FileField(
+        required=False,
+        help_text="Or upload a completed .xlsx or .csv file",
+    )

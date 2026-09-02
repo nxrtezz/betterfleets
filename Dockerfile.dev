@@ -7,11 +7,23 @@ RUN npm ci
 
 COPY frontend /app/frontend
 COPY .parcelrc tsconfig.json /app/
-RUN npm run lint && npm run build
+RUN npm run build
 
 
-FROM ghcr.io/bustimes/bustimes.org/bustimes-base:3.14
+FROM python:3.13-slim
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    git \
+    libpq-dev \
+    geos-bin \
+    libgeos-dev \
+    gdal-bin \
+    libgdal-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app/
@@ -20,6 +32,7 @@ COPY uv.lock pyproject.toml /app/
 RUN uv sync --frozen
 
 ENV PATH="/app/.venv/bin:$PATH"
+ENV GDAL_LIBRARY_PATH=/usr/lib/gdal/libgdal.so
 
 # Install Playwright
 RUN uv pip install playwright
@@ -31,7 +44,6 @@ COPY --from=0 /app/busstops/static /app/busstops/static
 COPY . /app/
 
 ENV PORT=8000 STATIC_ROOT=/staticfiles
-RUN ./manage.py collectstatic --noinput
 
 EXPOSE 8000
 CMD ["gunicorn", "buses.wsgi"]

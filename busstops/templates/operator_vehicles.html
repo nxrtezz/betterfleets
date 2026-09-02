@@ -40,6 +40,94 @@
             border-color: var(--link-color);
             box-shadow: 0 0 0 1px var(--link-color);
         }
+
+        .fleet-filters {
+            margin: 0.75rem 0;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.25rem;
+            background: var(--background-color);
+        }
+
+        .filter-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: flex-end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+            min-width: 120px;
+        }
+
+        .filter-group label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .filter-group select {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.25rem;
+            background: var(--background-color);
+            color: var(--text-color);
+            font-size: 0.875rem;
+        }
+
+        .filter-group select:focus {
+            outline: 2px solid var(--link-color);
+            outline-offset: 1px;
+        }
+
+        .filter-form .button {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.25rem;
+            background: var(--link-color);
+            color: white;
+            font-size: 0.875rem;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .filter-form .button.secondary {
+            background: var(--border-color);
+            color: var(--text-color);
+        }
+
+        .filter-form .button:hover {
+            opacity: 0.9;
+        }
+
+        @media (max-width: 768px) {
+            .filter-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-group {
+                min-width: 100%;
+            }
+
+            .filter-form .button {
+                width: 100%;
+            }
+        }
+
+        /* Zebra striping for fleet table */
+        table.fleet tbody tr:nth-child(even) {
+            background-color: var(--table-row-alt-background, rgba(0, 0, 0, 0.03));
+        }
+
+        @media (prefers-color-scheme: dark) {
+            table.fleet tbody tr:nth-child(even) {
+                background-color: var(--table-row-alt-background, rgba(255, 255, 255, 0.05));
+            }
+        }
     </style>
 {% endblock head %}
 
@@ -178,6 +266,64 @@
 {% if active_operator_tab == 'depots' and not parent %}
     {% include 'includes/depot_section.html' with depot_section_class='' depot_map_html=depot_map_html %}
 {% else %}
+{% if not historical and not parent %}
+<div class="fleet-filters">
+    <form method="GET" action="{{ object.get_vehicles_url }}" class="filter-form">
+        {% if available_liveries %}
+        <div class="filter-group">
+            <label for="livery-filter">Livery</label>
+            <select id="livery-filter" name="livery">
+                <option value="">All liveries</option>
+                {% for livery in available_liveries %}
+                <option value="{{ livery.id }}" {% if selected_livery and selected_livery.id == livery.id %}selected{% endif %}>{{ livery.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        
+        {% if available_vehicle_types %}
+        <div class="filter-group">
+            <label for="type-filter">Type</label>
+            <select id="type-filter" name="vehicle_type">
+                <option value="">All types</option>
+                {% for vehicle_type in available_vehicle_types %}
+                <option value="{{ vehicle_type.id }}" {% if selected_vehicle_type and selected_vehicle_type.id == vehicle_type.id %}selected{% endif %}>{{ vehicle_type.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        
+        {% if available_garages %}
+        <div class="filter-group">
+            <label for="garage-filter">Garage</label>
+            <select id="garage-filter" name="garage">
+                <option value="">All garages</option>
+                {% for garage in available_garages %}
+                <option value="{{ garage.id }}" {% if selected_garage and selected_garage.id == garage.id %}selected{% endif %}>{{ garage.name|default:garage.code }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        
+        <div class="filter-group">
+            <label for="sort-filter">Sort by</label>
+            <select id="sort-filter" name="sort">
+                <option value="">Default</option>
+                <option value="fleet_number_asc" {% if request.GET.sort == 'fleet_number_asc' %}selected{% endif %}>Fleet number (ascending)</option>
+                <option value="fleet_number_desc" {% if request.GET.sort == 'fleet_number_desc' %}selected{% endif %}>Fleet number (descending)</option>
+                <option value="type_asc" {% if request.GET.sort == 'type_asc' %}selected{% endif %}>Type (ascending)</option>
+                <option value="type_desc" {% if request.GET.sort == 'type_desc' %}selected{% endif %}>Type (descending)</option>
+                <option value="age_asc" {% if request.GET.sort == 'age_asc' %}selected{% endif %}>Year of manufacture (oldest first)</option>
+                <option value="age_desc" {% if request.GET.sort == 'age_desc' %}selected{% endif %}>Year of manufacture (newest first)</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="button">Apply filters</button>
+        <a href="{{ object.get_vehicles_url }}" class="button secondary">Clear filters</a>
+    </form>
+</div>
+{% endif %}
+
 <div class="table-wrapper">
 {% if mass_log_mode %}
 <form action="{{ request.get_full_path }}" method="POST">
@@ -227,18 +373,24 @@
                     </td>
                 {% endif %}
                 <td class="tabular"{% if not vehicle.reg %} colspan="2"{% endif %}>
-                    <a href="{{ vehicle.get_fleet_code_url }}"{% if vehicle.vehicle_type.style == "train" and vehicle.fleet_code %} target="_blank" rel="noopener"{% endif %}>
+                    <a href="{{ vehicle.get_fleet_code_url }}"{% if vehicle.vehicle_type.style == "train" and vehicle.fleet_code %} target="_blank" rel="noopener"{% endif %}
+                       {% if vehicle.operated_by %}
+                           title="{% if vehicle.operator_id == object.id %}On loan to {{ vehicle.operated_by }}{% else %}On loan from {{ vehicle.operator }}{% endif %}"
+                       {% endif %}>
                         {% if vehicle.fleet_code or vehicle.fleet_number %}
-                            {% firstof vehicle.fleet_code vehicle.fleet_number %}
+                            {% if vehicle.operated_by %}<em>{% firstof vehicle.fleet_code vehicle.fleet_number %}</em>{% else %}{% firstof vehicle.fleet_code vehicle.fleet_number %}{% endif %}
                         {% elif not vehicle.reg %}
-                            {{ vehicle.code }}
+                            {% if vehicle.operated_by %}<em>{{ vehicle.code }}</em>{% else %}{{ vehicle.code }}{% endif %}
                         {% endif %}
                     </a>
                 </td>
                 {% if vehicle.reg %}
                     <td>
-                        <a href="{{ vehicle.get_absolute_url }}" class="reg">
-                            {% if vehicle.preserved %}<em>{{ vehicle.get_reg }}</em>{% else %}{{ vehicle.get_reg }}{% endif %}
+                        <a href="{{ vehicle.get_absolute_url }}" class="reg"
+                           {% if vehicle.operated_by %}
+                           title="{% if vehicle.operator_id == object.id %}On loan to {{ vehicle.operated_by }}{% else %}On loan from {{ vehicle.operator }}{% endif %}"
+                           {% endif %}>
+                            {% if vehicle.preserved or vehicle.operated_by %}<em>{{ vehicle.get_reg }}</em>{% else %}{{ vehicle.get_reg }}{% endif %}
                         </a>
                     </td>
                 {% endif %}

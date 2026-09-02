@@ -4,20 +4,89 @@
 
 {% block bodyclass %}narrow{% endblock %}
 
+{% block head %}
+<style>
+.request-shell { display:grid; gap:1.5rem; }
+.request-card { background:var(--background-color); border:1px solid var(--border-color); border-radius:1rem; padding:1.5rem; }
+.request-tabs { display:flex; flex-wrap:wrap; gap:.65rem; padding:0; list-style:none; margin:0; }
+.request-tabs a, .request-tabs span { display:inline-flex; padding:.45rem .85rem; border-radius:999px; border:1px solid var(--border-color); text-decoration:none; color:var(--text-color); }
+.request-tabs a:hover { background:var(--brand-color-darker); }
+.request-form { display:grid; gap:1.25rem; max-width:600px; }
+.request-form label { display:grid; gap:.5rem; font-weight:600; color:var(--text-color); }
+.request-form select, .request-form input, .request-form textarea { width:100%; padding:.75rem; border:1px solid var(--border-color); border-radius:.5rem; background:var(--background-color); color:var(--text-color); font-size:1rem; }
+.request-form select:focus, .request-form input:focus, .request-form textarea:focus { outline:2px solid var(--brand-color); border-color:transparent; }
+.request-form small { font-weight:400; color:var(--text-color); opacity:0.7; font-size:0.875rem; }
+.request-form button { padding:.75rem 1.5rem; font-size:1rem; }
+.success-message { background:var(--success-background); color:var(--success-text); padding:1rem; border-radius:.5rem; margin-bottom:1rem; }
+.error-message { background:var(--error-background); color:var(--error-text); padding:1rem; border-radius:.5rem; margin-bottom:1rem; }
+.form-section { margin-bottom:2rem; }
+.form-section h2 { margin:0 0 1rem 0; }
+</style>
+{% endblock %}
+
 {% block content %}
 
-<h1>Requests</h1>
+<div class="request-shell">
+    <section class="request-card">
+        <h1>Requests</h1>
 
-<ul class="horizontal">
-    <li><a href="{% url 'request_vehicle' %}">Vehicle</a></li>
-    <li><a href="{% url 'request_service' %}">Service</a></li>
-    <li><a href="{% url 'request_operator' %}">Operator</a></li>
-    <li><a href="{% url 'request_vehicle_model' %}">Vehicle Model</a></li>
-</ul>
+        <ul class="request-tabs">
+            <li><a href="{% url 'request_vehicle' %}">Vehicle</a></li>
+            <li><a href="{% url 'request_service' %}">Service</a></li>
+            <li><a href="{% url 'request_operator' %}">Operator</a></li>
+            <li><a href="{% url 'request_vehicle_model' %}">Vehicle Model</a></li>
+            <li><a href="#generic-request">Generic Request</a></li>
+        </ul>
+    </section>
 
-{% if entries %}
-    <h2>Recent requests</h2>
-    {% include 'revision_feed.html' with entries=entries %}
-{% endif %}
+    <section class="request-card form-section">
+        <h2>Report a Bug</h2>
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+        {% if success %}
+        <div class="success-message">{{ success }}</div>
+        {% endif %}
+        <form method="post" action="{% url 'report_bug' %}">
+            {% csrf_token %}
+            <div class="request-form">
+                <label for="category">
+                    Category
+                    <select name="category" id="category" required>
+                        <option value="">Select a category</option>
+                        <option value="ui">UI/UX</option>
+                        <option value="data">Data Issue</option>
+                        <option value="performance">Performance</option>
+                        <option value="security">Security</option>
+                        <option value="other">Other</option>
+                    </select>
+                </label>
+                <label for="severity">
+                    Severity (1-10)
+                    <input type="number" name="severity" id="severity" min="1" max="10" required>
+                    <small>1 = minor, 10 = critical</small>
+                </label>
+                <label for="summary">
+                    Summary
+                    <textarea name="summary" id="summary" rows="4" required></textarea>
+                </label>
+                <button type="submit" class="button">Submit Bug Report</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="request-card form-section" id="generic-request">
+        <h2>Generic Request</h2>
+        <p>Have a feature request, improvement idea, or data correction? Submit it here.</p>
+        <a href="{% url 'generic_request_page' %}" class="button">Submit Generic Request</a>
+    </section>
+
+    {% if entries %}
+    <section class="request-card">
+        <h2>Recent requests</h2>
+        {% include 'revision_feed.html' with entries=entries %}
+    </section>
+    {% endif %}
+</div>
 
 {% endblock content %}

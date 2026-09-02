@@ -13,7 +13,7 @@ from django.db.models import Q
 from django.urls import reverse
 
 from bustimes.models import Garage
-from vehicles.models import HistoricalFleet, HistoricalVehicle, Livery, Vehicle, VehicleType
+from vehicles.models import HistoricalVehicle, Livery, Vehicle, VehicleType
 
 COLUMN_KEYS = (
     "noc",
@@ -270,62 +270,67 @@ def build_historical_vehicles(
     return instances, errors
 
 
-def build_vehicles(
-    fleet: HistoricalFleet,
-    rows: list[list[str]],
-) -> tuple[list[Vehicle], list[str]]:
-    instances: list[Vehicle] = []
-    errors: list[str] = []
-    livery_cache: dict[str, int | None] = {}
-    op_id = fleet.operator_id
-    for line_no, cells in enumerate(rows, start=1):
-        if not any((c or "").strip() for c in cells):
-            continue
-        fn, err = _parse_fleet_number(cells[0])
-        if err:
-            errors.append(f"Line {line_no}: {err}")
-            continue
-        d = dict(zip(COLUMN_KEYS, cells, strict=True))
-        livery_id = _resolve_livery_id(op_id, d["livery_name"], livery_cache)
-        code = (
-            (d["code"] or "").strip()
-            or (d["fleet_code"] or "").strip()
-            or (str(fn) if fn is not None else "")
-            or (d["reg"] or "").strip()
-        )
-        if not code:
-            code = f"row-{line_no}"
+# NOTE: The following functions are not currently used in the codebase
+# and were written for a HistoricalFleet feature that appears to have been removed.
+# They are kept here for reference but commented out to avoid import errors.
 
-        v = Vehicle(
-            operator_id=op_id,
-            historical_fleet_id=fleet.id,
-            fleet_number=fn,
-            fleet_code=(d["fleet_code"] or "")[:24],
-            reg=(d["reg"] or "")[:24],
-            code=code[:255],
-            branding=(d["branding"] or "")[:255],
-            name=(d["name"] or "")[:255],
-            notes=(d["notes"] or "")[:255],
-            livery_id=livery_id,
-            colours=(d["colours"] or "")[:255],
-            slug=(d["slug"] or "")[:255],
-        )
-        vtn = (d["vehicle_type_name"] or "").strip()
-        if vtn:
-            vt = VehicleType.objects.filter(name__iexact=vtn).first()
-            if vt:
-                v.vehicle_type_id = vt.pk
-        gn = (d["garage_name"] or "").strip()
-        if gn:
-            g = (
-                Garage.objects.filter(operators=op_id)
-                .filter(Q(name__iexact=gn) | Q(code__iexact=gn))
-                .first()
-            )
-            if g:
-                v.garage_id = g.id
-        instances.append(v)
-    return instances, errors
+# def build_vehicles(
+#     fleet_id: int,
+#     operator_id: str,
+#     rows: list[list[str]],
+# ) -> tuple[list[Vehicle], list[str]]:
+#     instances: list[Vehicle] = []
+#     errors: list[str] = []
+#     livery_cache: dict[str, int | None] = {}
+#     op_id = operator_id
+#     for line_no, cells in enumerate(rows, start=1):
+#         if not any((c or "").strip() for c in cells):
+#             continue
+#         fn, err = _parse_fleet_number(cells[0])
+#         if err:
+#             errors.append(f"Line {line_no}: {err}")
+#             continue
+#         d = dict(zip(COLUMN_KEYS, cells, strict=True))
+#         livery_id = _resolve_livery_id(op_id, d["livery_name"], livery_cache)
+#         code = (
+#             (d["code"] or "").strip()
+#             or (d["fleet_code"] or "").strip()
+#             or (str(fn) if fn is not None else "")
+#             or (d["reg"] or "").strip()
+#         )
+#         if not code:
+#             code = f"row-{line_no}"
+
+#         v = Vehicle(
+#             operator_id=op_id,
+#             historical_fleet_id=fleet_id,
+#             fleet_number=fn,
+#             fleet_code=(d["fleet_code"] or "")[:24],
+#             reg=(d["reg"] or "")[:24],
+#             code=code[:255],
+#             branding=(d["branding"] or "")[:255],
+#             name=(d["name"] or "")[:255],
+#             notes=(d["notes"] or "")[:255],
+#             livery_id=livery_id,
+#             colours=(d["colours"] or "")[:255],
+#             slug=(d["slug"] or "")[:255],
+#         )
+#         vtn = (d["vehicle_type_name"] or "").strip()
+#         if vtn:
+#             vt = VehicleType.objects.filter(name__iexact=vtn).first()
+#             if vt:
+#                 v.vehicle_type_id = vt.pk
+#         gn = (d["garage_name"] or "").strip()
+#         if gn:
+#             g = (
+#                 Garage.objects.filter(operators=op_id)
+#                 .filter(Q(name__iexact=gn) | Q(code__iexact=gn))
+#                 .first()
+#             )
+#             if g:
+#                 v.garage_id = g.id
+#         instances.append(v)
+#     return instances, errors
 
 
 def build_live_vehicles(operator, rows: list[list[str]]):
@@ -431,20 +436,24 @@ def bulk_import_historical_vehicles(operator_id: str, text: str) -> tuple[int, l
     return len(instances), row_errors
 
 
-def bulk_import_vehicles(fleet: HistoricalFleet, text: str) -> tuple[int, list[str]]:
-    """Returns (created_count, error_messages)."""
-    rows, parse_err = parse_pasted_rows(text)
-    if parse_err:
-        return 0, [parse_err]
-    instances, row_errors = build_vehicles(fleet, rows)
-    if not instances and not row_errors:
-        return 0, ["No valid vehicle rows to import."]
-    if row_errors and not instances:
-        return 0, row_errors
-    with transaction.atomic():
-        for v in instances:
-            v.save()
-    return len(instances), row_errors
+# NOTE: The following functions are not currently used in the codebase
+# and were written for a HistoricalFleet feature that appears to have been removed.
+# They are kept here for reference but commented out to avoid import errors.
+
+# def bulk_import_vehicles(fleet_id: int, operator_id: str, text: str) -> tuple[int, list[str]]:
+#     """Returns (created_count, error_messages)."""
+#     rows, parse_err = parse_pasted_rows(text)
+#     if parse_err:
+#         return 0, [parse_err]
+#     instances, row_errors = build_vehicles(fleet_id, operator_id, rows)
+#     if not instances and not row_errors:
+#         return 0, ["No valid vehicle rows to import."]
+#     if row_errors and not instances:
+#         return 0, row_errors
+#     with transaction.atomic():
+#         for v in instances:
+#             v.save()
+#     return len(instances), row_errors
 
 
 def bulk_import_live_vehicles(operator, text: str):
@@ -499,35 +508,39 @@ def rows_text_from_uploaded_workbook(uploaded_file) -> str:
     return output.getvalue()
 
 
-def export_fleet_rows(fleet: HistoricalFleet) -> list[tuple]:
-    """Rows matching :data:`COLUMN_KEYS` for spreadsheet export."""
-    rows = []
-    qs = fleet.vehicles.select_related("vehicle_type", "garage", "livery").order_by(
-        "fleet_number", "fleet_code", "reg", "id"
-    )
-    for v in qs:
-        vt_name = v.vehicle_type.name if v.vehicle_type_id else ""
-        livery_label = v.livery.name if v.livery_id else ""
-        garage_label = ""
-        if v.garage_id:
-            garage_label = (v.garage.name or v.garage.code or "").strip()
-        rows.append(
-            (
-                v.fleet_number if v.fleet_number is not None else "",
-                v.fleet_code or "",
-                v.reg or "",
-                v.code or "",
-                v.branding or "",
-                v.name or "",
-                v.notes or "",
-                vt_name,
-                livery_label,
-                v.colours or "",
-                garage_label,
-                v.slug or "",
-            )
-        )
-    return rows
+# NOTE: The following function is not currently used in the codebase
+# and was written for a HistoricalFleet feature that appears to have been removed.
+# It is kept here for reference but commented out to avoid import errors.
+
+# def export_fleet_rows(fleet_id: int) -> list[tuple]:
+#     """Rows matching :data:`COLUMN_KEYS` for spreadsheet export."""
+#     rows = []
+#     qs = Vehicle.objects.filter(historical_fleet_id=fleet_id).select_related("vehicle_type", "garage", "livery").order_by(
+#         "fleet_number", "fleet_code", "reg", "id"
+#     )
+#     for v in qs:
+#         vt_name = v.vehicle_type.name if v.vehicle_type_id else ""
+#         livery_label = v.livery.name if v.livery_id else ""
+#         garage_label = ""
+#         if v.garage_id:
+#             garage_label = (v.garage.name or v.garage.code or "").strip()
+#         rows.append(
+#             (
+#                 v.fleet_number if v.fleet_number is not None else "",
+#                 v.fleet_code or "",
+#                 v.reg or "",
+#                 v.code or "",
+#                 v.branding or "",
+#                 v.name or "",
+#                 v.notes or "",
+#                 vt_name,
+#                 livery_label,
+#                 v.colours or "",
+#                 garage_label,
+#                 v.slug or "",
+#             )
+#         )
+#     return rows
 
 
 def export_operator_fleet_rows(operator) -> list[tuple]:

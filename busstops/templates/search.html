@@ -8,7 +8,7 @@
 
 <h1>Search</h1>
 
-<p>Search operators, vehicles, preservation groups and users</p>
+<p>Search operators, vehicles, and preservation groups{% if request.user.is_authenticated %}, and users{% endif %}</p>
 
 <form method="get" action="/search" class="search">
 
@@ -46,6 +46,21 @@
     </ul>
     {% endif %}
 
+    {% if request.user.is_authenticated and users %}
+        <h2>{{ users|length }} user{{ users|length|pluralize }}</h2>
+
+        <ul class="has-smalls">
+            {% for result in users %}
+                <li>
+                    <a href="{{ result.get_absolute_url }}">
+                        <span>{{ result.get_display_name }}</span>
+                        <small>@{{ result.get_username_display }} · {{ result.total_count }} edit{{ result.total_count|pluralize }} · {{ result.review_count }} review{{ result.review_count|pluralize }}</small>
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
     {% if preservation_groups %}
         <h2>{{ preservation_groups|length }} preservation group{{ preservation_groups|length|pluralize }}</h2>
 
@@ -55,21 +70,6 @@
                     <a href="{{ result.get_absolute_url }}">
                         <span>{{ result.name }}</span>
                         <small>{{ result.vehicle_count }} preserved vehicle{{ result.vehicle_count|pluralize }}</small>
-                    </a>
-                </li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-
-    {% if users %}
-        <h2>{{ users|length }} user{{ users|length|pluralize }}</h2>
-
-        <ul class="has-smalls">
-            {% for result in users %}
-                <li>
-                    <a href="{{ result.get_absolute_url }}">
-                        <span>{{ result.get_display_name }}</span>
-                        <small>@{{ result.get_username_display }} · {{ result.total_count }} edit{{ result.total_count|pluralize }} · {{ result.review_count }} review{{ result.review_count|pluralize }}</small>
                     </a>
                 </li>
             {% endfor %}

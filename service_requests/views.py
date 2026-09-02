@@ -5,9 +5,46 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import ListView, DetailView, CreateView, UpdateView
 from django.urls import reverse
+import requests
+import re
+import hashlib
+from django.core.files.base import ContentFile
 
 from .models import Request, RequestComment, RequestHistory, RequestCategory, RequestStatus
 from .forms import RequestForm, RequestCommentForm, RequestStatusForm
+
+
+def get_flickr_image_url(flickr_url):
+    """Extract the actual image URL and optional credit from a Flickr photo page."""
+    try:
+        response = requests.get(flickr_url, timeout=10)
+        response.raise_for_status()
+        
+        # Use regex to find the image URL and alt text in the noscript tag
+        # Pattern to match: <img src="..." alt="...">
+        pattern = r'<img[^>]*src=["\']([^"\']*staticflickr[^"\']*)["\'][^>]*alt=["\']([^"\']*)["\']'
+        matches = re.findall(pattern, response.text)
+        
+        if matches:
+            image_url, alt_text = matches[0]
+            # Ensure it has the protocol
+            if image_url.startswith('//'):
+                image_url = 'https:' + image_url
+            
+            # Extract credit from alt text (format: "... | by author")
+            credit = ""
+            if alt_text and '| by' in alt_text:
+                credit = alt_text.split('| by')[-1].strip()
+            elif alt_text:
+                # Fallback: use the entire alt text if no "| by" pattern
+                credit = alt_text.strip()
+            
+            return image_url, credit
+        
+        return None, None
+    except Exception as e:
+        print(f"Error extracting Flickr image URL: {e}")
+        return None, None
 
 
 class RequestListView(ListView):
@@ -165,6 +202,51 @@ def change_status(request, request_id):
             if req.status == RequestStatus.RESOLVED:
                 req.resolved_by = request.user
                 req.save(update_fields=["resolved_by"])
+                
+                # Handle photo request approval
+                if req.category == RequestCategory.PHOTO and req.photo_url and req.vehicle:
+                    try:
+                        from photos.models import Photo, truncate_photo_text
+                        
+                        # Extract the actual image URL and optional credit from Flickr page
+                        image_url, credit = get_flickr_image_url(req.photo_url)
+                        if not image_url:
+                            messages.error(request, f"Request status changed to {new_status}, but could not extract image URL from Flickr page.")
+                            return redirect("service_requests:detail", id=request_id)
+                        
+                        # Download the image
+                        image_response = requests.get(image_url, timeout=10)
+                        image_response.raise_for_status()
+                        
+                        # Create the photo
+                        photo = Photo()
+                        photo.user = request.user
+                        photo.author = ""
+                        photo.credit = truncate_photo_text(credit)
+                        
+                        # Extract photo ID for caption if possible
+                        photo_id_match = re.search(r'/photos/[^/]+/(\d+)', req.photo_url)
+                        if photo_id_match:
+                            photo_id = photo_id_match.group(1)
+                            photo.caption = f"Photo {photo_id}"
+                        
+                        # Save the image first to prevent automatic Flickr download
+                        sha1 = hashlib.sha1(usedforsecurity=False)
+                        sha1.update(image_response.content)
+                        photo.image.save(f"{sha1.hexdigest()}.jpg", ContentFile(image_response.content))
+                        
+                        # Now set the flickr_url after image is saved to prevent automatic download
+                        photo.flickr_url = req.photo_url
+                        
+                        photo.save()
+                        
+                        # Add to vehicle
+                        photo.vehicles.add(req.vehicle)
+                        
+                        messages.success(request, f"Request status changed to {new_status}. Photo added successfully.")
+                    except Exception as e:
+                        messages.error(request, f"Request status changed to {new_status}, but failed to add photo: {str(e)}")
+                    return redirect("service_requests:detail", id=request_id)
             
             # Create history entry
             RequestHistory.objects.create(

@@ -1,12 +1,12 @@
-# BetterFleets
+# BetterFleets V2
 
-BetterFleets is a bus fleet tracking and logging application, forked from [bustimes.org](https://bustimes.org/). This project adds Discord bot integration, driver logging functionality, and enhanced user features while maintaining the core vehicle tracking capabilities.
+BetterFleets V2 is a bus fleet tracking and logging application, forked from [bustimes.org](https://bustimes.org/). It builds on the core vehicle tracking platform with improved fleet discovery and management, community contribution workflows, and an isolated development environment.
 
 **Credit:** BetterFleets is based on the excellent [bustimes.org](https://bustimes.org) project by James Goodwin. The original project provides the foundation for bus tracking, timetables, and vehicle management.
 
-## What's this?
+## About
 
-Source code for the BetterFleets application, a fork of [bustimes.org](https://bustimes.org/). BetterFleets adds Discord bot integration, driver logging, and enhanced user features to the original bus tracking platform.
+This repository contains the BetterFleets V2 application. It retains the upstream bustimes.org foundations for live vehicle tracking, timetables, and fleet data while adding BetterFleets-specific features for community logging and fleet management.
 
 It's a magnificent monolithic Django app that's evolved over time (since 2015). The structure doesn't make complete sense:
 
@@ -40,6 +40,7 @@ I try to document things for "future me", but invariably this documentation will
 - [Release audit notes](docs/release-audit.md)
 - [API Usage](docs/API_USAGE.md)
 - [Development Environment Setup](docs/DEV_ENVIRONMENT_SETUP.md)
+- [BetterFleets V2 development plan](planning.md)
 - [Train Tracking Setup](docs/setup_train_tracking.md)
 - [Discord Release Message](docs/discord_release_message.md)
 - [Photo Log Plan](docs/Photo-Log-Plan.md)
@@ -110,9 +111,9 @@ For the rest, there are some Django management commands that need to be run inde
 These update the big map of bus locations, etc.
 I use supervisord (see [config/supervisor.conf](config/supervisor.conf)).
 
-## BetterFleets Features
+## BetterFleets V2 features
 
-In addition to the core features from bustimes.org, BetterFleets includes:
+In addition to the core features from bustimes.org, BetterFleets V2 includes:
 
 - **Discord Bot Integration**: Slash commands for logging vehicles, checking completion stats, and linking Discord accounts
 - **Driver Logging**: Separate tracking for vehicles driven (vs. ridden as a passenger)
@@ -121,6 +122,10 @@ In addition to the core features from bustimes.org, BetterFleets includes:
 - **User Account Linking**: Connect Discord accounts to BetterFleets user accounts via 6-digit codes
 - **Route Completion**: Users can log routes they have ridden from a service page. Route lists show a tick for ridden routes, a cross for unlogged public routes, and a dash for non-public routes. Non-public routes can still be logged and are included in a user's ridden total.
 - **Public Profile Stats**: Profiles whose owners have enabled public fleet logging show vehicle, photo, and route-completion totals. The livery tab groups the user's logged vehicles by operator and livery.
+- **Fleet discovery**: Search operator fleet lists, filter vehicles, and sort fleet tables by key vehicle attributes.
+- **Vehicle and photo contributions**: Submit vehicle edits, report issues, and suggest Flickr-hosted photos through a reviewable request workflow.
+- **Fleet events**: Browse and search dated fleet events, including event descriptions and banners.
+- **Safer V2 development**: Run V2 in a Docker Compose stack isolated from production. See the [development environment guide](docs/DEV_ENVIRONMENT_SETUP.md).
 
 ## Deploying
 
