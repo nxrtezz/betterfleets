@@ -5,7 +5,7 @@ from django.db.models.functions import Upper
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("busstops", "0034_routenotice_other_services"),
+        ("busstops", "0033_stopfeature_stoppoint_features"),
     ]
 
     operations = [

@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+import os
 from functools import lru_cache
 from itertools import pairwise, groupby
 from types import SimpleNamespace
@@ -69,7 +70,6 @@ from busstops.models import (
     ServiceCode,
     StopUsage,
 )
-from busstops.bustimes_sync import compact_registration
 from busstops.utils import (
     build_depot_map_html,
     get_operator_depots,
@@ -113,6 +113,7 @@ REQUEST_SOURCES = {
     "service_request": "Service",
     "operator_request": "Operator",
     "vehicle_type_request": "Vehicle Model",
+    "photo_suggestion": "Photo Suggestion",
 }
 
 
@@ -121,12 +122,15 @@ REQUEST_TARGET_MODELS = {
     "service_request": Service,
     "operator_request": Operator,
     "vehicle_type_request": VehicleType,
+    "photo_suggestion": Vehicle,
 }
 
 TRUSTED_REQUEST_APPROVAL_SOURCES = {
     "stop_request",
     "service_request",
     "vehicle_request",
+    "vehicle_type_request",
+    "photo_suggestion",
 }
 
 
@@ -203,45 +207,7 @@ def require_dashboard_access(request):
     raise PermissionDenied
 
 
-def _get_bus_group_vehicle_search_results(query: str, bus_group: BusGroup):
-    query = (query or "").strip()
-    if not query:
-        return []
 
-    compact = query.replace(" ", "").upper()
-    queryset = (
-        apply_vehicle_schema_compat(
-            Vehicle.objects.select_related("operator", "vehicle_type")
-        )
-        .filter(
-            Q(code__iexact=query)
-            | Q(code__icontains=query)
-            | Q(fleet_code__iexact=query)
-            | Q(fleet_code__icontains=query)
-            | Q(reg__iexact=compact)
-            | Q(reg__icontains=compact)
-            | Q(name__icontains=query)
-            | Q(operator__name__icontains=query)
-        )
-        .order_by("operator__name", "fleet_number", "fleet_code", "reg", "code")
-        .distinct()[:25]
-    )
-    existing_ids = set(bus_group.vehicles.values_list("pk", flat=True))
-    results = []
-    for vehicle in queryset:
-        fleet_ref = vehicle.fleet_code or vehicle.fleet_number or vehicle.code
-        reg = vehicle.get_reg() if vehicle.reg else "No registration"
-        operator_name = vehicle.operator.name if vehicle.operator_id else "No operator"
-        type_name = vehicle.vehicle_type.name if vehicle.vehicle_type_id else ""
-        results.append(
-            {
-                "id": vehicle.pk,
-                "label": f"{fleet_ref} - {reg}",
-                "meta": " | ".join(filter(None, [operator_name, type_name])),
-                "already_added": vehicle.pk in existing_ids,
-            }
-        )
-    return results
 
 
 DASHBOARD_MODEL_ORDER = {
@@ -803,6 +769,7 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
     historical_year_cards = []
     selected_historical_year = None
     show_completion = request.user.is_authenticated
+    sort_option = request.GET.get("sort", "")
     mass_log_mode = (
         show_completion
         and request.user.is_authenticated
@@ -924,7 +891,7 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                 card["liveries"] = list(year_liveries)
         else:
             # Include vehicles owned by this operator
-            vehicles = operator.vehicle_set.filter(**current_fleet_filter()).select_related("livery")
+            vehicles = Vehicle.objects.filter(operator=operator, **current_fleet_filter()).select_related("livery", "operator")
 
             # Apply filters
             selected_garage = None
@@ -933,6 +900,14 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
             logged_filter = request.GET.get("logged")
             
             if not historical:
+                # Withdrawn filter
+                withdrawn_filter = request.GET.get("withdrawn")
+                if withdrawn_filter == "0":
+                    vehicles = vehicles.filter(**current_fleet_filter(withdrawn=False))
+                elif withdrawn_filter != "1":
+                    # Default behavior: hide withdrawn unless explicitly shown
+                    vehicles = vehicles.filter(**current_fleet_filter(withdrawn=False))
+                
                 garage_id = request.GET.get("garage")
                 if garage_id and garage_id.isdigit():
                     selected_garage = Garage.objects.filter(
@@ -974,10 +949,68 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                     elif logged_filter == "not_photographed":
                         vehicles = vehicles.filter(has_been_photographed=False)
 
-            if not historical and "withdrawn" not in request.GET:
+            if not historical and "withdrawn" not in request.GET and not withdrawn_filter:
                 vehicles = vehicles.filter(**current_fleet_filter(withdrawn=False))
 
-            # Apply annotations
+            # Also include vehicles on loan to this operator
+            loaned_vehicles = Vehicle.objects.filter(operated_by=operator, **current_fleet_filter()).select_related("livery", "operator")
+            
+            # Apply the same filters to loaned vehicles as owned vehicles
+            if not historical:
+                # Withdrawn filter
+                withdrawn_filter = request.GET.get("withdrawn")
+                if withdrawn_filter == "0":
+                    loaned_vehicles = loaned_vehicles.filter(**current_fleet_filter(withdrawn=False))
+                elif withdrawn_filter != "1":
+                    # Default behavior: hide withdrawn unless explicitly shown
+                    loaned_vehicles = loaned_vehicles.filter(**current_fleet_filter(withdrawn=False))
+                
+                garage_id = request.GET.get("garage")
+                if garage_id and garage_id.isdigit():
+                    selected_garage = Garage.objects.filter(
+                        pk=int(garage_id), operators=operator
+                    ).first()
+                    if selected_garage:
+                        loaned_vehicles = loaned_vehicles.filter(garage=selected_garage)
+                    else:
+                        loaned_vehicles = loaned_vehicles.none()
+                elif garage_id:
+                    loaned_vehicles = loaned_vehicles.none()
+                
+                # Livery filter
+                livery_id = request.GET.get("livery")
+                if livery_id and livery_id.isdigit():
+                    selected_livery = Livery.objects.filter(pk=int(livery_id)).first()
+                    if selected_livery:
+                        loaned_vehicles = loaned_vehicles.filter(livery=selected_livery)
+                    else:
+                        loaned_vehicles = loaned_vehicles.none()
+                
+                # Vehicle type filter
+                vehicle_type_id = request.GET.get("vehicle_type")
+                if vehicle_type_id and vehicle_type_id.isdigit():
+                    selected_vehicle_type = VehicleType.objects.filter(pk=int(vehicle_type_id)).first()
+                    if selected_vehicle_type:
+                        loaned_vehicles = loaned_vehicles.filter(vehicle_type=selected_vehicle_type)
+                    else:
+                        loaned_vehicles = loaned_vehicles.none()
+                
+                # Logged filter (for authenticated users)
+                if logged_filter and request.user.is_authenticated:
+                    if logged_filter == "ridden":
+                        loaned_vehicles = loaned_vehicles.filter(has_been_ridden=True)
+                    elif logged_filter == "photographed":
+                        loaned_vehicles = loaned_vehicles.filter(has_been_photographed=True)
+                    elif logged_filter == "not_ridden":
+                        loaned_vehicles = loaned_vehicles.filter(has_been_ridden=False)
+                    elif logged_filter == "not_photographed":
+                        loaned_vehicles = loaned_vehicles.filter(has_been_photographed=False)
+            
+            # Apply the same final filter to loaned vehicles
+            if not historical and "withdrawn" not in request.GET and not withdrawn_filter:
+                loaned_vehicles = loaned_vehicles.filter(**current_fleet_filter(withdrawn=False))
+
+            # Apply annotations before union (Django doesn't support annotate after union)
             vehicles = vehicles.annotate(feature_names=features_string_agg)
             vehicles = vehicles.annotate(accessibility_names=accessibility_string_agg)
             vehicles = vehicles.annotate(
@@ -991,11 +1024,28 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
             )
             vehicles = annotate_logged_state(vehicles, request.user)
             vehicles = annotate_photographed_state(vehicles, request.user)
-
+            
+            # Apply same annotations to loaned vehicles before union
+            loaned_vehicles = loaned_vehicles.annotate(feature_names=features_string_agg)
+            loaned_vehicles = loaned_vehicles.annotate(accessibility_names=accessibility_string_agg)
+            loaned_vehicles = loaned_vehicles.annotate(
+                pending_edits=Exists("vehiclerevision", filter=Q(pending=True)),
+                livery_name=Case(When(livery__show_name=True, then="livery__name")),
+                vehicle_type_name=F("vehicle_type__name"),
+                garage_name=Case(
+                    When(garage__name="", then="garage__code"),
+                    default="garage__name",
+                ),
+            )
+            loaned_vehicles = annotate_logged_state(loaned_vehicles, request.user)
+            loaned_vehicles = annotate_photographed_state(loaned_vehicles, request.user)
+            
+            # Apply select_related before union (Django doesn't support select_related after union)
             if "latest_journey_id" in _vehicle_db_columns():
                 vehicles = vehicles.select_related("latest_journey")
-
-            # Apply prefetch_related
+                loaned_vehicles = loaned_vehicles.select_related("latest_journey")
+            
+            # Apply prefetch_related before union (Django doesn't support prefetch_related after union)
             vehicles = vehicles.prefetch_related(
                 Prefetch(
                     "reviews",
@@ -1004,7 +1054,20 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                     ),
                 )
             )
-
+            loaned_vehicles = loaned_vehicles.prefetch_related(
+                Prefetch(
+                    "reviews",
+                    queryset=VehicleReview.objects.filter(
+                        status=VehicleReview.Status.PUBLISHED
+                    ),
+                )
+            )
+            
+            # Note: Don't apply schema compatibility before union as defer() can cause column count mismatches
+            # Schema compatibility will be applied after union if needed
+            vehicles = vehicles.union(loaned_vehicles)
+            
+            # Apply schema compatibility after union
             vehicles = apply_vehicle_schema_compat(vehicles)
 
     if historical:
@@ -1012,21 +1075,45 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
             "-historical_fleet_year", "fleet_number", "fleet_code", "reg", "code"
         )
     elif slug and not group_slug:
-        # Check if the operator has any fleet_number values set
-        has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
-
-        if has_fleet_numbers:
-            vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+        # Apply custom sorting if specified
+        if sort_option:
+            if sort_option == "fleet_number_asc":
+                vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+            elif sort_option == "fleet_number_desc":
+                vehicles = vehicles.order_by("-fleet_number", "-fleet_code", "-reg", "-code")
+            elif sort_option == "type_asc":
+                vehicles = vehicles.order_by("vehicle_type__name", "fleet_number", "fleet_code", "reg", "code")
+            elif sort_option == "type_desc":
+                vehicles = vehicles.order_by("-vehicle_type__name", "-fleet_number", "-fleet_code", "-reg", "-code")
+            elif sort_option == "age_asc":
+                # Oldest first - sort by year_of_manufacture ascending
+                vehicles = vehicles.order_by("year_of_manufacture", "fleet_number", "fleet_code", "reg", "code")
+            elif sort_option == "age_desc":
+                # Newest first - sort by year_of_manufacture descending
+                vehicles = vehicles.order_by("-year_of_manufacture", "-fleet_number", "-fleet_code", "-reg", "-code")
+            else:
+                # Default sorting
+                has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
+                if has_fleet_numbers:
+                    vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+                else:
+                    vehicles = vehicles.order_by("vehicle_type__name", "fleet_code", "reg", "code")
         else:
-            # No fleet numbers - sort by vehicle type
-            vehicles = vehicles.order_by("vehicle_type__name", "fleet_code", "reg", "code")
+            # Check if the operator has any fleet_number values set
+            has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
+
+            if has_fleet_numbers:
+                vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+            else:
+                # No fleet numbers - sort by vehicle type
+                vehicles = vehicles.order_by("vehicle_type__name", "fleet_code", "reg", "code")
     else:
         # Group view - default ordering
         vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
 
     completion_summary = None
     if show_completion and slug and not group_slug:
-        # Skip completion summary for union querysets (owned + operated vehicles)
+        # Skip completion summary for union querysets (owned + loaned vehicles)
         # as filter() is not supported on union querysets
         if not historical:
             completion_summary = None
@@ -1071,19 +1158,48 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
                 ),
             )
         )
+        if "latest_journey_id" in _vehicle_db_columns():
+            vehicles = vehicles.select_related("latest_journey")
+        vehicles = apply_vehicle_schema_compat(vehicles)
+        
         if historical:
             vehicles = vehicles.order_by(
                 "-historical_fleet_year", "fleet_number", "fleet_code", "reg", "code"
             )
         else:
-            # Check if the operator has any fleet_number values set
-            has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
-
-            if has_fleet_numbers:
-                vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+            # Apply custom sorting if specified
+            sort_option = request.GET.get("sort", "")
+            if sort_option:
+                if sort_option == "fleet_number_asc":
+                    vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+                elif sort_option == "fleet_number_desc":
+                    vehicles = vehicles.order_by("-fleet_number", "-fleet_code", "-reg", "-code")
+                elif sort_option == "type_asc":
+                    vehicles = vehicles.order_by("vehicle_type__name", "fleet_number", "fleet_code", "reg", "code")
+                elif sort_option == "type_desc":
+                    vehicles = vehicles.order_by("-vehicle_type__name", "-fleet_number", "-fleet_code", "-reg", "-code")
+                elif sort_option == "age_asc":
+                    # Oldest first - sort by year_of_manufacture ascending
+                    vehicles = vehicles.order_by("year_of_manufacture", "fleet_number", "fleet_code", "reg", "code")
+                elif sort_option == "age_desc":
+                    # Newest first - sort by year_of_manufacture descending
+                    vehicles = vehicles.order_by("-year_of_manufacture", "-fleet_number", "-fleet_code", "-reg", "-code")
+                else:
+                    # Default sorting
+                    has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
+                    if has_fleet_numbers:
+                        vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+                    else:
+                        vehicles = vehicles.order_by("vehicle_type__name", "fleet_code", "reg", "code")
             else:
-                # No fleet numbers - sort by vehicle type
-                vehicles = vehicles.order_by("vehicle_type__name", "fleet_code", "reg", "code")
+                # Check if the operator has any fleet_number values set
+                has_fleet_numbers = operator.vehicle_set.filter(fleet_number__isnull=False).exists()
+
+                if has_fleet_numbers:
+                    vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+                else:
+                    # No fleet numbers - sort by vehicle type
+                    vehicles = vehicles.order_by("vehicle_type__name", "fleet_code", "reg", "code")
         completion_summary = get_completion_summary_for_queryset(vehicle_ids, request.user)
 
     if group_slug:
@@ -1125,12 +1241,16 @@ def operator_vehicles(request, slug=None, group_slug=None, historical=False):
             "selected_livery": selected_livery if not historical else None,
             "selected_vehicle_type": selected_vehicle_type if not historical else None,
             "logged_filter": logged_filter if not historical else None,
+            "sort_option": sort_option if not historical else None,
             "available_liveries": Livery.objects.filter(
                 vehicle__operator=operator
             ).distinct().order_by('name') if not historical else Livery.objects.none(),
             "available_vehicle_types": VehicleType.objects.filter(
                 vehicle__operator=operator
             ).distinct().order_by('name') if not historical else VehicleType.objects.none(),
+            "available_garages": Garage.objects.filter(
+                vehicle__operator=operator
+            ).distinct().order_by('name') if not historical else Garage.objects.none(),
         }
 
     if request.user.is_authenticated:
@@ -1602,43 +1722,9 @@ def operator_debug(request, slug):
     )
 
 
-@require_http_methods(["GET", "POST"])
+@require_http_methods(["GET"])
 def bus_group_detail(request, slug):
     bus_group = get_object_or_404(BusGroup, slug=slug)
-
-    if request.method == "POST":
-        require_superuser(request)
-        vehicle_ids = [
-            int(vehicle_id)
-            for vehicle_id in request.POST.getlist("vehicle_ids")
-            if vehicle_id.isdigit()
-        ]
-        if vehicle_ids:
-            vehicles_to_add = list(Vehicle.objects.filter(pk__in=vehicle_ids))
-            bus_group.vehicles.add(*vehicles_to_add)
-            messages.success(
-                request,
-                f"Added {len(vehicles_to_add)} bus(es) to {bus_group}.",
-            )
-        else:
-            messages.info(request, "No buses were selected.")
-        return redirect(bus_group.get_absolute_url())
-
-    vehicles = list(
-        bus_group.vehicles.select_related("operator", "vehicle_type", "livery", "garage")
-        .annotate(
-            livery_name=Case(When(livery__show_name=True, then="livery__name")),
-            vehicle_type_name=F("vehicle_type__name"),
-            garage_name=Case(
-                When(garage__name="", then="garage__code"),
-                default="garage__name",
-            ),
-        )
-        .order_by("operator__name", "fleet_number", "fleet_code", "reg", "code")
-    )
-    operator_ids = {vehicle.operator_id for vehicle in vehicles if vehicle.operator_id}
-    for vehicle in vehicles:
-        vehicle.row_class = vehicle.get_fleet_row_class()
 
     return render(
         request,
@@ -1646,25 +1732,32 @@ def bus_group_detail(request, slug):
         {
             "object": bus_group,
             "page_theme": bus_group,
-            "vehicles": vehicles,
-            "operators_count": len(operator_ids),
-            "branding_column": any(vehicle.branding for vehicle in vehicles),
-            "name_column": any(vehicle.name for vehicle in vehicles),
-            "notes_column": any(
-                vehicle.notes and not vehicle.is_spare_ticket_machine()
-                for vehicle in vehicles
-            ),
-            "garage_column": any(vehicle.garage_name for vehicle in vehicles),
         },
     )
 
 
 @require_safe
-def bus_group_vehicle_search(request, slug):
-    require_superuser(request)
-    bus_group = get_object_or_404(BusGroup, slug=slug)
-    results = _get_bus_group_vehicle_search_results(request.GET.get("q", ""), bus_group)
-    return JsonResponse({"results": results})
+def events(request):
+    search_query = request.GET.get("search", "").strip()
+    
+    bus_groups = BusGroup.objects.filter(
+        event_date__isnull=False
+    ).order_by("event_date", "event_end_date", "title")
+    
+    if search_query:
+        bus_groups = bus_groups.filter(title__icontains=search_query)
+    
+    return render(
+        request,
+        "vehicles/events.html",
+        {
+            "bus_groups": bus_groups,
+            "search_query": search_query,
+        },
+    )
+
+
+
 
 
 def respond_conditionally(request, response):
@@ -2129,6 +2222,42 @@ class VehicleDetailView(DetailView):
                 photo_log.save(update_fields=["quantity"])
                 messages.success(self.request, f"Photo logged (total: {photo_log.quantity}).")
             return self.get(*args, **kwargs)
+        if (
+            self.request.user.is_authenticated
+            and "suggest_photo" in self.request.POST
+        ):
+            from busstops.data_changes import record_pending_change
+            from django.http import JsonResponse
+            
+            flickr_url = self.request.POST.get("photo_url", "")
+            if not flickr_url or "flickr.com" not in flickr_url.lower():
+                if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({"success": False, "error": "Please enter a valid Flickr URL"})
+                else:
+                    messages.error(self.request, "Please enter a valid Flickr URL")
+                    return self.get(*args, **kwargs)
+            
+            # Create a pending change for the photo suggestion
+            record_pending_change(
+                source="photo_suggestion",
+                instance=vehicle,
+                operation="add_photo",
+                changes={"flickr_url": {"to": flickr_url}},
+                payload={
+                    "flickr_url": flickr_url,
+                    "requested_by_id": self.request.user.id,
+                    "requested_by_label": str(self.request.user),
+                    "requested_title": f"Photo for {vehicle}",
+                    "summary": f"Photo suggestion by {self.request.user.username}",
+                },
+                reason=f"Photo suggestion by {self.request.user.username}"
+            )
+            
+            if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({"success": True})
+            else:
+                messages.success(self.request, "Photo suggestion submitted for approval!")
+                return self.get(*args, **kwargs)
         if self.request.user.is_authenticated and (
             "rating" in self.request.POST or "message" in self.request.POST
         ):
@@ -2178,7 +2307,10 @@ class VehicleDetailView(DetailView):
                 vehicle=vehicle,
             )
             review.delete()
-        elif self.request.user.has_perm("photos.add_photo"):
+        elif (
+            self.request.user.has_perm("photos.add_photo")
+            or getattr(self.request.user, "trusted", False)
+        ) and "flickr_url" in self.request.POST:
             form = PhotoForm(self.request.POST)
             if form.is_valid():
                 try:
@@ -2187,7 +2319,6 @@ class VehicleDetailView(DetailView):
                     photo.flickr_url = form.cleaned_data["flickr_url"]
                     photo.credit = form.cleaned_data.get("credit", "")
                     photo.caption = form.cleaned_data.get("caption", "")
-                    photo.author = form.cleaned_data.get("author", "")
                     photo.save()  # This will trigger automatic download
                     photo.vehicles.add(vehicle)
                     messages.success(self.request, "Photo added successfully.")
@@ -2198,7 +2329,6 @@ class VehicleDetailView(DetailView):
             flickr_url = self.request.POST.get("tu_flickr_url")
             credit = self.request.POST.get("tu_credit", "")
             caption = self.request.POST.get("tu_caption", "")
-            author = self.request.POST.get("tu_author", "")
             
             if not flickr_url:
                 messages.error(self.request, "Please provide a Flickr URL.")
@@ -2214,7 +2344,6 @@ class VehicleDetailView(DetailView):
                 photo.flickr_url = flickr_url
                 photo.credit = credit
                 photo.caption = caption
-                photo.author = author
                 photo.save()  # This will trigger automatic download
                 photo.vehicles.add(vehicle)
                 messages.success(self.request, "Photo added successfully.")
@@ -2255,38 +2384,6 @@ class VehicleDetailView(DetailView):
             )
             
             messages.success(self.request, "Photo suggestion submitted for review.")
-
-        elif self.request.user.is_authenticated and "request_photo" in self.request.POST:
-            from service_requests.models import Request, RequestCategory
-            
-            photo_url = self.request.POST.get("photo_url")
-            description = self.request.POST.get("description")
-            
-            if not description:
-                messages.error(self.request, "Please provide a description.")
-                return self.get(*args, **kwargs)
-            
-            if photo_url and 'flickr.com' not in photo_url.lower():
-                messages.error(self.request, "Only Flickr URLs are allowed.")
-                return self.get(*args, **kwargs)
-            
-            # Create request for photo
-            request_description = f"Photo request for {vehicle}\n\n"
-            request_description += f"Description: {description}\n"
-            if photo_url:
-                request_description += f"Flickr URL: {photo_url}\n"
-                request_description += "Note: Image will be automatically downloaded from Flickr URL when approved."
-            
-            request_obj = Request.objects.create(
-                title=f"Photo request for {vehicle}",
-                description=request_description,
-                category=RequestCategory.PHOTO,
-                vehicle=vehicle,
-                photo_url=photo_url or "",
-                author=self.request.user,
-            )
-            
-            messages.success(self.request, "Photo request submitted.")
 
         return self.get(*args, **kwargs)
 
@@ -2495,7 +2592,14 @@ def can_apply_request_log(user, log):
 def can_cancel_request_log(user, log):
     if not getattr(user, "is_authenticated", False):
         return False
-    return str((log.payload or {}).get("requested_by_id") or "") == str(user.id)
+    requested_by_id = (log.payload or {}).get("requested_by_id")
+    if not requested_by_id and log.source == "photo_suggestion":
+        # For photo suggestions, extract username from reason and check against current user
+        reason = log.reason or ""
+        if "by " in reason:
+            username = reason.split("by ")[-1].strip()
+            return username == user.username
+    return str(requested_by_id or "") == str(user.id)
 
 
 def build_request_change_items(log):
@@ -2513,7 +2617,7 @@ def build_request_change_items(log):
             "is_code": False,
         }
         lower_label = str(label).lower()
-        if lower_label == "image url":
+        if lower_label == "image url" or lower_label == "flickr url":
             item["is_link"] = True
         elif lower_label in {"left css", "right css"}:
             item["preview_css"] = str(value)
@@ -2798,11 +2902,27 @@ def wrap_vehicle_revision(revision):
 
 def wrap_request_log(log):
     requested_by_id = (log.payload or {}).get("requested_by_id")
-    requested_by_label = (log.payload or {}).get("requested_by_label") or requested_by_id
-    if requested_by_id:
-        requested_by_user = User.objects.filter(pk=requested_by_id).first()
-        if requested_by_user:
-            requested_by_label = str(requested_by_user)
+    # For photo suggestions, get the user from the reason field if requested_by_id is not in payload
+    if log.source == "photo_suggestion" and not requested_by_id:
+        # Extract username from reason like "Photo suggestion by username"
+        reason = log.reason or ""
+        if "by " in reason:
+            username = reason.split("by ")[-1].strip()
+            requested_by_user = User.objects.filter(username=username).first()
+            if requested_by_user:
+                requested_by_id = str(requested_by_user.id)
+                requested_by_label = str(requested_by_user)
+            else:
+                requested_by_label = username
+        else:
+            requested_by_label = "Unknown user"
+    else:
+        requested_by_label = (log.payload or {}).get("requested_by_label") or requested_by_id
+        if requested_by_id:
+            requested_by_user = User.objects.filter(pk=requested_by_id).first()
+            if requested_by_user:
+                requested_by_label = str(requested_by_user)
+    
     request_type_label = REQUEST_SOURCES.get(log.source, "Request")
     target_model = REQUEST_TARGET_MODELS.get(log.source)
     payload = log.payload or {}
@@ -2836,6 +2956,17 @@ def wrap_request_log(log):
         code = fields.get("code") or ((log.changes or {}).get("code") or {}).get("to") or ""
         if operator_id and operator_label and code:
             requested_title = f"{operator_label} {code}"
+    
+    # Handle photo suggestions - they target existing vehicles
+    if log.source == "photo_suggestion" and target_model:
+        try:
+            if log.target_pk and log.target_pk.isdigit():
+                created_object = target_model.objects.get(pk=log.target_pk)
+                if created_object and hasattr(created_object, "get_absolute_url"):
+                    object_url = created_object.get_absolute_url()
+                    requested_title = f"Photo for {created_object}"
+        except (target_model.DoesNotExist, ValueError):
+            pass
 
     created_title = str(created_object) if created_object else ""
 
@@ -3539,6 +3670,164 @@ def requests_home(request):
 
 
 @login_required
+def report_bug(request):
+    if request.method == "POST":
+        category = request.POST.get("category")
+        severity = request.POST.get("severity")
+        summary = request.POST.get("summary")
+
+        if not all([category, severity, summary]):
+            return render(
+                request,
+                "requests.html",
+                {
+                    "error": "All fields are required",
+                    "entries": [],
+                    "breadcrumb": [RequestsPage()],
+                },
+            )
+
+        try:
+            webhook_url = os.environ.get("BUG_DISCORD_ENDPOINT")
+            if webhook_url:
+                severity_num = int(severity)
+                emoji_map = {
+                    1: "🟢",
+                    2: "🟢",
+                    3: "🟡",
+                    4: "🟡",
+                    5: "🟠",
+                    6: "🟠",
+                    7: "🔴",
+                    8: "🔴",
+                    9: "🔴",
+                    10: "🚨",
+                }
+                emoji = emoji_map.get(severity_num, "⚪")
+
+                embed = {
+                    "title": f"{emoji} Bug Report - {category.upper()}",
+                    "description": summary,
+                    "fields": [
+                        {"name": "Category", "value": category, "inline": True},
+                        {"name": "Severity", "value": f"{severity_num}/10", "inline": True},
+                        {"name": "Reported by", "value": str(request.user), "inline": True},
+                    ],
+                    "color": severity_num * 100000 if severity_num <= 5 else 16711680,
+                }
+
+                response = requests.post(
+                    webhook_url,
+                    json={"embeds": [embed]},
+                    headers={"Content-Type": "application/json"},
+                )
+                response.raise_for_status()
+
+            return render(
+                request,
+                "requests.html",
+                {
+                    "success": "Bug report submitted successfully",
+                    "entries": [],
+                    "breadcrumb": [RequestsPage()],
+                },
+            )
+        except Exception as e:
+            return render(
+                request,
+                "requests.html",
+                {
+                    "error": f"Failed to submit bug report: {str(e)}",
+                    "entries": [],
+                    "breadcrumb": [RequestsPage()],
+                },
+            )
+
+    return redirect("requests_home")
+
+
+
+
+
+@login_required
+def generic_request_page(request):
+    form = forms.GenericRequestForm(request.POST or None)
+    request_log = None
+
+    if request.method == "POST" and form.is_valid():
+        try:
+            webhook_url = os.environ.get("REQUEST_DISCORD_ENDPOINT")
+            if webhook_url:
+                category = form.cleaned_data["category"]
+                title = form.cleaned_data["title"]
+                description = form.cleaned_data["description"]
+                priority = form.cleaned_data["priority"]
+                
+                emoji_map = {
+                    "low": "🟢",
+                    "medium": "🟡",
+                    "high": "🟠",
+                    "urgent": "🔴",
+                }
+                emoji = emoji_map.get(priority, "⚪")
+
+                embed = {
+                    "title": f"{emoji} {category.upper()} Request",
+                    "description": description,
+                    "fields": [
+                        {"name": "Title", "value": title, "inline": True},
+                        {"name": "Category", "value": category, "inline": True},
+                        {"name": "Priority", "value": priority.capitalize(), "inline": True},
+                        {"name": "Reported by", "value": str(request.user), "inline": True},
+                    ],
+                    "color": 16711680 if priority == "urgent" else (11750886 if priority == "high" else (16776960 if priority == "medium" else 5068894)),
+                }
+
+                response = requests.post(
+                    webhook_url,
+                    json={"embeds": [embed]},
+                    headers={"Content-Type": "application/json"},
+                )
+                response.raise_for_status()
+
+            return render(
+                request,
+                "request_form.html",
+                {
+                    "form": None,
+                    "request_log": {"success": True},
+                    "request_title": "Generic Request",
+                    "submit_label": "Submit Request",
+                    "breadcrumb": [RequestsPage()],
+                },
+            )
+        except Exception as e:
+            return render(
+                request,
+                "request_form.html",
+                {
+                    "form": form,
+                    "error": f"Failed to submit request: {str(e)}",
+                    "request_title": "Generic Request",
+                    "submit_label": "Submit Request",
+                    "breadcrumb": [RequestsPage()],
+                },
+            )
+
+    return render(
+        request,
+        "request_form.html",
+        {
+            "form": form,
+            "request_log": request_log,
+            "request_title": "Generic Request",
+            "submit_label": "Submit Request",
+            "breadcrumb": [RequestsPage()],
+        },
+    )
+
+
+@login_required
 def request_new_vehicle(request, slug=None):
     check_user(request)
 
@@ -3575,7 +3864,7 @@ def request_new_vehicle(request, slug=None):
         # Check if a vehicle with this registration already exists in the database
         reg = cleaned_data.get("reg")
         if reg:
-            reg = compact_registration(reg)
+            # RegField already normalizes the registration (uppercase, removes spaces)
             if Vehicle.objects.filter(reg__iexact=reg).exists():
                 existing_vehicle = Vehicle.objects.filter(reg__iexact=reg).first()
                 form.add_error(
@@ -3795,16 +4084,36 @@ def request_new_operator(request):
         elif Operator.objects.filter(name__iexact=name).exists():
             form.add_error("name", "An operator with that name already exists.")
         else:
+            fields = {
+                "noc": noc,
+                "name": name,
+            }
+            changes = {
+                "operator code": {"from": "", "to": noc},
+                "name": {"from": "", "to": name},
+            }
+            
+            # Add optional fields if provided
+            if form.cleaned_data.get("logo"):
+                fields["logo"] = form.cleaned_data["logo"]
+                changes["logo"] = {"from": "", "to": form.cleaned_data["logo"]}
+            if form.cleaned_data.get("vehicle_mode"):
+                fields["vehicle_mode"] = form.cleaned_data["vehicle_mode"]
+                changes["vehicle mode"] = {"from": "", "to": form.cleaned_data["vehicle_mode"]}
+            if form.cleaned_data.get("group"):
+                fields["group"] = str(form.cleaned_data["group"])
+                changes["group"] = {"from": "", "to": str(form.cleaned_data["group"])}
+            if form.cleaned_data.get("region"):
+                fields["region"] = str(form.cleaned_data["region"])
+                changes["region"] = {"from": "", "to": str(form.cleaned_data["region"])}
+            
             request_log = create_request_log(
                 source="operator_request",
                 target_model="busstops.operator",
                 target_pk=request_key,
                 target_repr=f"{noc} {name}",
-                fields={"noc": noc, "name": name},
-                changes={
-                    "operator code": {"from": "", "to": noc},
-                    "name": {"from": "", "to": name},
-                },
+                fields=fields,
+                changes=changes,
                 summary=form.cleaned_data["summary"],
                 user=request.user,
             )
@@ -3969,6 +4278,25 @@ def vehicle_revision_action(request, revision_id, action):
 
 @require_safe
 def vehicle_edits(request):
+    is_trusted_or_superuser = (
+        request.user.is_authenticated
+        and (request.user.trusted or request.user.is_superuser)
+    )
+    
+    default_status = "pending" if is_trusted_or_superuser else "approved"
+    default_show = "all" if is_trusted_or_superuser else "edits"
+    
+    vehicle = None
+    
+    # Sanitize request parameters for non-trusted users
+    filter_params = request.GET.copy()
+    if not is_trusted_or_superuser:
+        if filter_params.get("show") not in ["edits", None]:
+            filter_params["show"] = "edits"
+        if filter_params.get("status") not in ["approved", None]:
+            filter_params["status"] = "approved"
+    
+    # Build base queryset with joins and ordering
     revisions = (
         apply_vehicle_schema_compat(
             VehicleRevision.objects.select_related(
@@ -3979,17 +4307,12 @@ def vehicle_edits(request):
         .prefetch_related("vehiclerevisionfeature_set__feature")
         .order_by("-id")
     )
-
-    default_status = (
-        "pending"
-        if request.user.is_authenticated
-        and (request.user.trusted or request.user.is_superuser)
-        else "approved"
-    )
-    vehicle = None
+    
     f = filters.VehicleRevisionFilter(
-        request.GET or {"status": default_status, "show": "all"}, queryset=revisions
+        filter_params or {"status": default_status, "show": default_show}, 
+        queryset=revisions
     )
+    
     if request.user.is_anonymous or not (
         request.user.trusted
         or request.user.is_superuser
@@ -3997,6 +4320,8 @@ def vehicle_edits(request):
     ):
         f.filters["status"].field.choices = [("approved", "approved")]
         f.form.fields["status"].choices = [("approved", "approved")]
+        f.filters["show"].field.choices = [("edits", "Edits only")]
+        f.form.fields["show"].choices = [("edits", "Edits only")]
 
     if f.is_valid():
         vehicle_id = f.form.cleaned_data.get("vehicle")
@@ -4004,11 +4329,16 @@ def vehicle_edits(request):
             vehicle = (
                 Vehicle.objects.select_related("operator").filter(pk=vehicle_id).first()
             )
+        
         request_logs = filter_request_logs(get_request_logs_queryset(), f.form, request)
         show = f.form.cleaned_data.get("show") or "all"
         entries = []
         if show != "requests" and not show.endswith("_request"):
-            entries = [wrap_vehicle_revision(revision) for revision in f.qs]
+            # Limit revisions for non-trusted/superuser users to improve performance
+            revisions_qs = f.qs
+            if not is_trusted_or_superuser:
+                revisions_qs = revisions_qs[:10]
+            entries = [wrap_vehicle_revision(revision) for revision in revisions_qs]
         entries += [wrap_request_log_for_user(log, request.user) for log in request_logs]
         entries.sort(key=lambda entry: entry.created_at, reverse=True)
 
@@ -4023,7 +4353,7 @@ def vehicle_edits(request):
         {
             "filter": f,
             "entries": page,
-            "reset_query": f"status={default_status}&show=all",
+            "reset_query": f"status={default_status}&show={default_show}",
             "vehicle": vehicle,
         },
     )

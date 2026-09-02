@@ -7,6 +7,9 @@ class Migration(migrations.Migration):
         ("busstops", "0027_bustimes_sync_state_stop_groups"),
     ]
 
+    # This migration creates the RouteNotice model
+    # Originally there was a duplicate 0028_routenotice.py which has been removed
+
     operations = [
         migrations.CreateModel(
             name="RouteNotice",
@@ -35,6 +38,14 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="route_notices",
+                        to="busstops.service",
+                    ),
+                ),
+                (
+                    "other_services",
+                    models.ManyToManyField(
+                        blank=True,
+                        related_name="related_route_notices",
                         to="busstops.service",
                     ),
                 ),

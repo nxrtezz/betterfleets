@@ -1,18 +1,25 @@
 services:
   web_dev:
-    build: .
-    entrypoint: sh -c "uv sync --group dev --group test; DEBUG=1 exec ./manage.py runserver 0.0.0.0:8000"
-    container_name: django_web_dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    entrypoint: sh -c "uv sync --group dev --group test; ./manage.py collectstatic --noinput --ignore=missing; DEBUG=1 exec ./manage.py runserver 0.0.0.0:8000"
+    container_name: bfdev-django
     environment:
-      - SECRET_KEY=${SECRET_KEY-}
-      - DATABASE_URL=${DATABASE_URL-postgis://dev_user:dev_password@postgres_dev:5432/betterfleets_dev}
-      - REDIS_URL=${REDIS_URL-redis://redis_dev:6379}
+      - SECRET_KEY=${SECRET_KEY-dev-secret-key-change-in-production}
+      - DATABASE_URL=postgis://postgres:postgres@bfdev-postgres:5432/postgres
+      - REDIS_URL=redis://bfdev-redis:6379
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS-localhost 127.0.0.1 dev.eeveeit.uk}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS-http://localhost http://dev.eeveeit.uk https://dev.eeveeit.uk}
+      - FIDO2_RP_ID=${FIDO2_RP_ID-localhost}
+      - FIDO2_RP_NAME=${FIDO2_RP_NAME-BetterFleet-Dev}
+      - FIDO2_RP_ORIGINS=${FIDO2_RP_ORIGINS-http://localhost:18000,http://dev.eeveeit.uk}
       - NTA_API_KEY
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
       - PYTHONWARNINGS=all
     ports:
-      - "8010:8000"
+      - "18000:8000"
     restart: on-failure
     volumes:
       - .:/app:cached
@@ -23,13 +30,13 @@ services:
 
   postgres_dev:
     image: postgis/postgis
-    container_name: postgres_dev
+    container_name: bfdev-postgres
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
     environment:
-      - PGUSER=dev_user
-      - POSTGRES_PASSWORD=dev_password
-      - POSTGRES_DB=betterfleets_dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
       interval: 5s
@@ -38,7 +45,7 @@ services:
 
   redis_dev:
     image: redis
-    container_name: redis_dev
+    container_name: bfdev-redis
 
 volumes:
   postgres_data_dev:

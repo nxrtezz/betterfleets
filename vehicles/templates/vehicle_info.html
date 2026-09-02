@@ -71,7 +71,7 @@
 
     {% if vehicle.operated_by %}
         <div>
-            <dt>Operated by</dt>
+            <dt>Loan operator</dt>
             <dd><a href="{{ vehicle.operated_by.get_absolute_url }}">{{ vehicle.operated_by }}</a></dd>
         </div>
     {% endif %}
@@ -177,7 +177,7 @@
             <li><a href="{{ vehicle.get_edit_url }}">Edit</a></li>
         {% endif %}
         {% if request.user.is_authenticated %}
-            <li><a href="#" onclick="document.getElementById('suggest-photo-form').style.display='block'; return false;">Suggest photo</a></li>
+            <li><a href="#" onclick="suggestPhoto(); return false;">Suggest photo</a></li>
         {% endif %}
         {% if vehicle.is_editable and request.user.view_advanced %}
             <li><a href="{{ vehicle.get_edit_url }}?advanced">Advanced Edit</a></li>

@@ -657,7 +657,7 @@ def get_bustimes_service_map_data(service):
 def version(request):
     if commit_hash := os.environ.get("COMMIT_HASH"):
         return HttpResponse(
-            f"""<a href="https://github.com/jclgoodwin/bustimes.org/commit/{commit_hash}">{commit_hash}</a>""",
+            f"""<a href="https://github.com/bustimes/bustimes.org/commit/{commit_hash}">{commit_hash}</a>""",
         )
     return HttpResponse(
         os.environ.get("KAMAL_CONTAINER_NAME"), content_type="text/plain"
@@ -4733,15 +4733,17 @@ def search(request):
             if compact.isdigit():
                 user_filter |= Q(id=int(compact))
 
-            context["users"] = (
-                User.objects.annotate(
-                    review_count=Count("vehicle_reviews", distinct=True),
-                    total_count=SubqueryCount("vehiclerevision"),
+            # Only show user search results to authenticated users
+            if request.user.is_authenticated:
+                context["users"] = (
+                    User.objects.annotate(
+                        review_count=Count("vehicle_reviews", distinct=True),
+                        total_count=SubqueryCount("vehiclerevision"),
+                    )
+                    .filter(user_filter)
+                    .prefetch_related("manual_tags")
+                    .order_by("-trusted", "-total_count", "-review_count", "display_name", "username", "id")[:20]
                 )
-                .filter(user_filter)
-                .prefetch_related("manual_tags")
-                .order_by("-trusted", "-total_count", "-review_count", "display_name", "username", "id")[:20]
-            )
             context["preservation_groups"] = (
                 PreservationGroup.objects.filter(
                     Q(name__icontains=query_text)

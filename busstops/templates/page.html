@@ -345,6 +345,12 @@ window.STADIA_MAPS_API_KEY = "{{ STADIA_MAPS_API_KEY|default_if_none:''|escapejs
     <div>
         <a href="/" class="site-name">BetterFleets</a>
         <ul>
+            <li><a href="/search" class="header-icon" title="Search">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </a></li>
             <li><a href="/map" class="header-icon" title="Map">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
@@ -369,13 +375,6 @@ window.STADIA_MAPS_API_KEY = "{{ STADIA_MAPS_API_KEY|default_if_none:''|escapejs
                 </a></li>
             {% endif %}
         </ul>
-        <form method="GET" action="/search" class="search">
-            <label>
-                Search
-                <input name="q" placeholder="Search" type="search" value="{{ query }}" required>
-            </label>
-            <input type="submit" value="Search">
-        </form>
     </div>
 </header>
 {% endblock header %}
@@ -405,6 +404,7 @@ window.STADIA_MAPS_API_KEY = "{{ STADIA_MAPS_API_KEY|default_if_none:''|escapejs
         {% else %}
             <li><a href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}">Sign in</a></li>
         {% endif %}
+        <li><a href="/requests">Requests</a></li>
         <li><a href="/rules">Rules</a></li>
         <li><a href="https://discord.gg/QfmMuYH88Q">Discord</a></li>
         <li><a href="/data">Data & Privacy</a></li>

@@ -221,27 +221,6 @@ class ImportDvlaCommandTests(TestCase):
 class BusGroupViewsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.operator = Operator.objects.create(noc="TEST", name="Test Operator", slug="test-operator")
-        cls.other_operator = Operator.objects.create(
-            noc="OTHR",
-            name="Other Operator",
-            slug="other-operator",
-        )
-        cls.vehicle_type = VehicleType.objects.create(name="Enviro 400")
-        cls.vehicle_one = Vehicle.objects.create(
-            code="BUS1",
-            fleet_code="1001",
-            reg="YX24ABC",
-            operator=cls.operator,
-            vehicle_type=cls.vehicle_type,
-        )
-        cls.vehicle_two = Vehicle.objects.create(
-            code="BUS2",
-            fleet_code="2002",
-            reg="YX24ABD",
-            operator=cls.other_operator,
-            vehicle_type=cls.vehicle_type,
-        )
         cls.bus_group = BusGroup.objects.create(
             title="Pride Buses",
             slug="pride-buses",
@@ -249,61 +228,34 @@ class BusGroupViewsTests(TestCase):
             header_background="#112233",
             header_foreground="#ffffff",
             accent_colour="#ff006e",
-        )
-        cls.bus_group.vehicles.add(cls.vehicle_one)
-        cls.superuser = User.objects.create_superuser(
-            username="root",
-            email="root@example.com",
-            password="secret",
-        )
-        cls.staffless_user = User.objects.create_user(
-            username="member",
-            email="member@example.com",
-            password="secret",
+            event_date="2026-08-29",
+            event_end_date="2026-08-30",
         )
 
-    def test_bus_group_page_shows_add_bus_button_for_superuser(self):
-        self.client.force_login(self.superuser)
-
+    def test_bus_group_page_displays_basic_info(self):
         response = self.client.get(self.bus_group.get_absolute_url())
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Pride Buses")
-        self.assertContains(response, "Add bus")
-        self.assertContains(response, self.vehicle_one.get_reg())
+        self.assertContains(response, "Rainbow liveries across the fleet.")
+        self.assertContains(response, "2026-08-29")
+        self.assertContains(response, "2026-08-30")
 
-    def test_bus_group_vehicle_search_returns_matches(self):
-        self.client.force_login(self.superuser)
-
-        response = self.client.get(
-            f"{self.bus_group.get_absolute_url()}/vehicle-search",
-            {"q": "2002"},
-        )
+    def test_events_page_displays_bus_groups(self):
+        response = self.client.get("/events")
 
         self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertEqual(len(payload["results"]), 1)
-        self.assertEqual(payload["results"][0]["id"], self.vehicle_two.pk)
-        self.assertFalse(payload["results"][0]["already_added"])
+        self.assertContains(response, "Pride Buses")
+        self.assertContains(response, "2026-08-29")
 
-    def test_bus_group_vehicle_search_requires_superuser(self):
-        self.client.force_login(self.staffless_user)
-
-        response = self.client.get(
-            f"{self.bus_group.get_absolute_url()}/vehicle-search",
-            {"q": "2002"},
-        )
-
-        self.assertEqual(response.status_code, 403)
-
-    def test_superuser_can_add_bus_to_group(self):
-        self.client.force_login(self.superuser)
-
-        response = self.client.post(
-            self.bus_group.get_absolute_url(),
-            {"vehicle_ids": [str(self.vehicle_two.pk)]},
-            follow=True,
-        )
+    def test_events_page_search_filters_bus_groups(self):
+        response = self.client.get("/events?search=pride")
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(self.bus_group.vehicles.filter(pk=self.vehicle_two.pk).exists())
+        self.assertContains(response, "Pride Buses")
+
+    def test_events_page_search_no_results(self):
+        response = self.client.get("/events?search=nonexistent")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No events found")

@@ -289,6 +289,36 @@
             font-style: italic;
         }
     </style>
+    <script>
+        function suggestPhoto() {
+            const flickrUrl = prompt("Requesting a photo that you do not have permission to use will result in a photo request ban. Please only request photos you either took yourself or have explicit permission to use. We will remove any photos that the Flickr poster asks us to.\n\nEnter Flickr photo URL:");
+            if (flickrUrl) {
+                const formData = new FormData();
+                formData.append('suggest_photo', '1');
+                formData.append('photo_url', flickrUrl);
+                formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+                
+                fetch('{{ request.path }}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Photo suggestion submitted for approval!');
+                    } else {
+                        alert('Error: ' + (data.error || 'Failed to submit suggestion'));
+                    }
+                })
+                .catch(error => {
+                    alert('Error: ' + error.message);
+                });
+            }
+        }
+    </script>
 {% endblock head %}
 
 {% block bodyclass %}narrow{% endblock %}
@@ -300,13 +330,13 @@
     {% if photos %}
         <figure class="vehicle-photo">
             <img src="{{ photos.0.get_display_url }}" alt="{{ vehicle }}" loading="lazy">
-            {% if photos.0.caption or photos.0.author %}
+            {% if photos.0.caption or photos.0.credit %}
                 <figcaption>
                     {% if photos.0.caption %}
                         <div class="vehicle-photo__title">{{ photos.0.caption }}</div>
                     {% endif %}
-                    {% if photos.0.author %}
-                        <div class="vehicle-photo__author">by {{ photos.0.author }}</div>
+                    {% if photos.0.credit %}
+                        <div class="vehicle-photo__author">by {{ photos.0.credit }}</div>
                     {% endif %}
                 </figcaption>
             {% endif %}
@@ -346,59 +376,7 @@
 
     {% include 'previous_operators.html' %}
 
-    {% if request.user.is_authenticated %}
-    <div id="suggest-photo-form" style="display: none; margin: 1rem 0; padding: 1rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--background-color);">
-        <h3 style="margin-top: 0;">Suggest a photo</h3>
-        <form action="{{ request.path }}" method="POST">
-            {% csrf_token %}
-            <input type="hidden" name="suggest_photo" value="1">
-            
-            <p>
-                <label style="font-weight: bold;">Vehicle:</label><br>
-                <input type="text" value="{{ vehicle.get_reg }}{% if vehicle.fleet_number or vehicle.fleet_code %} ({{ vehicle.fleet_number|default:vehicle.fleet_code }}){% endif %}" readonly style="width: 100%; max-width: 300px;">
-            </p>
-            
-            <p>
-                <label style="font-weight: bold;">Flickr URL:</label><br>
-                <input type="url" name="photo_url" placeholder="Flickr photo URL (image will be downloaded)" required style="width: 100%; max-width: 300px;">
-            </p>
-            
-            <p>
-                <label style="font-weight: bold;">Summary:</label><br>
-                <input type="text" name="summary" placeholder="Describe your photo suggestion" required style="width: 100%; max-width: 300px;">
-            </p>
-            
-            <button type="submit" class="button">Submit suggestion</button>
-            <button type="button" onclick="document.getElementById('suggest-photo-form').style.display='none';" style="margin-left: 0.5rem;">Cancel</button>
-        </form>
-    </div>
 
-    <div id="request-photo-form" style="display: none; margin: 1rem 0; padding: 1rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--background-color);">
-        <h3 style="margin-top: 0;">Request a photo</h3>
-        <form action="{{ request.path }}" method="POST">
-            {% csrf_token %}
-            <input type="hidden" name="request_photo" value="1">
-            
-            <p>
-                <label style="font-weight: bold;">Vehicle:</label><br>
-                <input type="text" value="{{ vehicle.get_reg }}{% if vehicle.fleet_number or vehicle.fleet_code %} ({{ vehicle.fleet_number|default:vehicle.fleet_code }}){% endif %}" readonly style="width: 100%; max-width: 300px;">
-            </p>
-            
-            <p>
-                <label style="font-weight: bold;">Flickr URL (if available):</label><br>
-                <input type="url" name="photo_url" placeholder="Flickr photo URL (image will be downloaded)" style="width: 100%; max-width: 300px;">
-            </p>
-            
-            <p>
-                <label style="font-weight: bold;">Description:</label><br>
-                <textarea name="description" placeholder="Describe what photo you'd like added" required style="width: 100%; max-width: 300px;"></textarea>
-            </p>
-            
-            <button type="submit" class="button">Submit request</button>
-            <button type="button" onclick="document.getElementById('request-photo-form').style.display='none';" style="margin-left: 0.5rem;">Cancel</button>
-        </form>
-    </div>
-    {% endif %}
 
     {% if vehicle.has_sorn_vor_suggestion %}
         <div class="message">
@@ -442,9 +420,6 @@
             <input type="hidden" name="log_photo" value="1">
             <button type="submit" class="button">{% if vehicle_photographed %}Log photo ({{ photo_log_quantity }}){% else %}Log photo{% endif %}</button>
         </form>
-    {% endif %}
-    {% if request.user.is_authenticated %}
-        <button type="button" onclick="document.getElementById('request-photo-form').style.display='block';" class="button">Request photo</button>
     {% endif %}
     {% if can_drive_log %}
         <form action="{{ request.path }}{% if request.GET.date %}?date={{ request.GET.date|urlencode }}{% endif %}" method="POST">
@@ -649,13 +624,13 @@
                 {% for photo in photos %}{% if not forloop.first %}
                     <figure class="vehicle-photo" style="width: 180px; margin: 0;">
                         <img src="{{ photo.get_display_url }}" alt="" loading="lazy">
-                        {% if photo.caption or photo.author %}
+                        {% if photo.caption or photo.credit %}
                             <figcaption style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
                                 {% if photo.caption %}
                                     <div class="vehicle-photo__title" style="font-size: 0.8rem;">{{ photo.caption }}</div>
                                 {% endif %}
-                                {% if photo.author %}
-                                    <div class="vehicle-photo__author" style="font-size: 0.7rem;">by {{ photo.author }}</div>
+                                {% if photo.credit %}
+                                    <div class="vehicle-photo__author" style="font-size: 0.7rem;">by {{ photo.credit }}</div>
                                 {% endif %}
                             </figcaption>
                         {% endif %}
@@ -667,6 +642,11 @@
     {% endwith %}
 
     <h3 style="margin: 1rem 0 0.5rem;">Add photo (Flickr URL)</h3>
+    <p>
+        Requesting a photo that you do not have permission to use will result in a photo request ban.
+        Please only request photos you either took yourself or have explicit permission to use.
+        We will remove any photos that the Flickr poster asks us to.
+    </p>
     <form action="{{ request.path }}" method="POST" style="margin: 1rem 0;">
         {{ photo_form.as_p }}
         {% csrf_token %}
@@ -674,6 +654,11 @@
     </form>
     {% elif request.user.is_authenticated and request.user.trusted %}
     <h3 style="margin: 1rem 0 0.5rem;">Add photo (Flickr URL)</h3>
+    <p>
+        Requesting a photo that you do not have permission to use will result in a photo request ban.
+        Please only request photos you either took yourself or have explicit permission to use.
+        We will remove any photos that the Flickr poster asks us to.
+    </p>
     <form action="{{ request.path }}" method="POST" style="margin: 1rem 0;">
         <p>
             <label style="font-weight: bold;">Flickr URL:</label><br>
@@ -686,10 +671,6 @@
         <p>
             <label style="font-weight: bold;">Caption:</label><br>
             <input type="text" name="tu_caption" placeholder="Photo caption (optional)" style="width: 100%; max-width: 300px;">
-        </p>
-        <p>
-            <label style="font-weight: bold;">Author:</label><br>
-            <input type="text" name="tu_author" placeholder="Photo author (optional)" style="width: 100%; max-width: 300px;">
         </p>
         {% csrf_token %}
         <input type="submit" class="button" value="Add photo">

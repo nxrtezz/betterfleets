@@ -1332,7 +1332,7 @@ class ViewsTests(TestCase):
             response = self.client.get("/version")
         self.assertEqual(
             response.content,
-            b"<a href=\"https://github.com/jclgoodwin/bustimes.org/commit/i've had a ploughman's\">"
+            b"<a href=\"https://github.com/bustimes/bustimes.org/commit/i've had a ploughman's\">"
             b"i've had a ploughman's</a>",
         )
 

@@ -35,6 +35,7 @@ export type Vehicle = {
   tfl_code?: string;
   trip_id?: number;
   service_id?: number;
+  source?: string;
   service?: {
     url?: string;
     line_name: string;
@@ -113,7 +114,7 @@ function VehicleMarker({ vehicle, selected }: VehicleMarkerProps) {
 
   const isSvgLivery = vehicle.vehicle?.livery_type === 'svg' && vehicle.vehicle?.livery_svg_url;
 
-  if (isSvgLivery) {
+  if (isSvgLivery && vehicle.vehicle) {
     marker = (
       <img
         src={vehicle.vehicle.livery_svg_url}
