@@ -7,6 +7,7 @@ from ciso8601 import parse_datetime
 from django.contrib.gis.geos import Point
 from django.contrib.auth.models import Permission
 from django.test import TestCase, override_settings
+from django.urls import reverse
 
 from accounts.models import User
 from busstops.models import (
@@ -834,7 +835,7 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
         self.client.force_login(self.trusted_user)
 
         response = self.client.post(
-            f"{self.vehicle_1.get_edit_url()}?advanced",
+            reverse("vehicle_advanced_edit", args=(self.vehicle_1.slug,)),
             {
                 "fleet_number": "1",
                 "reg": "FD54JYA",
@@ -897,7 +898,7 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
         self.client.force_login(self.staff_user)
 
         response = self.client.post(
-            f"{self.vehicle_1.get_edit_url()}?advanced",
+            reverse("vehicle_advanced_edit", args=(self.vehicle_1.slug,)),
             {
                 "fleet_number": "1",
                 "reg": "FD54JYA",
