@@ -13,7 +13,7 @@ def get_user_route_stats(user) -> dict:
         ridden=True,
         service__operator__isnull=False,
     ).distinct()
-    ridden_operator_ids = ridden_routes.values("service__operator_id")
+    ridden_operator_ids = ridden_routes.values("service__operator")
     public_routes = Service.objects.annotate(
         actual_public_use=Coalesce("public_use", BoolOr("route__public_use"), True)
     ).exclude(actual_public_use=False).filter(

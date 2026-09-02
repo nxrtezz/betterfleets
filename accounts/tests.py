@@ -283,6 +283,12 @@ class UserDirectoryTests(TransactionTestCase):
         self.assertEqual(livery_response.status_code, HTTPStatus.OK)
         self.assertContains(livery_response.json()["html"], "Test Livery")
 
+    def test_user_detail_shows_zero_route_total_without_ridden_routes(self):
+        response = self.client.get(self.viewer.get_absolute_url())
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertContains(response, "0/0")
+
     def test_user_list_search_filters_results(self):
         target = User.objects.create_user(
             username="target-user",
