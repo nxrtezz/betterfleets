@@ -9,7 +9,7 @@ from openpyxl import load_workbook
 from openpyxl.workbook import Workbook
 
 from accounts.models import User
-from busstops.models import Operator, OperatorGroup, Organisation, Service, ServiceColour
+from busstops.models import Operator, OperatorGroup, Organisation, Service
 from bustimes.models import Garage
 from fleet.parsers.pdf_fleet_parser import ParsedFleetRecord
 from vehicles.models import Livery, Vehicle
@@ -32,7 +32,7 @@ class OperatorAdminMassAddTests(TestCase):
             current=True,
         )
         cls.existing_service.operator.add(cls.operator)
-        cls.blue = ServiceColour.objects.create(name="Blue", background="#0000ff")
+        cls.blue = "#0000ff"
         cls.superuser = User.objects.create_superuser(
             username="root",
             email="root@example.com",
@@ -278,8 +278,8 @@ class OperatorAdminMassAddTests(TestCase):
             "rows_text": "\n".join(
                 [
                     "service_code,line_name,description,current,public_use,colour",
-                    "MASS-1,1 Updated,Town - Station via Centre,false,true,Blue",
-                    "MASS-2,2,Town - Hospital,true,false,Blue",
+                    "MASS-1,1 Updated,Town - Station via Centre,false,true,#0000ff",
+                    "MASS-2,2,Town - Hospital,true,false,#0000ff",
                     ",,,,maybe,Unknown",
                 ]
             ),
@@ -947,5 +947,4 @@ class OperatorAdminMassAddTests(TestCase):
         self.assertEqual(operator_two.organisation, organisation)
         self.assertTrue(self.operator.is_manual)
         self.assertTrue(operator_two.is_manual)
-
 

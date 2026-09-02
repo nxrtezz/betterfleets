@@ -18,7 +18,6 @@ from busstops.models import (
     OperatorCode,
     Region,
     Service,
-    ServiceColour,
     StopPoint,
 )
 from vehicles.models import Vehicle, VehicleJourney
@@ -1054,17 +1053,15 @@ class ImportTransXChangeTest(TestCase):
 
     @time_machine.travel("25 June 2016")
     def test_do_service_scotland(self):
-        colour = ServiceColour.objects.create(
-            name="Navy Blue Line",
-            foreground="#111111",
-            background="#c0c0c0",
-            use_name_as_brand=True,
-        )
         source = DataSource.objects.create(
             name="S", url="ftp://ftp.tnds.basemap.co.uk/S.zip"
         )
         service = Service.objects.create(
-            service_code="ABBN017", line_name="N17", colour=colour, source=source
+            service_code="ABBN017",
+            line_name="N17",
+            line_brand="Navy Blue Line",
+            colour="#c0c0c0",
+            source=source,
         )
         service.operator.add(self.fabd)
 
@@ -1132,18 +1129,13 @@ class ImportTransXChangeTest(TestCase):
         # Test service colour
         response = self.client.get("/stops/639004592")
         self.assertContains(response, "background: #c0c0c0;")
-        self.assertContains(response, "border-color: #111111;")
-        self.assertContains(response, "color: #111111;")
+        self.assertContains(response, "border-color: #c0c0c0;")
+        self.assertContains(response, "color: #000;")
 
         response = self.client.get("/operators/FABD")
         self.assertContains(response, "background: #c0c0c0;")
-        self.assertContains(response, "border-color: #111111;")
-        self.assertContains(response, "color: #111111;")
-
-        self.assertEqual(
-            colour.preview(),
-            """<div style="background:#c0c0c0;color:#111111">Navy Blue Line</div>""",
-        )
+        self.assertContains(response, "border-color: #c0c0c0;")
+        self.assertContains(response, "color: #000;")
 
         # set current=False and re-import - should reset operator etc:
         service.operator.add(self.fecs)

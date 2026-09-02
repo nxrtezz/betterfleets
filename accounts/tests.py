@@ -3,10 +3,12 @@ from unittest.mock import patch
 
 from django.core import mail
 from django.test import Client, TestCase, TransactionTestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from busstops.models import Operator
-from vehicles.models import Vehicle, VehicleReview, VehicleRevision
+from fleet.models import FleetRideLog
+from vehicles.models import Livery, Vehicle, VehicleReview, VehicleRevision
 
 from .models import Invitation, ProfileTag, RegistrationSettings, User
 
@@ -259,6 +261,27 @@ class UserDirectoryTests(TransactionTestCase):
         self.assertContains(response, "Public Profile")
         self.assertContains(response, "@public-user-detail")
         self.assertNotContains(response, "Edit profile")
+
+    def test_user_liveries_endpoint_uses_the_profile_route(self):
+        livery = Livery.objects.create(name="Test Livery", colour="#123456")
+        vehicle = Vehicle.objects.create(
+            code="LIVERY-1",
+            operator=self.operator,
+            livery=livery,
+        )
+        FleetRideLog.objects.create(user=self.viewer, vehicle=vehicle)
+
+        profile_response = self.client.get(self.viewer.get_absolute_url())
+        livery_response = self.client.get(
+            reverse("user_liveries", args=(self.viewer.pk,))
+        )
+
+        self.assertContains(
+            profile_response,
+            reverse("user_liveries", args=(self.viewer.pk,)),
+        )
+        self.assertEqual(livery_response.status_code, HTTPStatus.OK)
+        self.assertContains(livery_response.json()["html"], "Test Livery")
 
     def test_user_list_search_filters_results(self):
         target = User.objects.create_user(

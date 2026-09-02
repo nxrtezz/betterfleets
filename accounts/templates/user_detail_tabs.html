@@ -531,7 +531,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('liveries-container');
         if (container.dataset.loaded) return;
         
-        fetch(`/accounts/{{ object.id }}/liveries/`)
+        fetch("{% url 'user_liveries' object.pk %}")
             .then(response => response.json())
             .then(data => {
                 container.innerHTML = data.html;

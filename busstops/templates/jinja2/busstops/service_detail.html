@@ -7,15 +7,6 @@
     <meta property="og:description" content="{{ operators.0 }}">
     <link rel="stylesheet" href="{{ static('dist/js/app.css') }}">
 
-    {% if object.colour %}
-    <style>
-        .colour-{{ object.colour_id }} {
-            background: {{ object.colour.background }};
-            border-color: {{ object.colour.foreground }};
-            color: {{ object.colour.foreground }};
-        }
-    </style>
-    {% endif %}
 {% endblock head %}
 
 {% block bodyclass %}{% endblock %}
@@ -27,14 +18,14 @@
     {% for line_name in object.get_line_names() %}
         {% if line_name and line_name not in object.line_brand %}
             {% if ' ' not in line_name or line_name not in object.description %}
-                <strong class="name{% if ' ' not in line_name %} is-short{% endif %}{% if object.colour_id %} colour colour-{{ object.colour_id }}{% endif %}">
+                <strong class="name{% if ' ' not in line_name %} is-short{% endif %}{% if object.colour %} colour{% endif %}"{% if object.colour %} style="background: {{ object.colour }}; border-color: {{ object.colour }}; color: {{ object.colour_foreground }}"{% endif %}>
                     {{ line_name }}
                 </strong>
             {% endif %}
         {% endif %}
     {% endfor %}
     {% if object.line_brand %}
-        <strong class="name{% if object.colour_id %} colour colour-{{ object.colour_id }}{% endif %}">{{ object.line_brand }}</strong>
+        <strong class="name{% if object.colour %} colour{% endif %}"{% if object.colour %} style="background: {{ object.colour }}; border-color: {{ object.colour }}; color: {{ object.colour_foreground }}"{% endif %}>{{ object.line_brand }}</strong>
     {% endif %}
     </span>
     <span class="description">{{ object.description }} {% if request.user.is_authenticated %}{% if not route_is_public %}<span title="Non-public route" aria-label="Non-public route">-</span>{% elif route_ridden %}<span title="Route ridden" aria-label="Route ridden">&#10003;</span>{% else %}<span title="Route not yet ridden" aria-label="Route not yet ridden">&#10007;</span>{% endif %}{% endif %}</span>

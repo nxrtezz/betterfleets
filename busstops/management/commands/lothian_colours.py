@@ -1,7 +1,6 @@
 from django.core.management.base import BaseCommand
 
 from vehicles.models import Vehicle
-from ...models import ServiceColour
 
 
 class Command(BaseCommand):
@@ -21,12 +20,7 @@ class Command(BaseCommand):
                 service = vehicle.latest_journey.service
 
                 if data["routeName"] == service.line_name:
-                    colour, _ = ServiceColour.objects.get_or_create(
-                        {"name": data["routeName"]},
-                        foreground=data["routeTextColor"],
-                        background=data["routeColor"],
-                    )
-                    service.colour = colour
+                    service.colour = data["routeColor"]
                     service.save(update_fields=["colour"])
 
                     line_names.add(data["routeName"])

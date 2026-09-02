@@ -8,10 +8,17 @@ from .models import ServiceLog
 
 def get_user_route_stats(user) -> dict:
     """Return route-completion totals for a user's public profile."""
+    ridden_routes = ServiceLog.objects.filter(
+        user=user,
+        ridden=True,
+        service__operator__isnull=False,
+    ).distinct()
+    ridden_operator_ids = ridden_routes.values("service__operator_id")
     public_routes = Service.objects.annotate(
         actual_public_use=Coalesce("public_use", BoolOr("route__public_use"), True)
-    ).exclude(actual_public_use=False)
-    ridden_routes = ServiceLog.objects.filter(user=user, ridden=True)
+    ).exclude(actual_public_use=False).filter(
+        operator__in=ridden_operator_ids
+    ).distinct()
     total_public_routes = public_routes.count()
     ridden_non_public_routes = ridden_routes.exclude(
         service_id__in=public_routes.values("id")

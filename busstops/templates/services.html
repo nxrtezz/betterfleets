@@ -1,12 +1,4 @@
 <style>
-{% for colour in colours %}
-.colour-{{ colour.id }} {
-    background: {{ colour.background }};
-    border-color: {{ colour.foreground }};
-    color: {{ colour.foreground }};
-}
-{% endfor %}
-
 .services-container {
     margin: 1.5rem 0;
 }
@@ -92,9 +84,18 @@
     <li>
         <a href="{{ service.get_absolute_url }}">
             <span class="names">
-                <strong class="name is-short">
-                    {{ service.line_name }}
-                </strong>
+                {% for line_name in service.get_line_names %}
+                    {% if line_name and line_name not in service.line_brand %}
+                        {% if ' ' not in line_name or line_name not in service.description %}
+                            <strong class="name{% if ' ' not in line_name %} is-short{% endif %}{% if service.colour %} colour{% endif %}"{% if service.colour %} style="background: {{ service.colour }}; border-color: {{ service.colour }}; color: {{ service.colour_foreground }}"{% endif %}>
+                                {{ line_name }}
+                            </strong>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+                {% if service.line_brand %}
+                    <strong class="name{% if service.colour %} colour{% endif %}"{% if service.colour %} style="background: {{ service.colour }}; border-color: {{ service.colour }}; color: {{ service.colour_foreground }}"{% endif %}>{{ service.line_brand }}</strong>
+                {% endif %}
             </span>
             <span class="description">
                 {{ service.description }}{% if request.user.is_authenticated %} {% if not service.route_is_public %}<span title="Non-public route" aria-label="Non-public route">-</span>{% elif service.route_ridden %}<span title="Route ridden" aria-label="Route ridden">&#10003;</span>{% else %}<span title="Route not yet ridden" aria-label="Route not yet ridden">&#10007;</span>{% endif %}{% endif %}
