@@ -21,7 +21,6 @@ from django.contrib.gis.geos import GEOSGeometry, Point
 from django.db import IntegrityError
 from django.db.models import Count, Exists, OuterRef, Q
 from django.db.models.functions import Now, Upper
-from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import localdate
 from titlecase import titlecase
 
@@ -30,14 +29,12 @@ from busstops.models import (
     Operator,
     Service,
     ServiceCode,
-    ServiceColour,
     StopPoint,
     StopUsage,
 )
 from busstops.management.commands.naptan_new import get_stop
 from busstops.utils import get_datetime
 from txc import TransXChange
-from vehicles.models import get_text_colour
 
 from ...models import (
     BankHoliday,
@@ -1300,21 +1297,15 @@ class Command(BaseCommand):
                 service.description = description
 
             if line.colour:
-                background = f"#{line.colour}"
-                foreground = get_text_colour(background) or "#000"
-                service.colour, _ = ServiceColour.objects.get_or_create(
-                    background=background,
-                    foreground=foreground,
-                    use_name_as_brand=False,
-                )
+                service.colour = f"#{line.colour.lstrip('#')}"
             elif service_code and service.mode == "bus" and service_code[:4] == "tfl_":
                 # London bus red
-                service.colour_id = 8
+                service.colour = "#dc241f"
             else:
                 # use the operator's colour
                 for operator in operators.values():
                     if operator.colour_id:
-                        service.colour_id = operator.colour_id
+                        service.colour = operator.colour.background
                         break
 
             # Lines and Services can have a MarketingName
@@ -1344,21 +1335,6 @@ class Command(BaseCommand):
                             f" [{line_brand}]"
                         )
 
-            if (
-                not line_brand
-                and service.colour_id
-            ):
-                try:
-                    colour = service.colour
-                    if (
-                        colour.use_name_as_brand
-                        and colour.name
-                        and colour.name != service.line_name
-                    ):
-                        # e.g. (First Eastern Counties) 'Yellow Line'
-                        line_brand = colour.name
-                except ObjectDoesNotExist:
-                    pass
             if any(line_brand == operator.name for operator in operators.values()):
                 line_brand = ""
 

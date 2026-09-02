@@ -5,7 +5,6 @@ from django.db.models import Exists, Max, OuterRef
 from django.views.generic.detail import DetailView
 
 from busstops.models import Service
-from busstops.views import get_colours
 from bustimes.models import Route
 
 from .models import Licence, Registration, Variation
@@ -72,8 +71,6 @@ class RegistrationView(UpperCaseSlugMixin, DetailView):
             current=True,
         )
         context["services"] = sorted(services, key=Service.get_order)
-        if context["services"]:
-            context["colours"] = get_colours(context["services"])
 
         return context
 

@@ -74,6 +74,11 @@ def service_slug_source(instance):
     return str(instance)
 
 
+def validate_hex_colour(value):
+    if value and not re.fullmatch(r"#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?", value):
+        raise ValidationError("Enter a three- or six-digit hexadecimal colour.")
+
+
 class SearchMixin:
     def update_search_vector(self):
         instance = self._meta.default_manager.with_documents().get(pk=self.pk)
@@ -1390,7 +1395,12 @@ class Service(models.Model):
 
     public_use = models.BooleanField(null=True)
 
-    colour = models.ForeignKey(ServiceColour, models.SET_NULL, null=True, blank=True)
+    colour = models.CharField(
+        max_length=7,
+        blank=True,
+        validators=[validate_hex_colour],
+        help_text="Hexadecimal colour, e.g. #1d4ed8.",
+    )
 
     is_rail_replacement = models.BooleanField(
         default=False,
@@ -1454,6 +1464,20 @@ class Service(models.Model):
         if self.line_brand:
             return f"{line_name} - {self.line_brand}"
         return line_name
+
+    @property
+    def colour_foreground(self):
+        if not self.colour or not re.fullmatch(
+            r"#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?", self.colour
+        ):
+            return ""
+        colour = self.colour.lstrip("#")
+        if len(colour) == 3:
+            colour = "".join(component * 2 for component in colour)
+        red, green, blue = (
+            int(colour[index : index + 2], 16) for index in range(0, 6, 2)
+        )
+        return "#fff" if 0.299 * red + 0.587 * green + 0.114 * blue <= 186 else "#000"
 
     def get_a_mode(self):
         if self.mode and self.mode[0].lower() in "aeiou":
@@ -1741,7 +1765,4 @@ class SIRISource(models.Model):
 
     def is_poorly(self):
         return cache.get(self.get_poorly_key())
-
-
-
 

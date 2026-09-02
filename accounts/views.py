@@ -274,7 +274,7 @@ def user_detail(request, pk):
         timeline_items.append({
             'type': 'review',
             'item': review,
-            'created_at': review.updated_at if review.updated_at > review.created_at else review.created_at,
+            'created_at': review.updated_at or review.created_at,
         })
     for photo in photos:
         timeline_items.append({
@@ -296,7 +296,10 @@ def user_detail(request, pk):
         })
     
     # Sort by date
-    timeline_items.sort(key=lambda x: x['created_at'], reverse=True)
+    timeline_items.sort(
+        key=lambda item: (item["created_at"] is not None, item["created_at"]),
+        reverse=True,
+    )
     timeline_items = timeline_items[:100]
 
     context = {

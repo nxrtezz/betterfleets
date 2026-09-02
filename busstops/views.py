@@ -129,7 +129,6 @@ from .models import (
     RouteNotice,
     Service,
     ServiceCode,
-    ServiceColour,
     StopArea,
     StopGroup,
     StopPoint,
@@ -433,12 +432,6 @@ operator_has_current_services_or_vehicles = operator_has_current_services | Exis
         )
     ),
 )
-
-
-def get_colours(services):
-    colours = set(service.colour_id for service in services if service.colour_id)
-    if colours:
-        return ServiceColour.objects.filter(id__in=colours)
 
 
 def compact_text(value):
@@ -1743,11 +1736,10 @@ class RegionDetailView(UppercasePrimaryKeyMixin, DetailView):
             context["services"] = sorted(
                 context["operators"][0]
                 .service_set.filter(current=True)
+                .with_line_names()
                 .defer("geometry"),
                 key=Service.get_order,
             )
-            context["colours"] = get_colours(context["services"])
-
         return context
 
 
@@ -1794,7 +1786,7 @@ class AdminAreaDetailView(DetailView):
         ).defer("latlong")
 
         if not (context["localities"] or context["districts"]):
-            services = Service.objects.filter(current=True).defer(
+            services = Service.objects.with_line_names().filter(current=True).defer(
                 "geometry", "search_vector"
             )
             services = services.filter(
@@ -1908,7 +1900,6 @@ class LocalityDetailView(UppercasePrimaryKeyMixin, DetailView):
             context["modes"] = {
                 service.mode for service in context["services"] if service.mode
             }
-            context["colours"] = get_colours(context["services"])
         context["breadcrumb"] = [
             crumb
             for crumb in [
@@ -2043,8 +2034,6 @@ class StopPointDetailView(DetailView):
         context["modes"] = {
             service.mode for service in context["services"] if service.mode
         }
-        context["colours"] = get_colours(context["services"])
-
         nearby = (
             StopPoint.objects.filter(active=True)
             .order_by("common_name", "indicator")
@@ -2687,9 +2676,6 @@ class OperatorDetailView(DetailView):
         if context["services"] or context["non_current_services"] or context["event_services"]:
             # for 'from {date}' for future services:
             context["today"] = timezone.localdate()
-            context["colours"] = get_colours(
-                context["services"] + context["non_current_services"] + context["event_services"]
-            )
 
         record_recently_viewed(
             self.request,
@@ -3511,7 +3497,7 @@ class ServiceDetailView(DetailView):
     model = Service
     queryset = (
         model.objects.with_line_names()
-        .select_related("region", "source", "colour")
+        .select_related("region", "source")
         .annotate(actual_public_use=Coalesce("public_use", BoolOr("route__public_use")))
         .prefetch_related("operator")
         .defer("search_vector")
@@ -3653,15 +3639,6 @@ class ServiceDetailView(DetailView):
         context["route_is_public"] = self.object.actual_public_use is not False
 
         context["related"] = self.object.get_similar_services()
-        if context["related"]:
-            context["colours"] = get_colours(
-                [
-                    service
-                    for service in context["related"]
-                    if service.colour_id != self.object.colour_id
-                ]
-            )
-
         # timetable
 
         date = None

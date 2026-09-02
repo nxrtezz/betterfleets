@@ -99,7 +99,7 @@ class Command(BaseCommand):
             service.source = source
             service.description = route.description = row.route_long_name
             service.current = True
-            service.colour_id = operator.colour_id
+            service.colour = operator.colour.background if operator.colour_id else ""
             service.route_type = MODES[row.route_type]
             if row.geometry:
                 service.geometry = row.geometry.wkt

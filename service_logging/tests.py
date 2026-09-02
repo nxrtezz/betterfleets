@@ -2,6 +2,7 @@ from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from .models import ServiceLog
+from .completion import get_user_route_stats
 
 User = get_user_model()
 
@@ -66,6 +67,24 @@ class ServiceLogModelTests(TestCase):
         )
         self.assertIn("ridden", str(log))
         self.assertIn("photographed", str(log))
+
+    def test_route_stats_only_include_ridden_operators(self):
+        from busstops.models import Operator, Service
+
+        first_operator = Operator.objects.create(noc="FIRST", name="First Operator")
+        second_operator = Operator.objects.create(noc="SECOND", name="Second Operator")
+        first_service = Service.objects.create(service_code="FIRST-1", line_name="1")
+        second_service = Service.objects.create(service_code="SECOND-1", line_name="1")
+        first_service.operator.add(first_operator)
+        second_service.operator.add(second_operator)
+
+        self.assertEqual(get_user_route_stats(self.user)["overall_total"], 0)
+
+        ServiceLog.objects.create(user=self.user, service=first_service, ridden=True)
+
+        stats = get_user_route_stats(self.user)
+        self.assertEqual(stats["ridden"], 1)
+        self.assertEqual(stats["overall_total"], 1)
 
 
 class ServiceLogViewTests(TestCase):

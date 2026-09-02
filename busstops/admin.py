@@ -3588,7 +3588,7 @@ vehicle.garage.name if vehicle.garage else "",
         instructions.append(
             [
                 "colour",
-                "Optional service colour id or exact colour name.",
+                "Optional three- or six-digit hexadecimal colour, e.g. #1d4ed8.",
             ]
         )
         return workbook
@@ -3629,7 +3629,6 @@ vehicle.garage.name if vehicle.garage else "",
     def _mass_route_rows_from_operator_services(self, operator):
         services = (
             models.Service.objects.filter(operator=operator)
-            .select_related("colour")
             .order_by("line_name", "description", "service_code", "pk")
             .distinct()
         )
@@ -3649,7 +3648,7 @@ vehicle.garage.name if vehicle.garage else "",
                     "true" if service.timetable_wrong else "false",
                     "true" if service.tracking else "false",
                     "" if service.public_use is None else ("true" if service.public_use else "false"),
-                    service.colour.name if service.colour else "",
+                    service.colour,
                 )
             )
         return rows
@@ -3706,16 +3705,12 @@ vehicle.garage.name if vehicle.garage else "",
 
     def _resolve_service_colour(self, value):
         if value == "":
-            return None
-        if value.isdigit():
-            try:
-                return models.ServiceColour.objects.get(pk=int(value))
-            except models.ServiceColour.DoesNotExist as exc:
-                raise ValueError(f"Unknown colour id '{value}'") from exc
-        colour = models.ServiceColour.objects.filter(name__iexact=value).first()
-        if colour:
-            return colour
-        raise ValueError(f"Unknown colour '{value}'")
+            return ""
+        try:
+            models.validate_hex_colour(value)
+        except ValidationError as exc:
+            raise ValueError(exc.messages[0]) from exc
+        return value
 
     def _find_mass_add_service(self, operator, mapped):
         service_id = mapped.get("service_id", "")
@@ -3846,9 +3841,8 @@ vehicle.garage.name if vehicle.garage else "",
                 with transaction.atomic():
                     service = row["service"]
                     values = row["values"].copy()
-                    colour = values.pop("colour")
                     if service is None:
-                        service = models.Service.objects.create(**values, colour=colour)
+                        service = models.Service.objects.create(**values)
                         row["operator"].service_set.add(service)
                         service.update_search_vector()
                         row["service"] = service
@@ -3856,8 +3850,7 @@ vehicle.garage.name if vehicle.garage else "",
                     else:
                         for field, value in values.items():
                             setattr(service, field, value)
-                        service.colour = colour
-                        service.save(update_fields=[*values.keys(), "colour", "modified_at"])
+                        service.save(update_fields=[*values.keys(), "modified_at"])
                         service.update_search_vector()
                         if not service.operator.filter(pk=row["operator"].pk).exists():
                             service.operator.add(row["operator"])
@@ -5051,7 +5044,7 @@ class ServiceAdmin(GISModelAdmin):
         "is_rail_replacement",
     )
     search_fields = ("service_code", "line_name", "line_brand", "description")
-    raw_id_fields = ("operator", "stops", "colour", "source")
+    raw_id_fields = ("operator", "stops", "source")
     inlines = [
         ServiceCodeInline,
         RouteInline,
@@ -5067,7 +5060,6 @@ class ServiceAdmin(GISModelAdmin):
         "route_editor_link",
     ]
     list_editable = ["colour", "line_brand"]
-    list_select_related = ["colour"]
     actions = [
         "assign_to_operator",
         "current_false",
@@ -7165,21 +7157,21 @@ class ServiceCodeAdmin(admin.ModelAdmin):
 
 @admin.register(models.ServiceColour)
 class ServiceColourAdmin(admin.ModelAdmin):
-    list_display = ["preview", "foreground", "background", "services"]
+    list_display = ["preview", "foreground", "background", "operators"]
     search_fields = ["name"]
-    list_filter = [("service__operator", admin.EmptyFieldListFilter)]
+    list_filter = [("operator", admin.EmptyFieldListFilter)]
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
         if "changelist" in request.resolver_match.view_name:
             queryset = queryset.annotate(
-                services=SubqueryCount("service", filter=Q(current=True))
+                operators=SubqueryCount("operator")
             )
         return queryset
 
-    @admin.display(ordering="services")
-    def services(self, obj):
-        return obj.services
+    @admin.display(ordering="operators")
+    def operators(self, obj):
+        return obj.operators
 
 
 @admin.register(models.DataSource)
@@ -7336,7 +7328,6 @@ class PaymentMethodAdmin(admin.ModelAdmin):
 
 admin.site.register(models.Region)
 admin.site.register(models.District)
-
 
 
 

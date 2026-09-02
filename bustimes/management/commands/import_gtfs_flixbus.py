@@ -120,7 +120,7 @@ class Command(BaseCommand):
             service.line_name = line_name
             service.description = route.description = row.route_long_name
             service.current = True
-            service.colour_id = operator.colour_id
+            service.colour = operator.colour.background if operator.colour_id else ""
             service.source = source
             service.geometry = geometries.get(row.route_id)
             service.region_id = "GB"
