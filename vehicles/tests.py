@@ -834,7 +834,7 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
         self.client.force_login(self.trusted_user)
 
         response = self.client.post(
-            f"{self.vehicle_1.get_edit_url()}?advanced",
+            f"{self.vehicle_1.get_edit_url().replace('/edit', '/advanced-edit')}",
             {
                 "fleet_number": "1",
                 "reg": "FD54JYA",
@@ -897,7 +897,7 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
         self.client.force_login(self.staff_user)
 
         response = self.client.post(
-            f"{self.vehicle_1.get_edit_url()}?advanced",
+            f"{self.vehicle_1.get_edit_url().replace('/edit', '/advanced-edit')}",
             {
                 "fleet_number": "1",
                 "reg": "FD54JYA",

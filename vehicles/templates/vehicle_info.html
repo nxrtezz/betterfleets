@@ -166,7 +166,7 @@
             <li><a href="#" onclick="suggestPhoto(); return false;">Suggest photo</a></li>
         {% endif %}
         {% if vehicle.is_editable and request.user.view_advanced %}
-            <li><a href="{{ vehicle.get_edit_url }}?advanced">Advanced Edit</a></li>
+            <li><a href="{% url 'vehicle_advanced_edit' vehicle.slug %}">Advanced Edit</a></li>
         {% endif %}
         {% if vehicle.is_editable and request.user.trusted %}
             <li><a href="{% url 'vehicle_compare' vehicle.id %}">Compare</a></li>

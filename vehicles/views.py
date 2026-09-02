@@ -3389,7 +3389,7 @@ revision_display_related_fields = (
 
 
 @login_required
-def edit_vehicle(request, **kwargs):
+def edit_vehicle(request, advanced_mode=False, **kwargs):
     check_user(request)
 
     edit_related = ["vehicle_type", "livery", "operator", "garage"]
@@ -3416,6 +3416,7 @@ def edit_vehicle(request, **kwargs):
     context = {
         "previous": vehicle.get_previous(),
         "next": vehicle.get_next(),
+        "advanced_mode": advanced_mode,
     }
 
     revision = None
@@ -3426,9 +3427,6 @@ def edit_vehicle(request, **kwargs):
         ]["VehicleUniqueId"]
     except (KeyError, TypeError):
         pass
-
-    # Check if advanced mode is requested via query parameter
-    advanced_mode = "advanced" in request.GET
 
     if advanced_mode:
         form = forms.AdvancedVehicleEditForm(form_data, vehicle=vehicle)
