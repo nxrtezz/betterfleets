@@ -20,6 +20,7 @@ from busstops.models import (
 )
 
 from .models import (
+    AdvancedField,
     Livery,
     Vehicle,
     VehicleFeature,
@@ -604,6 +605,42 @@ class VehiclesTests(TestCase):
         self.assertRedirects(
             response, self.vehicle_1.get_advanced_edit_url(), 302, 200
         )
+
+        AdvancedField.objects.create(
+            name="Engine",
+            slug="engine",
+            field_type=AdvancedField.FieldType.TEXT,
+        )
+
+        response = self.client.post(
+            self.vehicle_1.get_advanced_edit_url(),
+            {
+                "vehicle_type": self.vehicle_1.vehicle_type_id,
+                "fleet_number": str(self.vehicle_1.fleet_number),
+                "colours": "",
+                "reg": self.vehicle_1.reg,
+                "advanced_engine": "Cummins B6.7",
+                "summary": "Add engine metadata",
+            },
+        )
+        self.assertContains(response, "Thank you")
+        self.assertIn("advanced", response.context["revision"].changes)
+
+        self.client.force_login(self.trusted_user)
+        response = self.client.post(
+            self.vehicle_1.get_advanced_edit_url(),
+            {
+                "vehicle_type": self.vehicle_1.vehicle_type_id,
+                "fleet_number": str(self.vehicle_1.fleet_number),
+                "colours": "",
+                "reg": self.vehicle_1.reg,
+                "advanced_engine": "Volvo D8K",
+                "summary": "Fix engine metadata",
+            },
+        )
+        self.assertContains(response, "Thank you")
+        self.vehicle_1.refresh_from_db()
+        self.assertEqual(self.vehicle_1.advanced.get("engine"), "Volvo D8K")
 
     def test_vehicle_edit_1(self):
         response = self.client.get("/vehicles/edits?status=pending")

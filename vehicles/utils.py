@@ -1,4 +1,5 @@
 import math
+import json
 
 from django.core.cache import caches
 from django.conf import settings
@@ -182,6 +183,19 @@ def get_revision(vehicle, data):
             from_value = (vehicle.data or {}).get(key, "")
             revision.changes[f"data:{key}"] = f"-{from_value}\n+{to_value}"
 
+    if "advanced" in data:
+        from_advanced = dict(vehicle.advanced or {})
+        to_advanced = dict(from_advanced)
+        for key, value in data.pop("advanced").items():
+            if value is None or value == "":
+                to_advanced.pop(key, None)
+            else:
+                to_advanced[key] = value
+        if from_advanced != to_advanced:
+            revision.changes["advanced"] = (
+                f"-{json.dumps(from_advanced, sort_keys=True)}\n+{json.dumps(to_advanced, sort_keys=True)}"
+            )
+
     assert not data
 
     return revision, features
@@ -268,6 +282,10 @@ def apply_revision(revision, features=None):
             else:
                 vehicle.previous_operators = None
             changed_fields.append("previous_operators")
+
+        elif field == "advanced":
+            vehicle.advanced = json.loads(to_value) if to_value else {}
+            changed_fields.append("advanced")
 
         else:
             assert False
