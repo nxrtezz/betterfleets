@@ -121,6 +121,13 @@ urlpatterns = [
     ),
     path("vehicles/<int:id>/edit", views.edit_vehicle),
     path("vehicles/<slug>/edit", views.edit_vehicle, name="vehicle_edit"),
+    path("vehicles/<int:id>/advanced-edit", views.edit_vehicle, {"advanced": True}),
+    path(
+        "vehicles/<slug>/advanced-edit",
+        views.edit_vehicle,
+        {"advanced": True},
+        name="vehicle_advanced_edit",
+    ),
     path("vehicles/<int:id>/compare", views.vehicle_compare, name="vehicle_compare"),
     path(
         "vehicles/<int:id>/debug",

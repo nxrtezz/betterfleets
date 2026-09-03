@@ -51,7 +51,7 @@
         </script>
     {% endif %}
 
-    <h1>Edit vehicle details{% if request.GET.advanced %} (Advanced){% endif %}</h1>
+    <h1>Edit vehicle details{% if advanced_mode %} (Advanced){% endif %}</h1>
 
     <p>
         Ticket machine code:<br>
@@ -63,12 +63,12 @@
 
     {% include "previous_operators.html" %}
 
-    <form action="{{ vehicle.get_edit_url }}{% if request.GET.advanced %}?advanced{% endif %}" method="POST">
+    <form action="{% if advanced_mode %}{{ vehicle.get_advanced_edit_url }}{% else %}{{ vehicle.get_edit_url }}{% endif %}" method="POST">
         <div class="edit-vehicle">
             {{ form.as_p }}
         </div>
 
-        {% if not request.GET.advanced %}
+        {% if not advanced_mode %}
         <div id="previous-operators-section">
             <h3>Previous Operators</h3>
             <div id="previous-operators-list"></div>
@@ -174,11 +174,11 @@
 {% endif %}
 
 {% if previous %}
-    <p class="previous"><a href="{{ previous.get_edit_url }}">&larr; {{ previous }}</a></p>
+    <p class="previous"><a href="{% if advanced_mode %}{{ previous.get_advanced_edit_url }}{% else %}{{ previous.get_edit_url }}{% endif %}">&larr; {{ previous }}</a></p>
 {% endif %}
 
 {% if next %}
-    <p class="next"><a href="{{ next.get_edit_url }}">{{ next }} &rarr;</a></p>
+    <p class="next"><a href="{% if advanced_mode %}{{ next.get_advanced_edit_url }}{% else %}{{ next.get_edit_url }}{% endif %}">{{ next }} &rarr;</a></p>
 {% endif %}
 
 {% endblock content %}
