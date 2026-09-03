@@ -585,6 +585,26 @@ class VehiclesTests(TestCase):
 &.right{{background:linear-gradient(270deg,red 50%,#00f 50%)}}}}\n""",
         )
 
+    def test_vehicle_advanced_edit_route(self):
+        self.client.force_login(self.staff_user)
+
+        self.staff_user.view_advanced = True
+        self.staff_user.save(update_fields=["view_advanced"])
+
+        response = self.client.get(self.vehicle_1.get_absolute_url())
+        self.assertContains(
+            response, f'href="{self.vehicle_1.get_advanced_edit_url()}"'
+        )
+        self.assertNotContains(response, f"{self.vehicle_1.get_edit_url()}?advanced")
+
+        response = self.client.get(self.vehicle_1.get_advanced_edit_url())
+        self.assertContains(response, "Edit vehicle details (Advanced)")
+
+        response = self.client.get(f"{self.vehicle_1.get_edit_url()}?advanced")
+        self.assertRedirects(
+            response, self.vehicle_1.get_advanced_edit_url(), 302, 200
+        )
+
     def test_vehicle_edit_1(self):
         response = self.client.get("/vehicles/edits?status=pending")
         self.assertContains(response, "pending is not one of the available choices")
