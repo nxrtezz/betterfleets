@@ -11,12 +11,12 @@ urlpatterns = [
     path("accounts/", include("accounts.urls")),
     path("api/", include(api.router.urls)),
     path("tools/", include("tools.urls")),
-    path("requests/", include("service_requests.urls")),
     path("favourites/", include("favourites.urls")),
     path("service-logging/", include("service_logging.urls")),
     path("", include("busstops.urls")),
     path("", include("vehicles.urls")),
     path("", include("bustimes.urls")),
+    path("service-requests/", include("service_requests.urls")),
 ]
 
 if settings.DEBUG:

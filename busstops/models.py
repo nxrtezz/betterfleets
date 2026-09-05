@@ -1390,7 +1390,7 @@ class Service(models.Model):
 
     public_use = models.BooleanField(null=True)
 
-    colour = models.ForeignKey(ServiceColour, models.SET_NULL, null=True, blank=True)
+    colour = models.CharField(max_length=7, blank=True, help_text="Hex colour code e.g. #0055aa")
 
     is_rail_replacement = models.BooleanField(
         default=False,

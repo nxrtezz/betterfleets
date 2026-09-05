@@ -1300,21 +1300,15 @@ class Command(BaseCommand):
                 service.description = description
 
             if line.colour:
-                background = f"#{line.colour}"
-                foreground = get_text_colour(background) or "#000"
-                service.colour, _ = ServiceColour.objects.get_or_create(
-                    background=background,
-                    foreground=foreground,
-                    use_name_as_brand=False,
-                )
+                service.colour = f"#{line.colour}"
             elif service_code and service.mode == "bus" and service_code[:4] == "tfl_":
                 # London bus red
-                service.colour_id = 8
+                service.colour = "#FF0000"
             else:
                 # use the operator's colour
                 for operator in operators.values():
-                    if operator.colour_id:
-                        service.colour_id = operator.colour_id
+                    if operator.colour:
+                        service.colour = operator.colour
                         break
 
             # Lines and Services can have a MarketingName
@@ -1340,25 +1334,8 @@ class Command(BaseCommand):
                     line_brand = txc_service.marketing_name
 
                     if service.description and " [" in service.description:
-                        service.description = service.description.removesuffix(
-                            f" [{line_brand}]"
-                        )
+                        service.description = service.description.removesuffix(" [")
 
-            if (
-                not line_brand
-                and service.colour_id
-            ):
-                try:
-                    colour = service.colour
-                    if (
-                        colour.use_name_as_brand
-                        and colour.name
-                        and colour.name != service.line_name
-                    ):
-                        # e.g. (First Eastern Counties) 'Yellow Line'
-                        line_brand = colour.name
-                except ObjectDoesNotExist:
-                    pass
             if any(line_brand == operator.name for operator in operators.values()):
                 line_brand = ""
 

@@ -3658,7 +3658,7 @@ class ServiceDetailView(DetailView):
                 [
                     service
                     for service in context["related"]
-                    if service.colour_id != self.object.colour_id
+                    if service.colour != self.object.colour
                 ]
             )
 

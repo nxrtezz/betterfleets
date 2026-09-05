@@ -1,9 +1,9 @@
 <style>
 {% for colour in colours %}
-.colour-{{ colour.id }} {
-    background: {{ colour.background }};
-    border-color: {{ colour.foreground }};
-    color: {{ colour.foreground }};
+.colour-{{ colour|slice:'1:' }} {
+    background: {{ colour }};
+    border-color: {{ colour }};
+    color: {{ colour }};
 }
 {% endfor %}
 </style>
@@ -14,14 +14,14 @@
         {% for line_name in service.get_line_names %}
             {% if line_name and line_name not in service.line_brand %}
                 {% if ' ' not in line_name or line_name not in service.description %}
-                    <strong class="name{% if service.colour_id %} colour colour-{{ service.colour_id }}{% endif %}">
+                    <strong class="name{% if service.colour %} colour colour-{{ service.colour|slice:'1:' }}{% endif %}">
                         {{ line_name }}
                     </strong>
                 {% endif %}
             {% endif %}
         {% endfor %}
         {% if service.line_brand %}
-            <strong class="name{% if service.colour_id %} colour colour-{{ service.colour_id }}{% endif %}">{{ service.line_brand }}</strong>
+            <strong class="name{% if service.colour %} colour colour-{{ service.colour|slice:'1:' }}{% endif %}">{{ service.line_brand }}</strong>
         {% endif %}
         </span>
         <span class="description">

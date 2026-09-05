@@ -121,12 +121,13 @@ class RouteAdmin(admin.ModelAdmin):
     list_display = [
         "__str__",
         "code",
+        "line_brand",
         "start_date",
         "end_date",
     ]
     list_filter = [("source", admin.RelatedOnlyFieldListFilter)]
     raw_id_fields = ["source", "service"]
-    search_fields = ["code"]
+    search_fields = ["code", "line_brand"]
     # inlines = [TripInline]
 
 
