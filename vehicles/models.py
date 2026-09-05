@@ -998,6 +998,9 @@ class Vehicle(models.Model):
     def get_edit_url(self):
         return reverse("vehicle_edit", args=(self.slug or self.id,))
 
+    def get_advanced_edit_url(self):
+        return reverse("vehicle_advanced_edit", args=(self.slug or self.id,))
+
     def get_flickr_url(self):
         if self.reg:
             reg = self.get_reg()

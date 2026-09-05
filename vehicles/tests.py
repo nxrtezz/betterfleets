@@ -20,6 +20,7 @@ from busstops.models import (
 )
 
 from .models import (
+    AdvancedField,
     Livery,
     Vehicle,
     VehicleFeature,
@@ -584,6 +585,62 @@ class VehiclesTests(TestCase):
             f""".livery-{self.livery.id}{{color:#fff;background:linear-gradient(90deg,red 50%,#00f 50%);\
 &.right{{background:linear-gradient(270deg,red 50%,#00f 50%)}}}}\n""",
         )
+
+    def test_vehicle_advanced_edit_route(self):
+        self.client.force_login(self.staff_user)
+
+        self.staff_user.view_advanced = True
+        self.staff_user.save(update_fields=["view_advanced"])
+
+        response = self.client.get(self.vehicle_1.get_absolute_url())
+        self.assertContains(
+            response, f'href="{self.vehicle_1.get_advanced_edit_url()}"'
+        )
+        self.assertNotContains(response, f"{self.vehicle_1.get_edit_url()}?advanced")
+
+        response = self.client.get(self.vehicle_1.get_advanced_edit_url())
+        self.assertContains(response, "Edit vehicle details (Advanced)")
+
+        response = self.client.get(f"{self.vehicle_1.get_edit_url()}?advanced")
+        self.assertRedirects(
+            response, self.vehicle_1.get_advanced_edit_url(), 302, 200
+        )
+
+        AdvancedField.objects.create(
+            name="Engine",
+            slug="engine",
+            field_type=AdvancedField.FieldType.TEXT,
+        )
+
+        response = self.client.post(
+            self.vehicle_1.get_advanced_edit_url(),
+            {
+                "vehicle_type": self.vehicle_1.vehicle_type_id,
+                "fleet_number": str(self.vehicle_1.fleet_number),
+                "colours": "",
+                "reg": self.vehicle_1.reg,
+                "advanced_engine": "Cummins B6.7",
+                "summary": "Add engine metadata",
+            },
+        )
+        self.assertContains(response, "Thank you")
+        self.assertIn("advanced", response.context["revision"].changes)
+
+        self.client.force_login(self.trusted_user)
+        response = self.client.post(
+            self.vehicle_1.get_advanced_edit_url(),
+            {
+                "vehicle_type": self.vehicle_1.vehicle_type_id,
+                "fleet_number": str(self.vehicle_1.fleet_number),
+                "colours": "",
+                "reg": self.vehicle_1.reg,
+                "advanced_engine": "Volvo D8K",
+                "summary": "Fix engine metadata",
+            },
+        )
+        self.assertContains(response, "Thank you")
+        self.vehicle_1.refresh_from_db()
+        self.assertEqual(self.vehicle_1.advanced.get("engine"), "Volvo D8K")
 
     def test_vehicle_edit_1(self):
         response = self.client.get("/vehicles/edits?status=pending")

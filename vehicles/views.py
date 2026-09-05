@@ -3394,6 +3394,7 @@ revision_display_related_fields = (
 @login_required
 def edit_vehicle(request, **kwargs):
     check_user(request)
+    advanced_mode = bool(kwargs.pop("advanced", False))
 
     edit_related = ["vehicle_type", "livery", "operator", "garage"]
     if "latest_journey_id" in _vehicle_db_columns():
@@ -3410,6 +3411,14 @@ def edit_vehicle(request, **kwargs):
         if not (request.user.trusted and vehicle.historical_fleet_id):
             raise PermissionDenied()
 
+    if request.method == "GET" and not advanced_mode and "advanced" in request.GET:
+        query = request.GET.copy()
+        query.pop("advanced", None)
+        url = vehicle.get_advanced_edit_url()
+        if query:
+            url = f"{url}?{query.urlencode()}"
+        return redirect(url)
+
     form_data = ensure_vehicle_revision_rules(request, vehicle)
     if hasattr(form_data, "status_code"):
         return form_data
@@ -3419,6 +3428,7 @@ def edit_vehicle(request, **kwargs):
     context = {
         "previous": vehicle.get_previous(),
         "next": vehicle.get_next(),
+        "advanced_mode": advanced_mode,
     }
 
     revision = None
@@ -3429,9 +3439,6 @@ def edit_vehicle(request, **kwargs):
         ]["VehicleUniqueId"]
     except (KeyError, TypeError):
         pass
-
-    # Check if advanced mode is requested via query parameter
-    advanced_mode = "advanced" in request.GET
 
     form = forms.EditVehicleForm(
         form_data,
