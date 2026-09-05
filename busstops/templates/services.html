@@ -1,11 +1,12 @@
-<style>
+{% if colours %}<style>
 {% for colour in colours %}
-.colour-{{ colour.id }} {
-    background: {{ colour.background }};
-    border-color: {{ colour.foreground }};
-    color: {{ colour.foreground }};
+.colour-{{ colour|slice:'1:' }} {
+    background: {{ colour }};
+    border-color: {{ colour }};
+    color: white;
 }
 {% endfor %}
+</style>{% endif %}
 
 .services-container {
     margin: 1.5rem 0;
@@ -92,7 +93,7 @@
     <li>
         <a href="{{ service.get_absolute_url }}">
             <span class="names">
-                <strong class="name is-short">
+                <strong class="name is-short{% if service.colour %} colour colour-{{ service.colour|slice:'1:' }}{% endif %}">
                     {{ service.line_name }}
                 </strong>
             </span>

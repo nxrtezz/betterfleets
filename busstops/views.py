@@ -436,9 +436,9 @@ operator_has_current_services_or_vehicles = operator_has_current_services | Exis
 
 
 def get_colours(services):
-    colours = set(service.colour_id for service in services if service.colour_id)
+    colours = set(service.colour for service in services if service.colour)
     if colours:
-        return ServiceColour.objects.filter(id__in=colours)
+        return colours
 
 
 def compact_text(value):

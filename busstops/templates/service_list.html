@@ -1,12 +1,12 @@
-<style>
+{% if colours %}<style>
 {% for colour in colours %}
 .colour-{{ colour|slice:'1:' }} {
     background: {{ colour }};
     border-color: {{ colour }};
-    color: {{ colour }};
+    color: white;
 }
 {% endfor %}
-</style>
+</style>{% endif %}
 <ul class="{{ class }}">
 {% for service in services %}
     <li><a href="{{ service.get_absolute_url }}">

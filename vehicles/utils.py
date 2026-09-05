@@ -182,6 +182,12 @@ def get_revision(vehicle, data):
             from_value = (vehicle.data or {}).get(key, "")
             revision.changes[f"data:{key}"] = f"-{from_value}\n+{to_value}"
 
+    if "advanced" in data:
+        advanced_data = dict(vehicle.advanced or {})
+        for key, to_value in data.pop("advanced").items():
+            from_value = advanced_data.get(key, "")
+            revision.changes[f"advanced:{key}"] = f"-{from_value}\n+{to_value}"
+
     assert not data
 
     return revision, features
@@ -268,6 +274,31 @@ def apply_revision(revision, features=None):
             else:
                 vehicle.previous_operators = None
             changed_fields.append("previous_operators")
+
+        elif field.startswith("advanced:"):
+            field_name = field.split(":", 1)[1]
+            # Store advanced fields in the JSONField
+            advanced_data = dict(vehicle.advanced or {})
+            # Convert string values back to appropriate types based on the form logic
+            if isinstance(to_value, str):
+                if to_value.lower() == "true":
+                    to_value = True
+                elif to_value.lower() == "false":
+                    to_value = False
+                elif to_value == "":
+                    to_value = None
+                elif to_value.isdigit():
+                    to_value = int(to_value)
+                # Handle date strings (ISO format YYYY-MM-DD)
+                elif len(to_value) == 10 and to_value[4] == "-" and to_value[7] == "-":
+                    try:
+                        from datetime import datetime
+                        to_value = datetime.strptime(to_value, "%Y-%m-%d").date()
+                    except (ValueError, AttributeError):
+                        pass  # Keep as string if not a valid date
+            advanced_data[field_name] = to_value
+            vehicle.advanced = advanced_data
+            changed_fields.append("advanced")
 
         else:
             assert False
