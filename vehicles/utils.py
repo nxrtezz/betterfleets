@@ -188,6 +188,10 @@ def get_revision(vehicle, data):
             from_value = advanced_data.get(key, "")
             revision.changes[f"advanced:{key}"] = f"-{from_value}\n+{to_value}"
 
+    # Handle any summary field that might be present
+    if "summary" in data:
+        data.pop("summary")
+
     assert not data
 
     return revision, features
