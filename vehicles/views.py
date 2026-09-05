@@ -4220,8 +4220,17 @@ def request_log_action(request, log_id, action):
             raise PermissionDenied
         if action == "apply":
             from busstops.data_changes import apply_pending_change
+            from django.contrib import messages
 
-            log = apply_pending_change(log, user=request.user)
+            try:
+                log = apply_pending_change(log, user=request.user)
+            except Exception as e:
+                messages.error(request, f"Could not approve this edit: {str(e)}")
+                return render(
+                    request,
+                    "request_log.html",
+                    {"request_entry": wrap_request_log_for_user(log, request.user).object, "user": request.user},
+                )
         else:
             from busstops.data_changes import reject_pending_change
 

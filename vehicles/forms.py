@@ -89,6 +89,7 @@ class OperatorVehicleColumnFieldsMixin:
 
 class AdvancedFieldsMixin:
     advanced_field_prefix = "advanced_"
+    dropdown_fields = {"chassis", "engine", "gearbox", "emissions"}
 
     def add_advanced_fields(self, values=None):
         self.advanced_fields = []
@@ -128,15 +129,36 @@ class AdvancedFieldsMixin:
                     required=False,
                 )
             else:  # TEXT
-                self.fields[field_name] = forms.CharField(
-                    label=field.name,
-                    help_text=field.help_text,
-                    required=False,
-                    max_length=500,
-                )
+                if field.slug in self.dropdown_fields:
+                    choices = self.get_dropdown_choices(field.slug)
+                    self.fields[field_name] = forms.ChoiceField(
+                        label=field.name,
+                        help_text=field.help_text,
+                        required=False,
+                        choices=[("", "")] + [(choice, choice) for choice in choices],
+                        widget=forms.Select(attrs={"class": "searchable-dropdown"}),
+                    )
+                else:
+                    self.fields[field_name] = forms.CharField(
+                        label=field.name,
+                        help_text=field.help_text,
+                        required=False,
+                        max_length=500,
+                    )
             
             self.fields[field_name].initial = values.get(field.slug, "")
             self.advanced_field_fields[field_name] = field
+
+    def get_dropdown_choices(self, slug):
+        import json
+        from pathlib import Path
+        
+        json_file = Path(__file__).parent / "static" / "vehicles" / f"{slug}.json"
+        if json_file.exists():
+            with open(json_file) as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
+        return []
 
     def get_advanced_field_updates(self):
         updates = {}

@@ -3649,7 +3649,7 @@ vehicle.garage.name if vehicle.garage else "",
                     "true" if service.timetable_wrong else "false",
                     "true" if service.tracking else "false",
                     "" if service.public_use is None else ("true" if service.public_use else "false"),
-                    service.colour.name if service.colour else "",
+                    service.colour or "",
                 )
             )
         return rows
@@ -3856,7 +3856,7 @@ vehicle.garage.name if vehicle.garage else "",
                     else:
                         for field, value in values.items():
                             setattr(service, field, value)
-                        service.colour = colour
+                        service.colour = colour.background if colour else ""
                         service.save(update_fields=[*values.keys(), "colour", "modified_at"])
                         service.update_search_vector()
                         if not service.operator.filter(pk=row["operator"].pk).exists():
@@ -5051,7 +5051,7 @@ class ServiceAdmin(GISModelAdmin):
         "is_rail_replacement",
     )
     search_fields = ("service_code", "line_name", "line_brand", "description")
-    raw_id_fields = ("operator", "stops", "colour", "source")
+    raw_id_fields = ("operator", "stops", "source")
     inlines = [
         ServiceCodeInline,
         RouteInline,
@@ -5067,7 +5067,7 @@ class ServiceAdmin(GISModelAdmin):
         "route_editor_link",
     ]
     list_editable = ["colour", "line_brand"]
-    list_select_related = ["colour"]
+    list_select_related = []
     actions = [
         "assign_to_operator",
         "current_false",
