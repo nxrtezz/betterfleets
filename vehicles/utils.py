@@ -188,11 +188,6 @@ def get_revision(vehicle, data):
             from_value = advanced_data.get(key, "")
             revision.changes[f"advanced:{key}"] = f"-{from_value}\n+{to_value}"
 
-    # Fallback for any unhandled keys - this should not happen but provides safety
-    if data:
-        print(f"WARNING: Unhandled keys in get_revision: {list(data.keys())}")
-        data.clear()
-
     assert not data
 
     return revision, features
