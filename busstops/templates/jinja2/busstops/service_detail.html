@@ -9,10 +9,10 @@
 
     {% if object.colour %}
     <style>
-        .colour-{{ object.colour|slice:'1:' }} {
+        .colour-{{ object.colour[1:] }} {
             background: {{ object.colour }};
             border-color: {{ object.colour }};
-            color: {{ object.colour }};
+            color: {{ object.get_colour_foreground() }};
         }
     </style>
     {% endif %}
@@ -27,14 +27,14 @@
     {% for line_name in object.get_line_names() %}
         {% if line_name and line_name not in object.line_brand %}
             {% if ' ' not in line_name or line_name not in object.description %}
-                <strong class="name{% if ' ' not in line_name %} is-short{% endif %}{% if object.colour %} colour colour-{{ object.colour|slice:'1:' }}{% endif %}">
+                <strong class="name{% if ' ' not in line_name %} is-short{% endif %}{% if object.colour %} colour colour-{{ object.colour[1:] }}{% endif %}">
                     {{ line_name }}
                 </strong>
             {% endif %}
         {% endif %}
     {% endfor %}
     {% if object.line_brand %}
-        <strong class="name{% if object.colour %} colour colour-{{ object.colour|slice:'1:' }}{% endif %}">{{ object.line_brand }}</strong>
+        <strong class="name{% if object.colour %} colour colour-{{ object.colour[1:] }}{% endif %}">{{ object.line_brand }}</strong>
     {% endif %}
     </span>
     <span class="description">{{ object.description }} {% if request.user.is_authenticated %}{% if not route_is_public %}<span title="Non-public route" aria-label="Non-public route">-</span>{% elif route_ridden %}<span title="Route ridden" aria-label="Route ridden">&#10003;</span>{% else %}<span title="Route not yet ridden" aria-label="Route not yet ridden">&#10007;</span>{% endif %}{% endif %}</span>
@@ -132,13 +132,33 @@
     {% include 'operator-contact-details.html' %}
 {% endfor %}
 
-{% if object.actual_public_use is not false and payment_methods %}
-    <p>
-        {% for method in payment_methods %}
-            {% if not loop.first %}{% if loop.last %} or {% else %}, {% endif %}{% endif %}{% if method.url %}<a href="{{ method.url }}">{% endif %}
-            {% if loop.first %}{{ method.name.capitalize() }}{% else %}{{ method }}{% endif %}{% if method.url %}</a>{% endif %}
-        {% endfor %} accepted
-    </p>
+{% if object.actual_public_use is not false and (payment_methods or free_service) %}
+    <h2>Payment methods</h2>
+    {% if free_service %}
+        <p>This service is free.</p>
+    {% endif %}
+    {% if payment_methods %}
+        <p>
+            {% for method in payment_methods %}
+                {% if not loop.first %}{% if loop.last %} or {% else %}, {% endif %}{% endif %}{% if method.url %}<a href="{{ method.url }}">{% endif %}
+                {% if loop.first and not service_specific_payment_methods %}{{ method.name.capitalize() }}{% else %}{{ method.name }}{% endif %}{% if method.url %}</a>{% endif %}
+            {% endfor %} accepted{% if service_specific_payment_methods %} on this service{% endif %}
+        </p>
+    {% endif %}
+{% endif %}
+
+{% if service_tickets %}
+    <h2>Accepted tickets</h2>
+    <ul class="ticket-list">
+        {% for ticket in service_tickets %}
+            <li>
+                <h3><a href="{{ ticket.url }}">{{ ticket.name }}</a></h3>
+                {% for variant in ticket.variants %}
+                    <p>{{ variant.full_name }}{% if variant.description %} — {{ variant.description }}{% endif %}{% if variant.prices %} ({{ variant.prices|join(", ") }}){% endif %}</p>
+                {% endfor %}
+            </li>
+        {% endfor %}
+    </ul>
 {% endif %}
 
 {% if app %}

@@ -323,10 +323,10 @@ class ViewsTests(TestCase):
         cls.event_route = Route.objects.create(
             service=cls.event_service,
             source=source,
+            code="E1",
             line_name="E1",
-            event_start_date=date(2023, 3, 10),
-            event_end_date=date(2023, 3, 12),
-            event_visibility_weeks=4,
+            start_date=date(2023, 3, 10),
+            end_date=date(2023, 3, 12),
         )
         Vehicle.objects.create(
             code="ADLDEMO1",
@@ -972,7 +972,7 @@ class ViewsTests(TestCase):
         self.assertContains(response, "Dayrider")
         self.assertContains(response, "Portsmouth Day Saver")
         self.assertContains(response, "City 1 day")
-        self.assertContains(response, "A: Â£7 C: Â£3.50")
+        self.assertContains(response, "A: £7 C: £3.50")
         self.assertContains(response, f"/fares/tickets/{ticket.id}")
 
     def test_operator_tickets_tab_lists_manual_ticket(self):
@@ -996,7 +996,7 @@ class ViewsTests(TestCase):
         self.assertContains(response, "Dayrider")
         self.assertContains(response, "Portsmouth Day Saver")
         self.assertContains(response, "City 1 day")
-        self.assertContains(response, "A: Â£7 C: Â£3.50")
+        self.assertContains(response, "A: £7 C: £3.50")
         self.assertContains(response, f"/fares/tickets/{ticket.id}")
 
     def test_operator_tickets_group_manual_tickets_by_ticket_type(self):
@@ -1031,8 +1031,8 @@ class ViewsTests(TestCase):
         self.assertContains(response, "2 ticket types")
         self.assertContains(response, "Ticket Name One")
         self.assertContains(response, "Ticket Name Two")
-        self.assertContains(response, "A: Â£2.50 C: Â£1")
-        self.assertContains(response, "A: Â£4 C: Â£2")
+        self.assertContains(response, "A: £2.50 C: £1")
+        self.assertContains(response, "A: £4 C: £2")
         self.assertContains(response, "zone X 1 day")
         self.assertContains(response, "zone Y 7 days")
 
@@ -1133,7 +1133,9 @@ class ViewsTests(TestCase):
         self.assertEqual(response.status_code, 302)
 
     def test_route_editor_search_and_save(self):
-        staff_user = User.objects.create(username="staff", is_staff=True)
+        staff_user = User.objects.create(
+            username="staff", email="staff@example.com", is_staff=True
+        )
         self.client.force_login(staff_user)
 
         second_stop = StopPoint.objects.create(
@@ -1488,11 +1490,13 @@ class RouteNoticeDetailViewTests(TestCase):
         Route.objects.create(
             service=cls.service,
             source=cls.source,
+            code="45",
             line_name="45",
         )
         Route.objects.create(
             service=cls.other_service,
             source=cls.source,
+            code="46",
             line_name="46",
         )
 

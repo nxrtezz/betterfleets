@@ -697,8 +697,6 @@ def format_price(amount):
     text = f"{amount:.2f}"
     if text.endswith(".00"):
         text = text[:-3]
-    elif text.endswith("0"):
-        text = text[:-1]
     return f"£{text}"
 
 
@@ -1810,11 +1808,11 @@ class AdminAreaDetailView(DetailView):
             }
         record_recently_viewed(
             self.request,
-            item_type="operator",
+            item_type="admin_area",
             item_id=self.object.pk,
-            title=self.object.name or self.object.noc,
+            title=self.object.name,
             url=self.object.get_absolute_url(),
-            subtitle=f"Operator {self.object.noc}",
+            subtitle=str(self.object.region),
         )
 
         context["breadcrumb"] = [self.object.region]
@@ -3511,7 +3509,7 @@ class ServiceDetailView(DetailView):
     model = Service
     queryset = (
         model.objects.with_line_names()
-        .select_related("region", "source", "colour")
+        .select_related("region", "source")
         .annotate(actual_public_use=Coalesce("public_use", BoolOr("route__public_use")))
         .prefetch_related("operator")
         .defer("search_vector")
@@ -3581,6 +3579,34 @@ class ServiceDetailView(DetailView):
             raise Http404()
 
         return service
+
+    def get_service_tickets(self):
+        if not FARES_AVAILABLE:
+            return []
+        try:
+            return group_serialized_tickets(
+                [
+                    *[
+                        serialize_tariff_ticket(tariff)
+                        for tariff in get_published_tariffs()
+                        .filter(services=self.object)
+                        .distinct()
+                        .order_by("name", "valid_between")
+                    ],
+                    *[
+                        serialize_manual_ticket(ticket)
+                        for ticket in get_manual_tickets()
+                        .filter(
+                            ticketacceptance__service=self.object,
+                            ticketacceptance__accepted=True,
+                        )
+                        .distinct()
+                        .order_by("name", "id")
+                    ],
+                ]
+            )
+        except Exception:
+            return []
 
     def get_fare_tables(self):
         fare_tables = (
@@ -3760,7 +3786,7 @@ class ServiceDetailView(DetailView):
                     "url": reverse("operator_tickets", kwargs={"slug": operator.slug}),
                     "name": "MyTrip app",
                 }
-            for method in PaymentMethod.objects.filter(
+            service_methods = PaymentMethod.objects.filter(
                 Exists(
                     Service.payment_methods.through.objects.filter(
                         payment_method=OuterRef("id"),
@@ -3768,20 +3794,32 @@ class ServiceDetailView(DetailView):
                         accepted=True,
                     )
                 )
-                | Exists(
-                    Operator.payment_methods.through.objects.filter(
-                        paymentmethod=OuterRef("id"),
-                        operator=operator,
-                    )
-                ),
-                ~Exists(
-                    Service.payment_methods.through.objects.filter(
-                        payment_method=OuterRef("id"),
-                        service=self.object,
-                        accepted=False,
-                    )
-                ),
-            ):
+            )
+            context["service_specific_payment_methods"] = bool(service_methods)
+
+            if context["service_specific_payment_methods"]:
+                methods = service_methods
+            else:
+                methods = PaymentMethod.objects.filter(
+                    Exists(
+                        Operator.payment_methods.through.objects.filter(
+                            paymentmethod=OuterRef("id"),
+                            operator=operator,
+                        )
+                    ),
+                    ~Exists(
+                        Service.payment_methods.through.objects.filter(
+                            payment_method=OuterRef("id"),
+                            service=self.object,
+                            accepted=False,
+                        )
+                    ),
+                )
+
+            for method in methods:
+                if method.name == "free service":
+                    context["free_service"] = True
+                    continue
                 if "app" in method.name and method.url:
                     context["app"] = method
                 else:
@@ -3827,6 +3865,7 @@ class ServiceDetailView(DetailView):
                     )
                     break
         context["fare_tables"] = self.get_fare_tables()
+        context["service_tickets"] = self.get_service_tickets()
 
         for url, text in self.object.get_traveline_links(date):
             context["links"].append({"url": url, "text": text})
@@ -4691,8 +4730,8 @@ def search(request):
                 )
             )
             operators = operators.filter(
-                Q(noc__iexact=compact)
-                | Q(search_vector=query)
+                Q(noc__iexact=compact) | Q(search_vector=query),
+                ceased_operations_on__isnull=True,
             ).annotate(
                 exact_noc_match=Case(
                     When(noc__iexact=compact, then=Value(1)),

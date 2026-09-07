@@ -63,14 +63,6 @@ def operator_slug_source(instance):
 
 
 def service_slug_source(instance):
-    """Generate a slug for a Service instance"""
-    if instance.service_code:
-        return instance.service_code
-    if instance.line_name:
-        return instance.line_name
-    if instance.description:
-        return instance.description
-    # Fallback to string representation if nothing else is available
     return str(instance)
 
 
@@ -1207,7 +1199,7 @@ class Operator(SearchMixin, models.Model):
         return reverse("operator_routes", args=(self.slug,))
 
     def get_absolute_url(self):
-        return self.get_routes_url()
+        return self.get_detail_url()
 
     def mode(self):
         return self.vehicle_mode
@@ -1445,6 +1437,17 @@ class Service(models.Model):
         if hasattr(self, "line_names") and self.line_names:
             return self.line_names
         return [self.line_name]
+
+    def get_colour_foreground(self):
+        """A legible text colour to use on top of `colour`"""
+        colour = self.colour.lstrip("#")
+        if len(colour) == 3:
+            colour = "".join(digit * 2 for digit in colour)
+        if len(colour) != 6:
+            return "#fff"
+        red, green, blue = (int(colour[i : i + 2], 16) for i in (0, 2, 4))
+        luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255
+        return "#000" if luminance > 0.6 else "#fff"
 
     def get_line_name(self):
         return ", ".join(self.get_line_names())
