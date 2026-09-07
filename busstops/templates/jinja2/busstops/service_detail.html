@@ -12,7 +12,7 @@
         .colour-{{ object.colour[1:] }} {
             background: {{ object.colour }};
             border-color: {{ object.colour }};
-            color: {{ object.colour }};
+            color: {{ object.get_colour_foreground() }};
         }
     </style>
     {% endif %}

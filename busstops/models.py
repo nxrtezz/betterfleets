@@ -1438,6 +1438,17 @@ class Service(models.Model):
             return self.line_names
         return [self.line_name]
 
+    def get_colour_foreground(self):
+        """A legible text colour to use on top of `colour`"""
+        colour = self.colour.lstrip("#")
+        if len(colour) == 3:
+            colour = "".join(digit * 2 for digit in colour)
+        if len(colour) != 6:
+            return "#fff"
+        red, green, blue = (int(colour[i : i + 2], 16) for i in (0, 2, 4))
+        luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255
+        return "#000" if luminance > 0.6 else "#fff"
+
     def get_line_name(self):
         return ", ".join(self.get_line_names())
 
