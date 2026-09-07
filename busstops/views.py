@@ -3511,7 +3511,7 @@ class ServiceDetailView(DetailView):
     model = Service
     queryset = (
         model.objects.with_line_names()
-        .select_related("region", "source", "colour")
+        .select_related("region", "source")
         .annotate(actual_public_use=Coalesce("public_use", BoolOr("route__public_use")))
         .prefetch_related("operator")
         .defer("search_vector")

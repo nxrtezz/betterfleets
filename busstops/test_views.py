@@ -323,10 +323,10 @@ class ViewsTests(TestCase):
         cls.event_route = Route.objects.create(
             service=cls.event_service,
             source=source,
+            code="E1",
             line_name="E1",
-            event_start_date=date(2023, 3, 10),
-            event_end_date=date(2023, 3, 12),
-            event_visibility_weeks=4,
+            start_date=date(2023, 3, 10),
+            end_date=date(2023, 3, 12),
         )
         Vehicle.objects.create(
             code="ADLDEMO1",
@@ -1488,11 +1488,13 @@ class RouteNoticeDetailViewTests(TestCase):
         Route.objects.create(
             service=cls.service,
             source=cls.source,
+            code="45",
             line_name="45",
         )
         Route.objects.create(
             service=cls.other_service,
             source=cls.source,
+            code="46",
             line_name="46",
         )
 

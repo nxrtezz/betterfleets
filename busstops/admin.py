@@ -3629,7 +3629,6 @@ vehicle.garage.name if vehicle.garage else "",
     def _mass_route_rows_from_operator_services(self, operator):
         services = (
             models.Service.objects.filter(operator=operator)
-            .select_related("colour")
             .order_by("line_name", "description", "service_code", "pk")
             .distinct()
         )
