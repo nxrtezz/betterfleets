@@ -3,7 +3,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.db.models import Exists, OuterRef, Q
 from django.utils.timezone import localdate
 
-from busstops.models import Operator, Service, StopPoint
+from busstops.models import DataSource, Operator, Service, StopPoint
 
 from ...models import Vehicle, VehicleJourney, VehicleLocation
 from ..import_live_vehicles import ImportLiveVehiclesCommand
@@ -64,13 +64,11 @@ class Command(ImportLiveVehiclesCommand):
     source_name = vehicle_code_scheme = "Stagecoach"
 
     def do_source(self):
-        from busstops.models import DataSource
-
         self.operators = Operator.objects.filter(group__name="Stagecoach").in_bulk()
         self.source, _ = DataSource.objects.get_or_create(
-            name=self.source_name,
-            defaults={"url": ""}
+            name=self.source_name, defaults={"url": ""}
         )
+        self.url = self.source.url
         return self
 
     @staticmethod

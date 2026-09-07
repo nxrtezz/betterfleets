@@ -8,7 +8,7 @@ from busstops.templatetags.date_range import date_range
 
 
 def from_now():
-    return [timezone.now()]
+    return [timezone.now(), None]
 
 
 SITUATION_SOURCE_NAMES = (

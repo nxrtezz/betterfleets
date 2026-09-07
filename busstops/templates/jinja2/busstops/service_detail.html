@@ -132,13 +132,33 @@
     {% include 'operator-contact-details.html' %}
 {% endfor %}
 
-{% if object.actual_public_use is not false and payment_methods %}
-    <p>
-        {% for method in payment_methods %}
-            {% if not loop.first %}{% if loop.last %} or {% else %}, {% endif %}{% endif %}{% if method.url %}<a href="{{ method.url }}">{% endif %}
-            {% if loop.first %}{{ method.name.capitalize() }}{% else %}{{ method }}{% endif %}{% if method.url %}</a>{% endif %}
-        {% endfor %} accepted
-    </p>
+{% if object.actual_public_use is not false and (payment_methods or free_service) %}
+    <h2>Payment methods</h2>
+    {% if free_service %}
+        <p>This service is free.</p>
+    {% endif %}
+    {% if payment_methods %}
+        <p>
+            {% for method in payment_methods %}
+                {% if not loop.first %}{% if loop.last %} or {% else %}, {% endif %}{% endif %}{% if method.url %}<a href="{{ method.url }}">{% endif %}
+                {% if loop.first and not service_specific_payment_methods %}{{ method.name.capitalize() }}{% else %}{{ method.name }}{% endif %}{% if method.url %}</a>{% endif %}
+            {% endfor %} accepted{% if service_specific_payment_methods %} on this service{% endif %}
+        </p>
+    {% endif %}
+{% endif %}
+
+{% if service_tickets %}
+    <h2>Accepted tickets</h2>
+    <ul class="ticket-list">
+        {% for ticket in service_tickets %}
+            <li>
+                <h3><a href="{{ ticket.url }}">{{ ticket.name }}</a></h3>
+                {% for variant in ticket.variants %}
+                    <p>{{ variant.full_name }}{% if variant.description %} — {{ variant.description }}{% endif %}{% if variant.prices %} ({{ variant.prices|join(", ") }}){% endif %}</p>
+                {% endfor %}
+            </li>
+        {% endfor %}
+    </ul>
 {% endif %}
 
 {% if app %}

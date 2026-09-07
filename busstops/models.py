@@ -63,14 +63,6 @@ def operator_slug_source(instance):
 
 
 def service_slug_source(instance):
-    """Generate a slug for a Service instance"""
-    if instance.service_code:
-        return instance.service_code
-    if instance.line_name:
-        return instance.line_name
-    if instance.description:
-        return instance.description
-    # Fallback to string representation if nothing else is available
     return str(instance)
 
 
@@ -1207,7 +1199,7 @@ class Operator(SearchMixin, models.Model):
         return reverse("operator_routes", args=(self.slug,))
 
     def get_absolute_url(self):
-        return self.get_routes_url()
+        return self.get_detail_url()
 
     def mode(self):
         return self.vehicle_mode

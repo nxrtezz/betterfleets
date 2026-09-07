@@ -224,10 +224,22 @@
         <ul class="ticket-list">
             {% for ticket in operator_tickets %}
                 <li>
-                    <a href="{{ ticket.url }}">{{ ticket.name }}</a>
-                    {% if ticket.route_count %}
-                        <span class="ticket-family__meta">· {{ ticket.route_count }} route{{ ticket.route_count|pluralize }}</span>
-                    {% endif %}
+                    <h3><a href="{{ ticket.url }}">{{ ticket.name }}</a></h3>
+                    <span class="ticket-family__meta">
+                        {{ ticket.variant_count }} ticket type{{ ticket.variant_count|pluralize }}
+                        {% if ticket.route_count %}
+                            · {{ ticket.route_count }} route{{ ticket.route_count|pluralize }}
+                        {% endif %}
+                    </span>
+                    <ul class="ticket-variants">
+                        {% for variant in ticket.variants %}
+                            <li>
+                                <a href="{{ variant.url }}">{{ variant.full_name }}</a>
+                                {% if variant.description %} — {{ variant.description }}{% endif %}
+                                {% if variant.prices %} ({{ variant.prices|join:", " }}){% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
                 </li>
             {% endfor %}
         </ul>
