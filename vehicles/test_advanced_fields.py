@@ -1,8 +1,11 @@
 from django.contrib.auth import get_user_model
+from django.http import QueryDict
 from django.test import TestCase
+from django.utils import timezone
 
 from vehicles.forms import EditVehicleForm
 from vehicles.models import AdvancedField, Vehicle
+from vehicles.utils import apply_revision, get_revision
 
 
 class AdvancedFieldOptionalTest(TestCase):
@@ -10,7 +13,7 @@ class AdvancedFieldOptionalTest(TestCase):
     def setUpTestData(cls):
         for order, (name, slug, field_type) in enumerate(
             (
-                ("Engine", "engine", AdvancedField.FieldType.TEXT),
+                ("Coachbuilder", "coachbuilder", AdvancedField.FieldType.TEXT),
                 (
                     "Seating capacity",
                     "seating-capacity",
@@ -41,3 +44,29 @@ class AdvancedFieldOptionalTest(TestCase):
         self.assertTrue(form.advanced_fields)
         for field_name in form.advanced_field_fields:
             self.assertFalse(form.fields[field_name].required, field_name)
+
+    def test_advanced_values_are_saved_to_the_vehicle(self):
+        form = EditVehicleForm(
+            QueryDict(
+                "advanced_coachbuilder=Wright&advanced_open-top=on"
+                "&advanced_delivered=2020-01-02&summary=advanced"
+            ),
+            user=self.user,
+            vehicle=self.vehicle,
+            sibling_vehicles=Vehicle.objects.none(),
+            advanced=True,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+        revision, features = get_revision(
+            self.vehicle, {"advanced": form.get_advanced_field_updates()}
+        )
+        revision.created_at = timezone.now()
+        revision.save()
+        apply_revision(revision, features)
+
+        self.vehicle.refresh_from_db()
+        self.assertEqual(
+            self.vehicle.advanced,
+            {"coachbuilder": "Wright", "open-top": True, "delivered": "2020-01-02"},
+        )

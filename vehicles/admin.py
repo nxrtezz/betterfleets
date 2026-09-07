@@ -10,11 +10,11 @@ from django.core.exceptions import PermissionDenied
 from django.db import models as django_models
 from django.db.models import Exists, OuterRef, Q
 from django.db import IntegrityError, connection
+from django.http import HttpResponse
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
-from simple_history.admin import SimpleHistoryAdmin
 from sql_util.utils import SubqueryCount
 
 from busstops.forms import FleetImportForm
@@ -32,20 +32,6 @@ from . import models
 from bustimes.admin import log_change
 
 UserModel = get_user_model()
-
-
-class VehicleAdminForm(forms.ModelForm):
-    class Meta:
-        model = models.Vehicle
-        fields = "__all__"
-
-    def clean(self):
-        cleaned_data = super().clean()
-        if cleaned_data.get("preserved_by_user") and cleaned_data.get("preservation_group"):
-            raise forms.ValidationError(
-                "Choose either an individual preservation owner or a preservation group, not both."
-            )
-        return cleaned_data
 
 
 @lru_cache(maxsize=1)
@@ -217,9 +203,9 @@ class VehicleTypeAdmin(admin.ModelAdmin):
     def assign_to_vehicle_group(self, request, queryset):
         class VehicleTypeBulkAssignVehicleGroupForm(forms.Form):
             vehicle_group = forms.ModelChoiceField(
-                queryset=models.VehicleTypeGroup.objects.select_related("manufacturer").order_by(
-                    "manufacturer__name", "name"
-                ),
+                queryset=models.VehicleTypeGroup.objects.select_related(
+                    "manufacturer"
+                ).order_by("manufacturer__name", "name"),
                 required=True,
                 label="Vehicle group",
                 help_text="Choose the vehicle group to apply to all selected vehicle types.",
@@ -282,7 +268,18 @@ class BusGroupAdmin(admin.ModelAdmin):
     )
     prepopulated_fields = {"slug": ("title",)}
     fieldsets = (
-        (None, {"fields": ("title", "slug", "description", "event_date", "event_end_date")}),
+        (
+            None,
+            {
+                "fields": (
+                    "title",
+                    "slug",
+                    "description",
+                    "event_date",
+                    "event_end_date",
+                )
+            },
+        ),
         (
             "Branding",
             {
@@ -312,9 +309,21 @@ class VehicleAdminForm(ModelForm):
         if "operator" in self.fields and "garage" in self.fields:
             operator = self.instance.operator if self.instance.pk else None
             if operator:
-                self.fields["garage"].queryset = self.fields["garage"].queryset.filter(operators=operator)
+                self.fields["garage"].queryset = self.fields["garage"].queryset.filter(
+                    operators=operator
+                )
             else:
                 self.fields["garage"].queryset = self.fields["garage"].queryset.none()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("preserved_by_user") and cleaned_data.get(
+            "preservation_group"
+        ):
+            raise forms.ValidationError(
+                "Choose either an individual preservation owner or a preservation group, not both."
+            )
+        return cleaned_data
 
 
 class VehicleBulkAssignLiveryForm(forms.Form):
@@ -360,38 +369,78 @@ class VehicleBulkLogUserForm(forms.Form):
 
 
 class VehicleBulkEditForm(forms.Form):
-    fleet_number = forms.IntegerField(required=False, help_text="Set fleet number. Leave blank to keep current.")
-    prev_registration = forms.CharField(required=False, max_length=24, help_text="Set previous registration. Leave blank to keep current.")
+    fleet_number = forms.IntegerField(
+        required=False, help_text="Set fleet number. Leave blank to keep current."
+    )
+    prev_registration = forms.CharField(
+        required=False,
+        max_length=24,
+        help_text="Set previous registration. Leave blank to keep current.",
+    )
     vehicle_type = forms.ModelChoiceField(
         queryset=models.VehicleType.objects.order_by("name"),
         required=False,
         help_text="Set vehicle type. Leave blank to keep current.",
     )
-    colours = forms.CharField(required=False, help_text="Set colours. Leave blank to keep current.")
+    colours = forms.CharField(
+        required=False, help_text="Set colours. Leave blank to keep current."
+    )
     livery = forms.ModelChoiceField(
         queryset=models.Livery.objects.order_by("name"),
         required=False,
         help_text="Set livery. Leave blank to keep current.",
     )
-    name = forms.CharField(required=False, max_length=255, help_text="Set name. Leave blank to keep current.")
-    branding = forms.CharField(required=False, max_length=255, help_text="Set branding. Leave blank to keep current.")
-    rear_advert = forms.CharField(required=False, max_length=255, help_text="Set rear advert. Leave blank to keep current.")
-    notes = forms.CharField(required=False, max_length=255, help_text="Set notes. Leave blank to keep current.")
+    name = forms.CharField(
+        required=False,
+        max_length=255,
+        help_text="Set name. Leave blank to keep current.",
+    )
+    branding = forms.CharField(
+        required=False,
+        max_length=255,
+        help_text="Set branding. Leave blank to keep current.",
+    )
+    rear_advert = forms.CharField(
+        required=False,
+        max_length=255,
+        help_text="Set rear advert. Leave blank to keep current.",
+    )
+    notes = forms.CharField(
+        required=False,
+        max_length=255,
+        help_text="Set notes. Leave blank to keep current.",
+    )
     withdrawn = forms.BooleanField(required=False, help_text="Mark as withdrawn")
     preserved = forms.BooleanField(required=False, help_text="Mark as preserved")
-    fleet_support_vehicle = forms.BooleanField(required=False, help_text="Mark as fleet support vehicle")
+    fleet_support_vehicle = forms.BooleanField(
+        required=False, help_text="Mark as fleet support vehicle"
+    )
     vor = forms.BooleanField(required=False, help_text="Mark as VOR (Vehicle Off Road)")
-    awaiting_delivery = forms.BooleanField(required=False, help_text="Mark as awaiting delivery")
-    trainer_vehicle = forms.BooleanField(required=False, help_text="Mark as trainer vehicle")
+    awaiting_delivery = forms.BooleanField(
+        required=False, help_text="Mark as awaiting delivery"
+    )
+    trainer_vehicle = forms.BooleanField(
+        required=False, help_text="Mark as trainer vehicle"
+    )
     demonstrator = forms.BooleanField(required=False, help_text="Mark as demonstrator")
-    year_of_manufacture = forms.IntegerField(required=False, help_text="Set year of manufacture. Leave blank to keep current.")
+    year_of_manufacture = forms.IntegerField(
+        required=False,
+        help_text="Set year of manufacture. Leave blank to keep current.",
+    )
     historical_fleet = forms.ModelChoiceField(
         queryset=Operator.objects.order_by("name"),
         required=False,
         help_text="Set historical fleet. Leave blank to keep current.",
     )
-    historical_fleet_year = forms.IntegerField(required=False, help_text="Set historical fleet year. Leave blank to keep current.")
-    historical_fleet_creator = forms.CharField(required=False, max_length=255, help_text="Set historical fleet creator. Leave blank to keep current.")
+    historical_fleet_year = forms.IntegerField(
+        required=False,
+        help_text="Set historical fleet year. Leave blank to keep current.",
+    )
+    historical_fleet_creator = forms.CharField(
+        required=False,
+        max_length=255,
+        help_text="Set historical fleet creator. Leave blank to keep current.",
+    )
     locked = forms.BooleanField(required=False, help_text="Lock vehicles")
 
 
@@ -597,9 +646,7 @@ class VehicleAdmin(admin.ModelAdmin):
         (
             "Advanced",
             {
-                "fields": (
-                    "advanced",
-                ),
+                "fields": ("advanced",),
                 "classes": ("collapse",),
             },
         ),
@@ -666,7 +713,9 @@ class VehicleAdmin(admin.ModelAdmin):
         context = {
             **self.admin_site.each_context(request),
             "opts": self.model._meta,
-            "queryset": queryset.order_by("operator__name", "fleet_number", "fleet_code", "reg", "code"),
+            "queryset": queryset.order_by(
+                "operator__name", "fleet_number", "fleet_code", "reg", "code"
+            ),
             "form": form,
             "title": title,
             "submit_label": submit_label,
@@ -720,7 +769,9 @@ class VehicleAdmin(admin.ModelAdmin):
                         rows,
                         manual_livery_selection=manual_livery_selection,
                     )
-                    livery_mappings = collect_livery_mappings(request.POST, livery_mapping_rows)
+                    livery_mappings = collect_livery_mappings(
+                        request.POST, livery_mapping_rows
+                    )
                     for item in livery_mapping_rows:
                         item["selected_livery_id"] = livery_mappings.get(
                             item["raw_name"],
@@ -730,7 +781,9 @@ class VehicleAdmin(admin.ModelAdmin):
                     form = FleetImportForm(
                         initial={
                             "operator": default_operator.pk if default_operator else "",
-                            "historical_fleet": historical_fleet.pk if historical_fleet else "",
+                            "historical_fleet": historical_fleet.pk
+                            if historical_fleet
+                            else "",
                             "historical_year": historical_year or "",
                             "manual_livery_selection": manual_livery_selection,
                             "rows_text": rows_text,
@@ -942,16 +995,16 @@ class VehicleAdmin(admin.ModelAdmin):
                 "historical_fleet_creator": "historical_fleet_creator",
                 "locked": "locked",
             }
-            
+
             for form_field, model_field in field_mappings.items():
                 value = form.cleaned_data.get(form_field)
                 if value is not None and value != "":
                     update_fields[model_field] = value
-            
+
             # Always set manual flags
             update_fields["is_manual"] = True
             update_fields["manual_updated_at"] = timezone.now()
-            
+
             if update_fields:
                 updated = selected_queryset.update(**update_fields)
                 self.message_user(
@@ -1127,11 +1180,12 @@ class VehicleAdmin(admin.ModelAdmin):
     def export_basic_fleet(self, request, queryset):
         # Group by operator for basic export
         from collections import defaultdict
+
         operators = defaultdict(list)
         for vehicle in queryset.select_related("operator"):
             if vehicle.operator:
                 operators[vehicle.operator].append(vehicle)
-        
+
         if len(operators) == 1:
             # Single operator export
             operator = list(operators.keys())[0]
@@ -1142,7 +1196,7 @@ class VehicleAdmin(admin.ModelAdmin):
             # Multiple operators - export as basic without operator header
             workbook = build_basic_fleet_workbook(None, queryset, advanced=False)
             filename = "fleet-basic.xlsx"
-        
+
         response = HttpResponse(
             workbook_bytes(workbook),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1159,14 +1213,15 @@ class VehicleAdmin(admin.ModelAdmin):
                 messages.WARNING,
             )
             return
-        
+
         # Group by operator for advanced export
         from collections import defaultdict
+
         operators = defaultdict(list)
         for vehicle in queryset.select_related("operator"):
             if vehicle.operator:
                 operators[vehicle.operator].append(vehicle)
-        
+
         if len(operators) == 1:
             # Single operator export
             operator = list(operators.keys())[0]
@@ -1177,7 +1232,7 @@ class VehicleAdmin(admin.ModelAdmin):
             # Multiple operators - export as advanced without operator header
             workbook = build_basic_fleet_workbook(None, queryset, advanced=True)
             filename = "fleet-advanced.xlsx"
-        
+
         response = HttpResponse(
             workbook_bytes(workbook),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1195,13 +1250,13 @@ class DuplicateLiveryFilter(admin.SimpleListFilter):
     parameter_name = "duplicate_name"
 
     def lookups(self, request, model_admin):
-        return (
-            ("yes", "has duplicate name"),
-        )
+        return (("yes", "has duplicate name"),)
 
     def queryset(self, request, queryset):
         if self.value() == "yes":
-            duplicates = models.Livery.objects.filter(~Q(id=OuterRef("id"))).filter(name__iexact=OuterRef("name"))
+            duplicates = models.Livery.objects.filter(~Q(id=OuterRef("id"))).filter(
+                name__iexact=OuterRef("name")
+            )
             queryset = queryset.filter(Exists(duplicates))
         return queryset
 
@@ -1602,7 +1657,14 @@ class VehicleRevisionAdmin(admin.ModelAdmin):
         UserFilter,
         ("vehicle__operator", admin.RelatedOnlyFieldListFilter),
     ]
-    list_select_related = ["from_operator", "to_operator", "from_garage", "to_garage", "vehicle", "user"]
+    list_select_related = [
+        "from_operator",
+        "to_operator",
+        "from_garage",
+        "to_garage",
+        "vehicle",
+        "user",
+    ]
 
     def get_queryset(self, request):
         return apply_vehicle_schema_compat(
