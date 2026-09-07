@@ -112,7 +112,9 @@ def get_revision(vehicle, data):
     if "features" in data or "accessibility_features" in data:
         current_features = list(revision.vehicle.features.all())
         current_standard_features = [
-            feature for feature in current_features if feature.category == feature.Category.FEATURE
+            feature
+            for feature in current_features
+            if feature.category == feature.Category.FEATURE
         ]
         current_accessibility_features = [
             feature
@@ -125,7 +127,9 @@ def get_revision(vehicle, data):
         requested_accessibility_features = list(
             data.pop("accessibility_features", current_accessibility_features)
         )
-        requested_features = requested_standard_features + requested_accessibility_features
+        requested_features = (
+            requested_standard_features + requested_accessibility_features
+        )
         for feature in current_features:
             if feature not in requested_features:
                 features.append(
@@ -172,7 +176,12 @@ def get_revision(vehicle, data):
 
     if "previous_operators" in data:
         import json
-        from_value = json.dumps(vehicle.previous_operators, indent=2) if vehicle.previous_operators else ""
+
+        from_value = (
+            json.dumps(vehicle.previous_operators, indent=2)
+            if vehicle.previous_operators
+            else ""
+        )
         to_value = data.pop("previous_operators") or ""
         if from_value != to_value:
             revision.changes["previous_operators"] = f"-{from_value}\n+{to_value}"
@@ -265,6 +274,7 @@ def apply_revision(revision, features=None):
 
         elif field == "previous_operators":
             import json
+
             if to_value:
                 try:
                     vehicle.previous_operators = json.loads(to_value)
@@ -289,13 +299,6 @@ def apply_revision(revision, features=None):
                     to_value = None
                 elif to_value.isdigit():
                     to_value = int(to_value)
-                # Handle date strings (ISO format YYYY-MM-DD)
-                elif len(to_value) == 10 and to_value[4] == "-" and to_value[7] == "-":
-                    try:
-                        from datetime import datetime
-                        to_value = datetime.strptime(to_value, "%Y-%m-%d").date()
-                    except (ValueError, AttributeError):
-                        pass  # Keep as string if not a valid date
             advanced_data[field_name] = to_value
             vehicle.advanced = advanced_data
             changed_fields.append("advanced")

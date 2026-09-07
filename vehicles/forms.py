@@ -4,37 +4,51 @@ from django.contrib.admin.widgets import AutocompleteSelect
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 
-from busstops.models import Manufacturer, Operator, OperatorGroup, OperatorVehicleColumn, Region
+from busstops.models import (
+    Manufacturer,
+    Operator,
+    OperatorGroup,
+    OperatorVehicleColumn,
+    Region,
+)
 from bustimes.models import Garage
 
 from .fields import validate_colours
 from .form_fields import RegField, SummaryField
-from .models import AdvancedField, Livery, Vehicle, VehicleFeature, VehicleReview, VehicleType
+from .models import (
+    AdvancedField,
+    Livery,
+    Vehicle,
+    VehicleFeature,
+    VehicleReview,
+    VehicleType,
+)
 
 
 class PhotoForm(forms.Form):
     """Form for adding Flickr photos to vehicles."""
+
     flickr_url = forms.URLField(
         label="Flickr URL",
         help_text="Enter a Flickr photo URL (image will be downloaded automatically)",
-        required=True
+        required=True,
     )
     credit = forms.CharField(
         label="Credit",
         max_length=255,
         required=False,
-        help_text="Photo credit (optional, will be auto-filled from Flickr if not provided)"
+        help_text="Photo credit (optional, will be auto-filled from Flickr if not provided)",
     )
     caption = forms.CharField(
         label="Caption",
         max_length=255,
         required=False,
-        help_text="Photo caption (optional, will be auto-filled from Flickr if not provided)"
+        help_text="Photo caption (optional, will be auto-filled from Flickr if not provided)",
     )
 
     def clean_flickr_url(self):
-        url = self.cleaned_data.get('flickr_url')
-        if url and 'flickr.com' not in url.lower():
+        url = self.cleaned_data.get("flickr_url")
+        if url and "flickr.com" not in url.lower():
             raise ValidationError("Only Flickr URLs are allowed for photos.")
         return url
 
@@ -94,15 +108,15 @@ class AdvancedFieldsMixin:
     def add_advanced_fields(self, values=None):
         self.advanced_fields = []
         self.advanced_field_fields = {}
-        
+
         self.advanced_fields = list(
             AdvancedField.objects.all().order_by("display_order", "name")
         )
         values = values or {}
-        
+
         for field in self.advanced_fields:
             field_name = f"{self.advanced_field_prefix}{field.slug}"
-            
+
             if field.field_type == AdvancedField.FieldType.BOOLEAN:
                 self.fields[field_name] = forms.BooleanField(
                     label=field.name,
@@ -145,14 +159,14 @@ class AdvancedFieldsMixin:
                         required=False,
                         max_length=500,
                     )
-            
+
             self.fields[field_name].initial = values.get(field.slug, "")
             self.advanced_field_fields[field_name] = field
 
     def get_dropdown_choices(self, slug):
         import json
         from pathlib import Path
-        
+
         json_file = Path(__file__).parent / "static" / "vehicles" / f"{slug}.json"
         if json_file.exists():
             with open(json_file) as f:
@@ -171,15 +185,17 @@ class AdvancedFieldsMixin:
             if field.field_type == AdvancedField.FieldType.BOOLEAN:
                 updates[field.slug] = bool(value)
             elif field.field_type == AdvancedField.FieldType.NUMBER:
-                updates[field.slug] = value if value is not None else None
+                updates[field.slug] = value if value is not None else ""
             elif field.field_type == AdvancedField.FieldType.DATE:
-                updates[field.slug] = value.isoformat() if value else None
+                updates[field.slug] = value.isoformat() if value else ""
             else:
                 updates[field.slug] = (value or "").strip() if value else ""
         return updates
 
 
-class EditVehicleForm(OperatorVehicleColumnFieldsMixin, AdvancedFieldsMixin, forms.Form):
+class EditVehicleForm(
+    OperatorVehicleColumnFieldsMixin, AdvancedFieldsMixin, forms.Form
+):
     FLEET_SUPPORT_FEATURE_ID = "8"
 
     @property
@@ -363,7 +379,9 @@ class EditVehicleForm(OperatorVehicleColumnFieldsMixin, AdvancedFieldsMixin, for
     )
 
     features = forms.ModelMultipleChoiceField(
-        queryset=VehicleFeature.objects.filter(category=VehicleFeature.Category.FEATURE),
+        queryset=VehicleFeature.objects.filter(
+            category=VehicleFeature.Category.FEATURE
+        ),
         widget=forms.CheckboxSelectMultiple,
         required=False,
     )
@@ -393,6 +411,7 @@ link to a picture to prove it. Be polite.""",
 
     def clean_previous_operators(self):
         import json
+
         value = self.cleaned_data.get("previous_operators", "").strip()
         if not value:
             return []
@@ -404,7 +423,9 @@ link to a picture to prove it. Be polite.""",
                 if not isinstance(item, dict):
                     raise ValidationError("Each previous operator must be an object")
                 if "operator_id" not in item:
-                    raise ValidationError("Each previous operator must have an operator_id")
+                    raise ValidationError(
+                        "Each previous operator must have an operator_id"
+                    )
             return data
         except json.JSONDecodeError:
             raise ValidationError("Invalid JSON format")
@@ -413,34 +434,41 @@ link to a picture to prove it. Be polite.""",
         cleaned_data = super().clean()
         # Handle adding a new previous operator from the helper fields
         add_operator = cleaned_data.get("add_previous_operator")
-        add_joined_fleet = cleaned_data.get("add_previous_operator_joined_fleet", "").strip()
-        
+        add_joined_fleet = cleaned_data.get(
+            "add_previous_operator_joined_fleet", ""
+        ).strip()
+
         if add_operator and add_joined_fleet:
             # Get existing previous operators
             import json
+
             existing = cleaned_data.get("previous_operators", "[]")
             if existing:
                 try:
-                    existing_list = json.loads(existing) if isinstance(existing, str) else existing
+                    existing_list = (
+                        json.loads(existing) if isinstance(existing, str) else existing
+                    )
                 except json.JSONDecodeError:
                     existing_list = []
             else:
                 existing_list = []
-            
+
             # Add the new operator
-            existing_list.append({
-                "operator_id": add_operator.id,
-                "operator_name": str(add_operator),
-                "joined_fleet": add_joined_fleet
-            })
-            
+            existing_list.append(
+                {
+                    "operator_id": add_operator.id,
+                    "operator_name": str(add_operator),
+                    "joined_fleet": add_joined_fleet,
+                }
+            )
+
             # Update the hidden field
             cleaned_data["previous_operators"] = json.dumps(existing_list)
-        
+
         # Clear the helper fields so they don't interfere
         cleaned_data["add_previous_operator"] = None
         cleaned_data["add_previous_operator_joined_fleet"] = ""
-        
+
         return cleaned_data
 
     @classmethod
@@ -465,21 +493,25 @@ link to a picture to prove it. Be polite.""",
 
         return data
 
-    def __init__(self, data, *args, user, vehicle, sibling_vehicles, advanced=False, **kwargs):
+    def __init__(
+        self, data, *args, user, vehicle, sibling_vehicles, advanced=False, **kwargs
+    ):
         super().__init__(self._normalize_bound_data(data), *args, **kwargs)
 
         self.fields["operator"].initial = vehicle.operator
         self.fields["operated_by"].initial = vehicle.operated_by
         self.fields["garage"].initial = vehicle.garage
-        
+
         # Filter garage queryset by operator like Django admin
         if "operator" in self.fields and "garage" in self.fields:
             operator = vehicle.operator
             if operator:
-                self.fields["garage"].queryset = self.fields["garage"].queryset.filter(operators=operator)
+                self.fields["garage"].queryset = self.fields["garage"].queryset.filter(
+                    operators=operator
+                )
             else:
                 self.fields["garage"].queryset = self.fields["garage"].queryset.none()
-        
+
         self.fields["reg"].initial = vehicle.reg
         self.fields["vehicle_type"].initial = vehicle.vehicle_type
         self.fields["colours"].initial = vehicle.livery_id
@@ -512,7 +544,10 @@ link to a picture to prove it. Be polite.""",
         self.fields["left_fleet"].initial = vehicle.left_fleet or ""
         if vehicle.previous_operators:
             import json
-            self.fields["previous_operators"].initial = json.dumps(vehicle.previous_operators)
+
+            self.fields["previous_operators"].initial = json.dumps(
+                vehicle.previous_operators
+            )
         # Don't initialize helper fields - they're for adding new entries only
         self.fields["notes"].initial = vehicle.notes
         self.fields["withdrawn"].initial = vehicle.withdrawn
@@ -524,29 +559,48 @@ link to a picture to prove it. Be polite.""",
         self.fields["demonstrator"].initial = vehicle.demonstrator
         self.fields["spare_ticket_machine"].initial = vehicle.is_spare_ticket_machine()
         self.add_operator_vehicle_column_fields(vehicle.operator, vehicle.data)
-        
+
         # Add advanced fields if in advanced mode
         if advanced:
             self.add_advanced_fields(vehicle.advanced or {})
-            
+
             # Hide all non-essential fields in advanced mode
             # Keep only: vehicle_type, fleet_number, colours (livery), reg, summary
-            fields_to_keep = {"vehicle_type", "fleet_number", "colours", "reg", "summary"}
+            fields_to_keep = {
+                "vehicle_type",
+                "fleet_number",
+                "colours",
+                "reg",
+                "summary",
+            }
             for field_name in list(self.fields.keys()):
-                if field_name not in fields_to_keep and not field_name.startswith(self.advanced_field_prefix):
+                if field_name not in fields_to_keep and not field_name.startswith(
+                    self.advanced_field_prefix
+                ):
                     del self.fields[field_name]
-            
+
             # Reorder fields: basic fields first, then advanced fields, then summary at bottom
             basic_fields = ["vehicle_type", "fleet_number", "colours", "reg"]
-            advanced_field_names = [name for name in list(self.fields.keys()) if name.startswith(self.advanced_field_prefix)]
+            advanced_field_names = [
+                name
+                for name in list(self.fields.keys())
+                if name.startswith(self.advanced_field_prefix)
+            ]
             new_order = basic_fields + advanced_field_names + ["summary"]
             self.order_fields(new_order)
 
-        if "fleet_support_vehicle" in self.fields and self.fields["fleet_support_vehicle"].initial:
+        if (
+            "fleet_support_vehicle" in self.fields
+            and self.fields["fleet_support_vehicle"].initial
+        ):
             if "features" in self.fields:
-                feature_ids = {feature.id for feature in self.fields["features"].initial}
+                feature_ids = {
+                    feature.id for feature in self.fields["features"].initial
+                }
                 feature_ids.add(8)
-                self.fields["features"].initial = VehicleFeature.objects.filter(id__in=feature_ids)
+                self.fields["features"].initial = VehicleFeature.objects.filter(
+                    id__in=feature_ids
+                )
 
         if vehicle.fleet_code:
             self.fields["fleet_number"].initial = vehicle.fleet_code
@@ -580,7 +634,11 @@ link to a picture to prove it. Be polite.""",
                 del self.fields["vehicle_type"]
             if not vehicle.name and "name" in self.fields:
                 del self.fields["name"]
-            if not vehicle.prev_registration and not vehicle.data and "previous_reg" in self.fields:
+            if (
+                not vehicle.prev_registration
+                and not vehicle.data
+                and "previous_reg" in self.fields
+            ):
                 del self.fields["previous_reg"]
             if (
                 not vehicle.colours
@@ -596,9 +654,12 @@ link to a picture to prove it. Be polite.""",
                 del self.fields["rear_advert"]
             if not vehicle.features.all() and "features" in self.fields:
                 del self.fields["features"]
-            if not vehicle.features.filter(
-                category=VehicleFeature.Category.ACCESSIBILITY
-            ).exists() and "accessibility_features" in self.fields:
+            if (
+                not vehicle.features.filter(
+                    category=VehicleFeature.Category.ACCESSIBILITY
+                ).exists()
+                and "accessibility_features" in self.fields
+            ):
                 del self.fields["accessibility_features"]
 
         if self.operator_vehicle_column_fields:
@@ -611,20 +672,24 @@ link to a picture to prove it. Be polite.""",
             else:
                 ordered_fields.extend(custom_field_names)
             self.order_fields(ordered_fields)
-        
-        if getattr(self, 'advanced_field_fields', None):
+
+        if getattr(self, "advanced_field_fields", None):
             # Get all current field names
             current_field_names = list(self.fields.keys())
             advanced_field_names = list(self.advanced_field_fields.keys())
-            
+
             # Build the new order: basic fields first, then advanced fields, then summary
-            basic_fields = [name for name in current_field_names if not name.startswith(self.advanced_field_prefix) and name != "summary"]
+            basic_fields = [
+                name
+                for name in current_field_names
+                if not name.startswith(self.advanced_field_prefix) and name != "summary"
+            ]
             new_order = basic_fields + advanced_field_names
-            
+
             # Add summary at the end if it exists
             if "summary" in current_field_names:
                 new_order.append("summary")
-            
+
             self.order_fields(new_order)
 
 
@@ -746,7 +811,9 @@ class NewVehicleRequestForm(OperatorVehicleColumnFieldsMixin, forms.Form):
         help_text="Use this if the code is for a spare ticket machine rather than a bus.",
     )
     features = forms.ModelMultipleChoiceField(
-        queryset=VehicleFeature.objects.filter(category=VehicleFeature.Category.FEATURE),
+        queryset=VehicleFeature.objects.filter(
+            category=VehicleFeature.Category.FEATURE
+        ),
         widget=forms.CheckboxSelectMultiple,
         required=False,
     )
@@ -880,7 +947,9 @@ class NewServiceRequestForm(forms.Form):
 class NewOperatorRequestForm(forms.Form):
     noc = forms.CharField(label="Operator code (NOC)", max_length=10)
     name = forms.CharField(max_length=100, label="Operator name")
-    logo = forms.URLField(required=False, label="Logo URL", help_text="URL to operator logo image")
+    logo = forms.URLField(
+        required=False, label="Logo URL", help_text="URL to operator logo image"
+    )
     vehicle_mode = forms.ChoiceField(
         required=False,
         choices=[
@@ -892,19 +961,19 @@ class NewOperatorRequestForm(forms.Form):
             ("ferry", "Ferry"),
             ("other", "Other"),
         ],
-        label="Vehicle mode"
+        label="Vehicle mode",
     )
     group = forms.ModelChoiceField(
         queryset=OperatorGroup.objects.order_by("name"),
         required=False,
         empty_label="Select operator group",
-        label="Operator group"
+        label="Operator group",
     )
     region = forms.ModelChoiceField(
         queryset=Region.objects.order_by("name"),
         required=False,
         empty_label="Select region",
-        label="Region"
+        label="Region",
     )
     summary = SummaryField(
         max_length=255,
@@ -941,14 +1010,14 @@ class GenericRequestForm(forms.Form):
             ("other", "Other"),
         ],
         required=True,
-        label="Category"
+        label="Category",
     )
     title = forms.CharField(max_length=255, label="Title", required=True)
     description = forms.CharField(
         widget=forms.Textarea,
         label="Description",
         required=True,
-        help_text="Please provide details about your request"
+        help_text="Please provide details about your request",
     )
     priority = forms.ChoiceField(
         choices=[
@@ -959,10 +1028,8 @@ class GenericRequestForm(forms.Form):
             ("urgent", "Urgent"),
         ],
         required=True,
-        label="Priority"
+        label="Priority",
     )
-
-
 
 
 class SornVehicleFilterForm(forms.Form):
@@ -993,9 +1060,7 @@ class SornVehicleFilterForm(forms.Form):
     include_withdrawn = forms.BooleanField(label="Include withdrawn", required=False)
     include_vor = forms.BooleanField(label="Include VOR", required=False)
     trainer_only = forms.BooleanField(label="Trainer only", required=False)
-    fleet_support_only = forms.BooleanField(
-        label="Fleet support only", required=False
-    )
+    fleet_support_only = forms.BooleanField(label="Fleet support only", required=False)
     awaiting_delivery_only = forms.BooleanField(
         label="Awaiting delivery only", required=False
     )
@@ -1010,8 +1075,14 @@ VehicleTypeRequestForm = NewVehicleModelRequestForm
 
 class LiveryRequestForm(forms.Form):
     name = forms.CharField(max_length=255, label="Livery name")
-    colour = forms.CharField(max_length=7, label="Primary colour", help_text="Hex code e.g. #0055aa")
-    colours = forms.CharField(max_length=255, label="Colours", help_text="Space-separated hex codes e.g. #0055aa #ffffff")
+    colour = forms.CharField(
+        max_length=7, label="Primary colour", help_text="Hex code e.g. #0055aa"
+    )
+    colours = forms.CharField(
+        max_length=255,
+        label="Colours",
+        help_text="Space-separated hex codes e.g. #0055aa #ffffff",
+    )
     summary = SummaryField(
         max_length=255,
         help_text="Explain the livery that should be added and any supporting details.",
@@ -1040,7 +1111,12 @@ class LiveFleetBulkImportForm(forms.Form):
     )
     bulk_text = forms.CharField(
         required=False,
-        widget=forms.Textarea(attrs={"rows": 10, "placeholder": "Paste tab-separated vehicle data here..."}),
+        widget=forms.Textarea(
+            attrs={
+                "rows": 10,
+                "placeholder": "Paste tab-separated vehicle data here...",
+            }
+        ),
         help_text="Paste vehicle data from the template or export",
     )
     workbook = forms.FileField(

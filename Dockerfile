@@ -34,4 +34,5 @@ ENV PORT=8000 STATIC_ROOT=/staticfiles
 RUN ./manage.py collectstatic --noinput
 
 EXPOSE 8000
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["gunicorn", "buses.wsgi"]

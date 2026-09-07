@@ -19,7 +19,7 @@ python manage.py collectstatic --noinput
 
 # Run database migrations
 echo "Running database migrations..."
-python manage.py migrate --noinput
+python manage.py migrate_with_lock
 
 # Start Gunicorn (Django application server)
 echo "Starting Gunicorn..."
