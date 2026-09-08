@@ -2255,26 +2255,29 @@ def vehicles_json(request) -> JsonResponse:
                 locations = normalize_bustimes_vehicle_items(items)
             else:
                 # Fallback to bustimes.org if BODS returns no data
-                logging.info("BODS returned no vehicles, falling back to bustimes.org")
-                items = get_bustimes_vehicle_items(request)
-                locations = normalize_bustimes_vehicle_items(items)
+                # logging.info("BODS returned no vehicles, falling back to bustimes.org")
+                # items = get_bustimes_vehicle_items(request)
+                # locations = normalize_bustimes_vehicle_items(items)
+                locations = []
         except (requests.RequestException, ValueError) as exc:
             logging.warning("Could not fetch BODS vehicles: %s", exc)
             # Fallback to bustimes.org
-            try:
-                items = get_bustimes_vehicle_items(request)
-                locations = normalize_bustimes_vehicle_items(items)
-            except (requests.RequestException, ValueError) as exc:
-                logging.warning("Could not fetch Bustimes vehicles.json: %s", exc)
-                return JsonResponse([], safe=False, status=502)
+            # try:
+            #     items = get_bustimes_vehicle_items(request)
+            #     locations = normalize_bustimes_vehicle_items(items)
+            # except (requests.RequestException, ValueError) as exc:
+            #     logging.warning("Could not fetch Bustimes vehicles.json: %s", exc)
+            #     return JsonResponse([], safe=False, status=502)
+            return JsonResponse([], safe=False, status=502)
     else:
         # No BODS API key configured, use bustimes.org
-        try:
-            items = get_bustimes_vehicle_items(request)
-            locations = normalize_bustimes_vehicle_items(items)
-        except (requests.RequestException, ValueError) as exc:
-            logging.warning("Could not fetch Bustimes vehicles.json: %s", exc)
-            return JsonResponse([], safe=False, status=502)
+        # try:
+        #     items = get_bustimes_vehicle_items(request)
+        #     locations = normalize_bustimes_vehicle_items(items)
+        # except (requests.RequestException, ValueError) as exc:
+        #     logging.warning("Could not fetch Bustimes vehicles.json: %s", exc)
+        #     return JsonResponse([], safe=False, status=502)
+        return JsonResponse([], safe=False, status=502)
 
     trip = request.GET.get("trip")
     if trip:
