@@ -524,22 +524,21 @@ def _get_bods_operator_refs(operator_ids):
     return sorted(refs)
 
 
-def _get_bods_vehicles(operator_ids):
-    """Fetch live vehicles from BODS for given operator IDs"""
+def _get_bods_vehicles(operator_ids=None):
+    """Fetch live vehicles from BODS for given operator IDs, or all vehicles if no operator_ids"""
     if not settings.BODS_API_KEY:
-        return []
-    
-    operator_refs = _get_bods_operator_refs(operator_ids)
-    if not operator_refs:
         return []
     
     request_kwargs = bods_auth.get_bods_request_kwargs()
     params = request_kwargs.get("params", {}).copy()
     
-    # Add operator refs to params - BODS expects operatorRef parameter
-    # Join multiple operator refs with commas
-    if operator_refs:
-        params["operatorRef"] = ",".join(operator_refs)
+    # Add operator refs to params if provided
+    if operator_ids:
+        operator_refs = _get_bods_operator_refs(operator_ids)
+        if operator_refs:
+            params["operatorRef"] = ",".join(operator_refs)
+        else:
+            return []
     
     request_kwargs["params"] = params
     
@@ -547,12 +546,18 @@ def _get_bods_vehicles(operator_ids):
         response = requests.get(_get_bods_datafeed_url(), **request_kwargs, timeout=30)
         response.raise_for_status()
         
+        logging.info(f"BODS response status: {response.status_code}, content-type: {response.headers.get('content-type')}")
+        
         # Handle zipped response
         content_type = response.headers.get("content-type", "")
         data = bods_parser.maybe_unzip_payload(response.content, content_type)
         
+        logging.info(f"BODS data size: {len(data)} bytes")
+        
         # Parse SIRI XML
         root, items = bods_parser.parse_vehicle_activity_xml(data)
+        
+        logging.info(f"BODS returned {len(items)} vehicle activities")
         
         # Convert to format compatible with the map
         vehicles = []
@@ -565,6 +570,7 @@ def _get_bods_vehicles(operator_ids):
                 logging.warning(f"Could not convert BODS item: {e}")
                 continue
         
+        logging.info(f"Successfully converted {len(vehicles)} vehicles for map")
         return vehicles
         
     except requests.RequestException as e:
@@ -784,9 +790,11 @@ def get_bods_vehicle_items(request):
             operator_codes = OperatorCode.objects.filter(source=bods_source)
             operator_ids = list(set(oc.code for oc in operator_codes))
     
+    # If still no operator IDs, query BODS without operator restriction
+    # to get all available vehicles
     if not operator_ids:
-        logging.warning("No operator IDs specified for BODS query")
-        return []
+        logging.info("No operator IDs specified, querying BODS without operator filter")
+        return _get_bods_vehicles()
     
     return _get_bods_vehicles(operator_ids)
 

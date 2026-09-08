@@ -63,10 +63,10 @@ class Command(BaseCommand):
         operator_refs = self._split_values(options["operator_refs"])
 
         operator_ids = [*nocs, *operator_refs]
+        
+        # Allow running without operator IDs to test full BODS feed
         if not operator_ids:
-            raise CommandError(
-                "Provide at least one --noc or --operator-ref (repeatable or comma-separated)."
-            )
+            self.stdout.write("No operator IDs specified, will query full BODS feed")
 
         if options.get("api_key"):
             settings.BODS_API_KEY = options["api_key"]
@@ -85,7 +85,7 @@ class Command(BaseCommand):
         request_kwargs = bods_auth.get_bods_request_kwargs(api_key, auth_mode)
         params = request_kwargs.get("params", {}).copy()
         
-        # Add operator refs
+        # Add operator refs only if provided
         if operator_ids:
             params["operatorRef"] = ",".join(operator_ids)
         
@@ -96,14 +96,23 @@ class Command(BaseCommand):
             response = requests.get(url, **request_kwargs)
             response.raise_for_status()
             
+            self.stdout.write(f"BODS response status: {response.status_code}")
+            self.stdout.write(f"Content-Type: {response.headers.get('content-type')}")
+            
             # Handle zipped response
             content_type = response.headers.get("content-type", "")
             data = bods_parser.maybe_unzip_payload(response.content, content_type)
             
+            self.stdout.write(f"Data size: {len(data)} bytes")
+            
             # Parse SIRI XML
             root, items = bods_parser.parse_vehicle_activity_xml(data)
             
-            self.stdout.write(f"input_operator_ids={','.join(operator_ids)}")
+            if operator_ids:
+                self.stdout.write(f"input_operator_ids={','.join(operator_ids)}")
+            else:
+                self.stdout.write("No operator filter - querying full BODS feed")
+            
             self.stdout.write(f"vehicle_count={len(items)}")
 
             if options["json"]:
