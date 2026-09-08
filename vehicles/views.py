@@ -693,6 +693,9 @@ def _convert_bods_item_to_map_format(item):
     # Add vehicle info if found
     if vehicle:
         map_item["vehicle"] = vehicle.get_json()
+    else:
+        # If no vehicle found, don't add vehicle field so it can be filtered out
+        pass
     
     # Add service info
     if line_name:
@@ -858,8 +861,37 @@ def normalize_bustimes_vehicle_items(items):
     """Normalize vehicle items from either BODS or bustimes.org format"""
     # Check if items are already in normalized format (from BODS)
     if items and all("vehicle" in item or "coordinates" in item for item in items):
-        # Items are already in the right format, just ensure consistency
-        return items
+        # Items are already in the right format, but we need to enrich vehicle data
+        # Extract vehicle IDs from the already-normalized BODS items
+        vehicle_ids = []
+        for item in items:
+            if "id" in item and isinstance(item["id"], int):
+                vehicle_ids.append(item["id"])
+        
+        if vehicle_ids:
+            # Enrich vehicle data with proper livery information
+            vehicles = (
+                apply_vehicle_schema_compat(
+                    Vehicle.objects.filter(id__in=vehicle_ids)
+                )
+                .select_related("vehicle_type", "livery")
+                .annotate(feature_names=features_string_agg, colour=F("livery__colour"))
+            )
+            vehicles_by_id = vehicles.in_bulk()
+            
+            # Update items with enriched vehicle data and filter out items without vehicles
+            enriched_items = []
+            for item in items:
+                if "id" in item and isinstance(item["id"], int):
+                    vehicle = vehicles_by_id.get(item["id"])
+                    if vehicle:
+                        item["vehicle"] = vehicle.get_json()
+                        enriched_items.append(item)
+                    # Filter out items that don't have matching vehicles
+            return enriched_items
+        
+        # If no vehicle IDs found, return empty list
+        return []
     
     # Original bustimes.org normalization logic
     remote_vehicle_ids = [str(item.get("id")) for item in items if item.get("id")]
