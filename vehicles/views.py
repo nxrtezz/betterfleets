@@ -26,6 +26,7 @@ from fleet.completion import (
 )
 from fleet.models import FleetPhotoLog
 from django.db.models import Sum
+from vehicles.realtime import bods_auth, bods_parser
 from django.apps import apps
 from django.conf import settings
 from django.contrib import admin, messages
@@ -490,6 +491,218 @@ def get_bustimes_source():
     return DataSource.objects.filter(name=BUSTIMES_SOURCE_NAME).first()
 
 
+def get_bods_source():
+    return DataSource.objects.filter(name="Bus Open Data").first()
+
+
+def _get_bods_datafeed_url():
+    """Get the BODS datafeed URL with bounding box parameters"""
+    url = "https://data.bus-data.dft.gov.uk/api/v1/datafeed/"
+    return url
+
+
+def _get_bods_operator_refs(operator_ids):
+    """Resolve operator IDs to BODS operator refs"""
+    from busstops.models import OperatorCode, Operator
+    
+    refs = set()
+    for operator_id in operator_ids:
+        # Try to find operator by NOC first
+        operators = Operator.objects.filter(noc__iexact=operator_id)
+        if operators.exists():
+            refs.add(operator_id.upper())
+        else:
+            # Try to find by operator code
+            operator_codes = OperatorCode.objects.filter(code__iexact=operator_id)
+            if operator_codes.exists():
+                for oc in operator_codes:
+                    refs.add(oc.code.upper())
+            else:
+                # Use as-is
+                refs.add(operator_id.upper())
+    
+    return sorted(refs)
+
+
+def _get_bods_vehicles(operator_ids):
+    """Fetch live vehicles from BODS for given operator IDs"""
+    if not settings.BODS_API_KEY:
+        return []
+    
+    operator_refs = _get_bods_operator_refs(operator_ids)
+    if not operator_refs:
+        return []
+    
+    request_kwargs = bods_auth.get_bods_request_kwargs()
+    params = request_kwargs.get("params", {}).copy()
+    
+    # Add operator refs to params - BODS expects operatorRef parameter
+    # Join multiple operator refs with commas
+    if operator_refs:
+        params["operatorRef"] = ",".join(operator_refs)
+    
+    request_kwargs["params"] = params
+    
+    try:
+        response = requests.get(_get_bods_datafeed_url(), **request_kwargs, timeout=30)
+        response.raise_for_status()
+        
+        # Handle zipped response
+        content_type = response.headers.get("content-type", "")
+        data = bods_parser.maybe_unzip_payload(response.content, content_type)
+        
+        # Parse SIRI XML
+        root, items = bods_parser.parse_vehicle_activity_xml(data)
+        
+        # Convert to format compatible with the map
+        vehicles = []
+        for item in items:
+            try:
+                vehicle_data = _convert_bods_item_to_map_format(item)
+                if vehicle_data:
+                    vehicles.append(vehicle_data)
+            except Exception as e:
+                logging.warning(f"Could not convert BODS item: {e}")
+                continue
+        
+        return vehicles
+        
+    except requests.RequestException as e:
+        logging.warning(f"Could not fetch BODS vehicles: {e}")
+        return []
+    except Exception as e:
+        logging.warning(f"Could not parse BODS response: {e}")
+        return []
+
+
+def _convert_bods_item_to_map_format(item):
+    """Convert a BODS SIRI vehicle activity item to map format"""
+    from ciso8601 import parse_datetime
+    from django.contrib.gis.geos import Point
+    from busstops.models import OperatorCode
+    from .models import Vehicle, VehicleCode
+    
+    monitored_journey = item.get("MonitoredVehicleJourney", {})
+    if not monitored_journey:
+        return None
+    
+    # Extract vehicle info with robust matching logic
+    vehicle_ref = monitored_journey.get("VehicleRef", "")
+    operator_ref = monitored_journey.get("OperatorRef", "")
+    
+    # Try to get VehicleUniqueId as fallback
+    try:
+        vehicle_unique_id = item["Extensions"]["VehicleJourney"]["VehicleUniqueId"]
+    except (KeyError, TypeError):
+        vehicle_unique_id = None
+    
+    if not vehicle_ref and vehicle_unique_id:
+        vehicle_ref = vehicle_unique_id
+    
+    # Remove operator prefix if present
+    if vehicle_ref:
+        vehicle_ref = vehicle_ref.removeprefix(f"{operator_ref}-")
+    
+    # Find local vehicle with sophisticated matching (similar to import_bod_avl)
+    vehicle = None
+    if vehicle_ref:
+        try:
+            # Try to find vehicle by code
+            vehicles = Vehicle.objects.filter(code__iexact=vehicle_ref)
+            
+            # If vehicle ref looks like a registration (globally unique)
+            if (
+                not vehicle_ref.isdigit()
+                and vehicle_ref.isupper()
+                and len(vehicle_ref) > 6
+                and not vehicle_ref.startswith("BUS")
+            ):
+                try:
+                    vehicle = vehicles.get()
+                except (Vehicle.DoesNotExist, Vehicle.MultipleObjectsReturned):
+                    pass
+            else:
+                # Try to match by operator if multiple vehicles
+                if vehicles.count() > 1:
+                    operator_codes = OperatorCode.objects.filter(code=operator_ref)
+                    if operator_codes.exists():
+                        operators = [oc.operator for oc in operator_codes]
+                        vehicles = vehicles.filter(operator__in=operators)
+                
+                # Special handling for TFLO (TfL)
+                if operator_ref == "TFLO" and vehicle_ref.startswith("TMP"):
+                    # This is a spare ticket machine
+                    vehicles = vehicles.filter(notes="Spare ticket machine")
+                
+                vehicle = vehicles.first()
+                
+                # If still not found, try VehicleUniqueId
+                if not vehicle and vehicle_unique_id:
+                    vehicles = Vehicle.objects.filter(code__iexact=vehicle_unique_id)
+                    if vehicles.count() > 1:
+                        operator_codes = OperatorCode.objects.filter(code=operator_ref)
+                        if operator_codes.exists():
+                            operators = [oc.operator for oc in operator_codes]
+                            vehicles = vehicles.filter(operator__in=operators)
+                    vehicle = vehicles.first()
+                    
+        except Exception as e:
+            logging.warning(f"Could not find vehicle for {vehicle_ref}: {e}")
+    
+    # Extract location
+    location = monitored_journey.get("VehicleLocation", {})
+    if not location:
+        return None
+    
+    longitude = location.get("Longitude")
+    latitude = location.get("Latitude")
+    if not longitude or not latitude:
+        return None
+    
+    # Extract datetime
+    recorded_at = monitored_journey.get("RecordedAtTime")
+    if not recorded_at:
+        return None
+    
+    try:
+        recorded_datetime = parse_datetime(recorded_at)
+    except Exception:
+        return None
+    
+    # Extract service info
+    line_name = monitored_journey.get("PublishedLineName", "") or monitored_journey.get("LineRef", "")
+    destination = monitored_journey.get("DestinationName", "")
+    
+    # Extract heading
+    heading = None
+    if "Bearing" in location:
+        try:
+            heading = float(location["Bearing"])
+        except (ValueError, TypeError):
+            pass
+    
+    # Build map item
+    map_item = {
+        "id": vehicle.id if vehicle else f"{operator_ref}-{vehicle_ref}",
+        "coordinates": [float(longitude), float(latitude)],
+        "datetime": recorded_datetime.isoformat(),
+        "heading": heading,
+        "destination": destination,
+    }
+    
+    # Add vehicle info if found
+    if vehicle:
+        map_item["vehicle"] = vehicle.get_json()
+    
+    # Add service info
+    if line_name:
+        map_item["service"] = {
+            "line_name": line_name,
+        }
+    
+    return map_item
+
+
 def get_remote_vehicle_ids(local_ids):
     codes = VehicleCode.objects.filter(
         scheme=BUSTIMES_SCHEME, vehicle_id__in=local_ids
@@ -547,6 +760,32 @@ def get_bustimes_vehicle_items(request):
     )
     response.raise_for_status()
     return response.json()
+
+
+def get_bods_vehicle_items(request):
+    """Get live vehicle items from BODS API"""
+    if not settings.BODS_API_KEY:
+        logging.warning("BODS_API_KEY not configured")
+        return []
+    
+    # Get operator IDs from request parameters
+    operator_ids = []
+    if "operator" in request.GET:
+        operator_ids = request.GET.get("operator", "").split(",")
+    
+    # If no operator specified, get all operators with BODS data
+    if not operator_ids:
+        from busstops.models import OperatorCode
+        bods_source = get_bods_source()
+        if bods_source:
+            operator_codes = OperatorCode.objects.filter(source=bods_source)
+            operator_ids = list(set(oc.code for oc in operator_codes))
+    
+    if not operator_ids:
+        logging.warning("No operator IDs specified for BODS query")
+        return []
+    
+    return _get_bods_vehicles(operator_ids)
 
 
 def parse_live_datetime(value):
@@ -616,6 +855,13 @@ def append_live_location(item, vehicle, journey):
 
 
 def normalize_bustimes_vehicle_items(items):
+    """Normalize vehicle items from either BODS or bustimes.org format"""
+    # Check if items are already in normalized format (from BODS)
+    if items and all("vehicle" in item or "coordinates" in item for item in items):
+        # Items are already in the right format, just ensure consistency
+        return items
+    
+    # Original bustimes.org normalization logic
     remote_vehicle_ids = [str(item.get("id")) for item in items if item.get("id")]
     remote_journey_ids = [
         str(item.get("journey_id")) for item in items if item.get("journey_id")
@@ -685,7 +931,8 @@ def normalize_bustimes_vehicle_items(items):
                 item["service"] = {"line_name": journey.route_name}
             append_live_location(item, vehicle, journey)
         else:
-            item.pop("journey_id", None)
+            # No journey found, but still add vehicle location
+            append_live_location(item, vehicle, None)
 
         local_items.append(item)
 
@@ -1968,13 +2215,35 @@ def respond_conditionally(request, response):
 
 @require_safe
 def vehicles_json(request) -> JsonResponse:
-    try:
-        items = get_bustimes_vehicle_items(request)
-    except (requests.RequestException, ValueError) as exc:
-        logging.warning("Could not fetch Bustimes vehicles.json: %s", exc)
-        return JsonResponse([], safe=False, status=502)
-
-    locations = normalize_bustimes_vehicle_items(items)
+    # Try BODS first if API key is configured
+    if settings.BODS_API_KEY:
+        try:
+            items = get_bods_vehicle_items(request)
+            if items:
+                # Normalize BODS items to match expected format
+                locations = normalize_bustimes_vehicle_items(items)
+            else:
+                # Fallback to bustimes.org if BODS returns no data
+                logging.info("BODS returned no vehicles, falling back to bustimes.org")
+                items = get_bustimes_vehicle_items(request)
+                locations = normalize_bustimes_vehicle_items(items)
+        except (requests.RequestException, ValueError) as exc:
+            logging.warning("Could not fetch BODS vehicles: %s", exc)
+            # Fallback to bustimes.org
+            try:
+                items = get_bustimes_vehicle_items(request)
+                locations = normalize_bustimes_vehicle_items(items)
+            except (requests.RequestException, ValueError) as exc:
+                logging.warning("Could not fetch Bustimes vehicles.json: %s", exc)
+                return JsonResponse([], safe=False, status=502)
+    else:
+        # No BODS API key configured, use bustimes.org
+        try:
+            items = get_bustimes_vehicle_items(request)
+            locations = normalize_bustimes_vehicle_items(items)
+        except (requests.RequestException, ValueError) as exc:
+            logging.warning("Could not fetch Bustimes vehicles.json: %s", exc)
+            return JsonResponse([], safe=False, status=502)
 
     trip = request.GET.get("trip")
     if trip:

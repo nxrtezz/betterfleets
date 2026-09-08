@@ -4,8 +4,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 import requests
 
-from vehicles.realtime import bods_auth
-from vehicles.views import _get_bods_datafeed_url, _get_bods_operator_refs, _get_bods_vehicles
+from vehicles.realtime import bods_auth, bods_parser
 
 
 class Command(BaseCommand):
@@ -81,30 +80,57 @@ class Command(BaseCommand):
         if options.get("show_http"):
             self._debug_http_probe(api_key, auth_mode)
 
-        resolved_refs = sorted(_get_bods_operator_refs(operator_ids))
-        vehicles = _get_bods_vehicles(operator_ids)
+        # Use BODS datafeed URL directly
+        url = "https://data.bus-data.dft.gov.uk/api/v1/datafeed/"
+        request_kwargs = bods_auth.get_bods_request_kwargs(api_key, auth_mode)
+        params = request_kwargs.get("params", {}).copy()
+        
+        # Add operator refs
+        if operator_ids:
+            params["operatorRef"] = ",".join(operator_ids)
+        
+        request_kwargs["params"] = params
+        request_kwargs["timeout"] = 30
 
-        self.stdout.write(f"input_operator_ids={','.join(operator_ids)}")
-        self.stdout.write(f"resolved_operator_refs={','.join(resolved_refs)}")
-        self.stdout.write(f"vehicle_count={len(vehicles)}")
+        try:
+            response = requests.get(url, **request_kwargs)
+            response.raise_for_status()
+            
+            # Handle zipped response
+            content_type = response.headers.get("content-type", "")
+            data = bods_parser.maybe_unzip_payload(response.content, content_type)
+            
+            # Parse SIRI XML
+            root, items = bods_parser.parse_vehicle_activity_xml(data)
+            
+            self.stdout.write(f"input_operator_ids={','.join(operator_ids)}")
+            self.stdout.write(f"vehicle_count={len(items)}")
 
-        if options["json"]:
-            self.stdout.write(json.dumps(vehicles, indent=2))
+            if options["json"]:
+                self.stdout.write(json.dumps(items, indent=2))
+                return
+
+            limit = max(options["limit"], 0)
+            for item in items[:limit]:
+                monitored_journey = item.get("MonitoredVehicleJourney", {})
+                vehicle_ref = monitored_journey.get("VehicleRef", "")
+                operator_ref = monitored_journey.get("OperatorRef", "")
+                line_name = monitored_journey.get("PublishedLineName", "")
+                destination = monitored_journey.get("DestinationName", "")
+                location = monitored_journey.get("VehicleLocation", {})
+                coordinates = [location.get("Longitude"), location.get("Latitude")]
+                
+                self.stdout.write(
+                    f"operator={operator_ref} vehicle={vehicle_ref} line={line_name} "
+                    f"dest={destination} coords={coordinates}"
+                )
+                
+        except requests.RequestException as exc:
+            self.stdout.write(f"Error fetching BODS data: {exc}")
             return
 
-        limit = max(options["limit"], 0)
-        for vehicle in vehicles[:limit]:
-            vehicle_name = (vehicle.get("vehicle") or {}).get("name", "")
-            service = (vehicle.get("service") or {}).get("line_name", "")
-            destination = vehicle.get("destination", "")
-            coordinates = vehicle.get("coordinates")
-            self.stdout.write(
-                f"id={vehicle['id']} vehicle={vehicle_name} line={service} "
-                f"dest={destination} coords={coordinates}"
-            )
-
     def _debug_http_probe(self, api_key: str, auth_mode: str | None):
-        url = _get_bods_datafeed_url()
+        url = "https://data.bus-data.dft.gov.uk/api/v1/datafeed/"
         request_kwargs = bods_auth.get_bods_request_kwargs(api_key, auth_mode)
         request_kwargs["timeout"] = 20
         effective_auth_mode = (auth_mode or "from-settings").lower()
