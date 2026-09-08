@@ -129,6 +129,40 @@ class DVLAMotStatus(models.TextChoices):
     VALID = "Valid", "Valid"
 
 
+def load_json_choices(filename):
+    """Load choices from a JSON file in the static directory."""
+    import json
+    from pathlib import Path
+    
+    # The models.py file is in vehicles/ directory, static files are in vehicles/static/vehicles/
+    json_path = Path(__file__).parent / "static" / "vehicles" / filename
+    try:
+        with open(json_path, 'r') as f:
+            choices = json.load(f)
+        # Convert list of strings to tuple of (value, label) pairs
+        return [(choice, choice) for choice in choices]
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+@lru_cache(maxsize=1)
+def get_chassis_choices():
+    """Get chassis choices from JSON file."""
+    return load_json_choices('chassis.json')
+
+
+@lru_cache(maxsize=1)
+def get_gearbox_choices():
+    """Get gearbox choices from JSON file."""
+    return load_json_choices('gearbox.json')
+
+
+@lru_cache(maxsize=1)
+def get_emissions_choices():
+    """Get emissions choices from JSON file."""
+    return load_json_choices('emissions.json')
+
+
 class VehicleTypeGroup(models.Model):
     manufacturer = models.ForeignKey(
         "busstops.Manufacturer",
@@ -712,6 +746,31 @@ class Vehicle(models.Model):
     data = models.JSONField(null=True, blank=True)
     garage = models.ForeignKey(
         "bustimes.Garage", models.SET_NULL, null=True, blank=True
+    )
+    capacity = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Vehicle seating capacity (number of passengers)"
+    )
+    length = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Vehicle length (e.g., '12m', '10.5m', '18m articulated')"
+    )
+    chassis = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Vehicle chassis type"
+    )
+    gearbox = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Vehicle gearbox/transmission type"
+    )
+    emissions_rating = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text="Vehicle emissions rating"
     )
     locked = models.BooleanField(default=False)
     advanced = models.JSONField(

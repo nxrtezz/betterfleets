@@ -314,6 +314,20 @@ class VehicleAdminForm(ModelForm):
                 )
             else:
                 self.fields["garage"].queryset = self.fields["garage"].queryset.none()
+        
+        # Load choices from JSON files for technical spec fields
+        if "chassis" in self.fields:
+            self.fields["chassis"].widget = forms.Select(
+                choices=[("", "--------")] + models.get_chassis_choices()
+            )
+        if "gearbox" in self.fields:
+            self.fields["gearbox"].widget = forms.Select(
+                choices=[("", "--------")] + models.get_gearbox_choices()
+            )
+        if "emissions_rating" in self.fields:
+            self.fields["emissions_rating"].widget = forms.Select(
+                choices=[("", "--------")] + models.get_emissions_choices()
+            )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -426,6 +440,30 @@ class VehicleBulkEditForm(forms.Form):
     year_of_manufacture = forms.IntegerField(
         required=False,
         help_text="Set year of manufacture. Leave blank to keep current.",
+    )
+    capacity = forms.IntegerField(
+        required=False,
+        help_text="Set capacity. Leave blank to keep current.",
+    )
+    length = forms.CharField(
+        required=False,
+        max_length=50,
+        help_text="Set length. Leave blank to keep current.",
+    )
+    chassis = forms.ChoiceField(
+        choices=[("", "--------")] + models.get_chassis_choices(),
+        required=False,
+        help_text="Set chassis. Leave blank to keep current.",
+    )
+    gearbox = forms.ChoiceField(
+        choices=[("", "--------")] + models.get_gearbox_choices(),
+        required=False,
+        help_text="Set gearbox. Leave blank to keep current.",
+    )
+    emissions_rating = forms.ChoiceField(
+        choices=[("", "--------")] + models.get_emissions_choices(),
+        required=False,
+        help_text="Set emissions rating. Leave blank to keep current.",
     )
     historical_fleet = forms.ModelChoiceField(
         queryset=Operator.objects.order_by("name"),
@@ -646,7 +684,14 @@ class VehicleAdmin(admin.ModelAdmin):
         (
             "Advanced",
             {
-                "fields": ("advanced",),
+                "fields": (
+                    "capacity",
+                    "length",
+                    "chassis",
+                    "gearbox",
+                    "emissions_rating",
+                    "advanced",
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -990,6 +1035,11 @@ class VehicleAdmin(admin.ModelAdmin):
                 "trainer_vehicle": "trainer_vehicle",
                 "demonstrator": "demonstrator",
                 "year_of_manufacture": "year_of_manufacture",
+                "capacity": "capacity",
+                "length": "length",
+                "chassis": "chassis",
+                "gearbox": "gearbox",
+                "emissions_rating": "emissions_rating",
                 "historical_fleet": "historical_fleet",
                 "historical_fleet_year": "historical_fleet_year",
                 "historical_fleet_creator": "historical_fleet_creator",
