@@ -869,7 +869,7 @@ def normalize_bustimes_vehicle_items(items):
                 vehicle_ids.append(item["id"])
         
         if vehicle_ids:
-            # Enrich vehicle data with proper livery information
+            # Enrich vehicle data with proper livery information for vehicles that exist
             vehicles = (
                 apply_vehicle_schema_compat(
                     Vehicle.objects.filter(id__in=vehicle_ids)
@@ -879,19 +879,18 @@ def normalize_bustimes_vehicle_items(items):
             )
             vehicles_by_id = vehicles.in_bulk()
             
-            # Update items with enriched vehicle data and filter out items without vehicles
-            enriched_items = []
+            # Update items with enriched vehicle data for vehicles that exist
+            # Keep all items, even if they don't have matching vehicles
             for item in items:
                 if "id" in item and isinstance(item["id"], int):
                     vehicle = vehicles_by_id.get(item["id"])
                     if vehicle:
+                        # Enrich with correct livery data from database
                         item["vehicle"] = vehicle.get_json()
-                        enriched_items.append(item)
-                    # Filter out items that don't have matching vehicles
-            return enriched_items
+                    # Keep the item even if vehicle doesn't exist locally
+                    # (it will use the BODS-provided vehicle data)
         
-        # If no vehicle IDs found, return empty list
-        return []
+        return items
     
     # Original bustimes.org normalization logic
     remote_vehicle_ids = [str(item.get("id")) for item in items if item.get("id")]
