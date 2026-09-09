@@ -85,6 +85,9 @@ class Command(BaseCommand):
         request_kwargs = bods_auth.get_bods_request_kwargs(api_key, auth_mode)
         params = request_kwargs.get("params", {}).copy()
         
+        # Add bounding box to cover UK (approximate)
+        params["boundingBox"] = "-8.0,50.0,2.0,60.0"
+        
         # Add operator refs only if provided
         if operator_ids:
             params["operatorRef"] = ",".join(operator_ids)

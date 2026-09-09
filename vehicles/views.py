@@ -496,7 +496,9 @@ def get_bods_source():
 
 
 def _get_bods_datafeed_url():
-    """Get the BODS datafeed URL with bounding box parameters"""
+    """Get the BODS datafeed URL - note that BODS requires specific dataset IDs"""
+    # BODS datafeed endpoint requires a dataset ID: https://data.bus-data.dft.gov.uk/api/v1/datafeed/{ID}/
+    # Without a dataset ID, we can try using query parameters but this may not work for all feeds
     url = "https://data.bus-data.dft.gov.uk/api/v1/datafeed/"
     return url
 
@@ -532,13 +534,18 @@ def _get_bods_vehicles(operator_ids=None):
     request_kwargs = bods_auth.get_bods_request_kwargs()
     params = request_kwargs.get("params", {}).copy()
     
+    # BODS requires specific dataset IDs for datafeed endpoint
+    # Since we don't have dataset IDs, we'll need to use the dataset API to get them first
+    # For now, let's try using the bounding box approach which might work without dataset IDs
+    
+    # Add bounding box to cover UK (approximate)
+    params["boundingBox"] = "-8.0,50.0,2.0,60.0"
+    
     # Add operator refs to params if provided
     if operator_ids:
         operator_refs = _get_bods_operator_refs(operator_ids)
         if operator_refs:
             params["operatorRef"] = ",".join(operator_refs)
-        else:
-            return []
     
     request_kwargs["params"] = params
     
@@ -575,6 +582,8 @@ def _get_bods_vehicles(operator_ids=None):
         
     except requests.RequestException as e:
         logging.warning(f"Could not fetch BODS vehicles: {e}")
+        logging.warning(f"Request URL: {response.url if hasattr(response, 'url') else 'N/A'}")
+        logging.warning(f"Request params: {params}")
         return []
     except Exception as e:
         logging.warning(f"Could not parse BODS response: {e}")
