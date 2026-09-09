@@ -177,7 +177,7 @@ class GarageViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = super().get_queryset()
         operator_noc = self.request.query_params.get('operator') or self.request.query_params.get('owner')
         if operator_noc:
-            queryset = queryset.filter(operator_id=operator_noc)
+            queryset = queryset.filter(operators__noc__iexact=operator_noc)
         return queryset
 
 

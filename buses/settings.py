@@ -142,6 +142,7 @@ MIDDLEWARE = [
     "busstops.middleware.SiteUsageTrackingMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "api.middleware.DiscordErrorNotificationMiddleware",  # Error notifications to Discord
     # "vehicles.middleware.UnicodeDecodeErrorMiddleware",  # Temporarily disabled
 ]
 
