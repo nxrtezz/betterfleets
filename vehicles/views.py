@@ -495,12 +495,54 @@ def get_bods_source():
     return DataSource.objects.filter(name="Bus Open Data").first()
 
 
-def _get_bods_datafeed_url():
-    """Get the BODS datafeed URL - note that BODS requires specific dataset IDs"""
+def _get_bods_datafeed_url(dataset_id=None):
+    """Get the BODS datafeed URL - BODS requires specific dataset IDs"""
     # BODS datafeed endpoint requires a dataset ID: https://data.bus-data.dft.gov.uk/api/v1/datafeed/{ID}/
-    # Without a dataset ID, we can try using query parameters but this may not work for all feeds
-    url = "https://data.bus-data.dft.gov.uk/api/v1/datafeed/"
-    return url
+    base_url = "https://data.bus-data.dft.gov.uk/api/v1/datafeed/"
+    if dataset_id:
+        return f"{base_url}{dataset_id}/"
+    return base_url
+
+
+def _get_bods_dataset_ids():
+    """Get available BODS dataset IDs for vehicle location data"""
+    if not settings.BODS_API_KEY:
+        return []
+    
+    request_kwargs = bods_auth.get_bods_request_kwargs()
+    params = request_kwargs.get("params", {}).copy()
+    params["status"] = "published"
+    params["limit"] = 100
+    
+    request_kwargs["params"] = params
+    
+    try:
+        # Query the dataset API to get available datasets
+        url = "https://data.bus-data.dft.gov.uk/api/v1/dataset/"
+        response = requests.get(url, **request_kwargs, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        dataset_ids = []
+        
+        # Extract dataset IDs from the response
+        for dataset in data.get("results", []):
+            # Only get datasets that are vehicle location (AVL) data
+            dataset_type = dataset.get("dataset_type", "")
+            if dataset_type.lower() in ["avl", "vehicle location", "bus location"]:
+                dataset_id = dataset.get("id")
+                if dataset_id:
+                    dataset_ids.append(dataset_id)
+        
+        logging.info(f"Found {len(dataset_ids)} BODS AVL dataset IDs")
+        return dataset_ids
+        
+    except requests.RequestException as e:
+        logging.warning(f"Could not fetch BODS dataset IDs: {e}")
+        return []
+    except Exception as e:
+        logging.warning(f"Could not parse BODS dataset response: {e}")
+        return []
 
 
 def _get_bods_operator_refs(operator_ids):
@@ -531,63 +573,64 @@ def _get_bods_vehicles(operator_ids=None):
     if not settings.BODS_API_KEY:
         return []
     
-    request_kwargs = bods_auth.get_bods_request_kwargs()
-    params = request_kwargs.get("params", {}).copy()
-    
-    # BODS requires specific dataset IDs for datafeed endpoint
-    # Since we don't have dataset IDs, we'll need to use the dataset API to get them first
-    # For now, let's try using the bounding box approach which might work without dataset IDs
-    
-    # Add bounding box to cover UK (approximate)
-    params["boundingBox"] = "-8.0,50.0,2.0,60.0"
-    
-    # Add operator refs to params if provided
-    if operator_ids:
-        operator_refs = _get_bods_operator_refs(operator_ids)
-        if operator_refs:
-            params["operatorRef"] = ",".join(operator_refs)
-    
-    request_kwargs["params"] = params
-    
-    try:
-        response = requests.get(_get_bods_datafeed_url(), **request_kwargs, timeout=30)
-        response.raise_for_status()
-        
-        logging.info(f"BODS response status: {response.status_code}, content-type: {response.headers.get('content-type')}")
-        
-        # Handle zipped response
-        content_type = response.headers.get("content-type", "")
-        data = bods_parser.maybe_unzip_payload(response.content, content_type)
-        
-        logging.info(f"BODS data size: {len(data)} bytes")
-        
-        # Parse SIRI XML
-        root, items = bods_parser.parse_vehicle_activity_xml(data)
-        
-        logging.info(f"BODS returned {len(items)} vehicle activities")
-        
-        # Convert to format compatible with the map
-        vehicles = []
-        for item in items:
-            try:
-                vehicle_data = _convert_bods_item_to_map_format(item)
-                if vehicle_data:
-                    vehicles.append(vehicle_data)
-            except Exception as e:
-                logging.warning(f"Could not convert BODS item: {e}")
-                continue
-        
-        logging.info(f"Successfully converted {len(vehicles)} vehicles for map")
-        return vehicles
-        
-    except requests.RequestException as e:
-        logging.warning(f"Could not fetch BODS vehicles: {e}")
-        logging.warning(f"Request URL: {response.url if hasattr(response, 'url') else 'N/A'}")
-        logging.warning(f"Request params: {params}")
+    # Get available BODS dataset IDs for AVL data
+    dataset_ids = _get_bods_dataset_ids()
+    if not dataset_ids:
+        logging.warning("No BODS AVL dataset IDs found")
         return []
-    except Exception as e:
-        logging.warning(f"Could not parse BODS response: {e}")
-        return []
+    
+    all_vehicles = []
+    
+    # Query each dataset ID
+    for dataset_id in dataset_ids:
+        request_kwargs = bods_auth.get_bods_request_kwargs()
+        params = request_kwargs.get("params", {}).copy()
+        
+        # Add operator refs to params if provided
+        if operator_ids:
+            operator_refs = _get_bods_operator_refs(operator_ids)
+            if operator_refs:
+                params["operatorRef"] = ",".join(operator_refs)
+            else:
+                continue  # Skip this dataset if no matching operators
+        
+        request_kwargs["params"] = params
+        
+        try:
+            url = _get_bods_datafeed_url(dataset_id)
+            response = requests.get(url, **request_kwargs, timeout=30)
+            response.raise_for_status()
+            
+            logging.info(f"BODS dataset {dataset_id} response status: {response.status_code}")
+            
+            # Handle zipped response
+            content_type = response.headers.get("content-type", "")
+            data = bods_parser.maybe_unzip_payload(response.content, content_type)
+            
+            # Parse SIRI XML
+            root, items = bods_parser.parse_vehicle_activity_xml(data)
+            
+            logging.info(f"BODS dataset {dataset_id} returned {len(items)} vehicle activities")
+            
+            # Convert to format compatible with the map
+            for item in items:
+                try:
+                    vehicle_data = _convert_bods_item_to_map_format(item)
+                    if vehicle_data:
+                        all_vehicles.append(vehicle_data)
+                except Exception as e:
+                    logging.warning(f"Could not convert BODS item from dataset {dataset_id}: {e}")
+                    continue
+            
+        except requests.RequestException as e:
+            logging.warning(f"Could not fetch BODS vehicles from dataset {dataset_id}: {e}")
+            continue
+        except Exception as e:
+            logging.warning(f"Could not parse BODS response from dataset {dataset_id}: {e}")
+            continue
+    
+    logging.info(f"Total vehicles from all BODS datasets: {len(all_vehicles)}")
+    return all_vehicles
 
 
 def _convert_bods_item_to_map_format(item):

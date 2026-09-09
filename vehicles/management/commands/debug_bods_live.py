@@ -85,14 +85,47 @@ class Command(BaseCommand):
         request_kwargs = bods_auth.get_bods_request_kwargs(api_key, auth_mode)
         params = request_kwargs.get("params", {}).copy()
         
-        # Add bounding box to cover UK (approximate)
-        params["boundingBox"] = "-8.0,50.0,2.0,60.0"
+        # Get dataset IDs if no operator specified
+        if not operator_ids:
+            # Try to get dataset IDs
+            try:
+                dataset_url = "https://data.bus-data.dft.gov.uk/api/v1/dataset/"
+                dataset_params = params.copy()
+                dataset_params["status"] = "published"
+                dataset_params["limit"] = 10
+                request_kwargs["params"] = dataset_params
+                
+                dataset_response = requests.get(dataset_url, **request_kwargs, timeout=30)
+                dataset_response.raise_for_status()
+                
+                dataset_data = dataset_response.json()
+                dataset_ids = []
+                for dataset in dataset_data.get("results", []):
+                    dataset_type = dataset.get("dataset_type", "")
+                    if dataset_type.lower() in ["avl", "vehicle location", "bus location"]:
+                        dataset_id = dataset.get("id")
+                        if dataset_id:
+                            dataset_ids.append(dataset_id)
+                
+                if dataset_ids:
+                    self.stdout.write(f"Found {len(dataset_ids)} AVL dataset IDs: {dataset_ids}")
+                    # Use the first dataset ID for testing
+                    url = f"{url}{dataset_ids[0]}/"
+                    params = {}  # Reset params for datafeed call
+                    request_kwargs["params"] = params
+                else:
+                    self.stdout.write("No AVL datasets found")
+                    return
+            except Exception as e:
+                self.stdout.write(f"Error getting dataset IDs: {e}")
+                return
+        else:
+            # Add operator refs only if provided
+            if operator_ids:
+                params["operatorRef"] = ",".join(operator_ids)
+            
+            request_kwargs["params"] = params
         
-        # Add operator refs only if provided
-        if operator_ids:
-            params["operatorRef"] = ",".join(operator_ids)
-        
-        request_kwargs["params"] = params
         request_kwargs["timeout"] = 30
 
         try:
