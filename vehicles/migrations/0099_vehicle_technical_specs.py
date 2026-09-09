@@ -11,21 +11,25 @@ class Migration(migrations.Migration):
 
     operations = [
         # Make the existing capacity column nullable to fix the NOT NULL constraint
+        # Use IF EXISTS to handle cases where column might already be modified
         migrations.RunSQL(
-            "ALTER TABLE vehicles_vehicle ALTER COLUMN capacity DROP NOT NULL;",
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'vehicles_vehicle' 
+                    AND column_name = 'capacity'
+                    AND is_nullable = 'NO'
+                ) THEN
+                    ALTER TABLE vehicles_vehicle ALTER COLUMN capacity DROP NOT NULL;
+                END IF;
+            END $$;
+            """,
             reverse_sql=migrations.RunSQL.noop
         ),
-        # Add the capacity field to the model (uses existing column)
-        migrations.AddField(
-            model_name="vehicle",
-            name="capacity",
-            field=models.PositiveIntegerField(
-                blank=True,
-                help_text="Vehicle seating capacity (number of passengers)",
-                null=True,
-            ),
-        ),
         # Add the remaining new fields (choices are loaded from JSON files, not hardcoded)
+        # Skip capacity field addition as it already exists in some databases
         migrations.AddField(
             model_name="vehicle",
             name="chassis",
