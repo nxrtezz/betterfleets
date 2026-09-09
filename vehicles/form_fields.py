@@ -20,4 +20,4 @@ class SummaryField(CharField):
             if "/in/photolist-" in value:
                 value = sub(r"/in/photolist(-\w+)+", "", value)
 
-        return value
+        return value or ""

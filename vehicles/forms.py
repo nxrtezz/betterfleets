@@ -395,6 +395,7 @@ class EditVehicleForm(
     notes = forms.CharField(required=False, max_length=255)
     summary = SummaryField(
         max_length=255,
+        required=False,
         help_text="""Explain your changes,
 if they need explaining.
 E.g. how you *know* a vehicle has *definitely been* withdrawn or repainted,
@@ -827,6 +828,7 @@ class NewVehicleRequestForm(OperatorVehicleColumnFieldsMixin, forms.Form):
     notes = forms.CharField(required=False, max_length=255)
     summary = SummaryField(
         max_length=255,
+        required=False,
         help_text="Explain how you know this vehicle belongs in the fleet.",
     )
 
@@ -940,6 +942,7 @@ class NewServiceRequestForm(forms.Form):
     service_code = forms.CharField(required=False, max_length=64)
     summary = SummaryField(
         max_length=255,
+        required=False,
         help_text="Explain what should be added and how you know it exists.",
     )
 
@@ -977,6 +980,7 @@ class NewOperatorRequestForm(forms.Form):
     )
     summary = SummaryField(
         max_length=255,
+        required=False,
         help_text="Explain what should be added and provide any useful evidence.",
     )
 
@@ -996,6 +1000,7 @@ class NewVehicleModelRequestForm(forms.Form):
     )
     summary = SummaryField(
         max_length=255,
+        required=False,
         help_text="Explain the model that should be added and any supporting details.",
     )
 

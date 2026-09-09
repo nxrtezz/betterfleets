@@ -4646,7 +4646,7 @@ def request_new_service(request):
                 target_repr=title,
                 fields=fields,
                 changes=changes,
-                summary=form.cleaned_data["summary"],
+                summary=form.cleaned_data.get("summary", ""),
                 user=request.user,
                 many_to_many={"operator": [operator.pk]},
             )
@@ -4726,7 +4726,7 @@ def request_new_operator(request):
                 target_repr=f"{noc} {name}",
                 fields=fields,
                 changes=changes,
-                summary=form.cleaned_data["summary"],
+                summary=form.cleaned_data.get("summary", ""),
                 user=request.user,
             )
             form = None
@@ -4785,7 +4785,7 @@ def request_new_vehicle_model(request):
                 target_repr=name,
                 fields=fields,
                 changes=changes,
-                summary=form.cleaned_data["summary"],
+                summary=form.cleaned_data.get("summary", ""),
                 user=request.user,
             )
             form = None
