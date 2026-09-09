@@ -9,6 +9,7 @@ from django.core.cache import cache
 from django.db import IntegrityError
 from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
+from django.utils import timezone
 from django.utils.dateparse import parse_duration
 
 from busstops.models import (
@@ -96,6 +97,19 @@ class Command(ImportLiveVehiclesCommand):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.hist = {}
+        
+        # Create the DataSource if it doesn't exist
+        from busstops.models import DataSource
+        self.source, created = DataSource.objects.get_or_create(
+            name=self.source_name,
+            defaults={
+                "url": "https://data.bus-data.dft.gov.uk/api/v1/datafeed/",
+                "datetime": timezone.now(),
+            }
+        )
+        if created:
+            print(f"Created DataSource: {self.source.name}")
+        
         request_kwargs = bods_auth.get_bods_request_kwargs()
         self.session.headers.update(request_kwargs.get("headers", {}))
         self._request_params = request_kwargs.get("params")
