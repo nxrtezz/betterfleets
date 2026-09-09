@@ -2223,7 +2223,7 @@ def vehicles_json(request) -> JsonResponse:
     except BadRequest:
         return cachable_400()
 
-    response = JsonResponse(locations)
+    response = JsonResponse(locations, safe=False)
 
     return respond_conditionally(request, response)
 
