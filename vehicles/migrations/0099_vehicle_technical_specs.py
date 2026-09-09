@@ -10,60 +10,68 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Make the existing capacity column nullable to fix the NOT NULL constraint
-        # Use IF EXISTS to handle cases where column might already be modified
+        # Add technical spec fields only if they don't already exist
+        # Use conditional SQL to handle databases where columns may already exist
         migrations.RunSQL(
             """
             DO $$
             BEGIN
-                IF EXISTS (
+                -- Add capacity if it doesn't exist
+                IF NOT EXISTS (
                     SELECT 1 FROM information_schema.columns 
                     WHERE table_name = 'vehicles_vehicle' 
                     AND column_name = 'capacity'
-                    AND is_nullable = 'NO'
                 ) THEN
-                    ALTER TABLE vehicles_vehicle ALTER COLUMN capacity DROP NOT NULL;
+                    ALTER TABLE vehicles_vehicle ADD COLUMN capacity INTEGER;
+                ELSE
+                    -- Make capacity nullable if it exists and is NOT NULL
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'vehicles_vehicle' 
+                        AND column_name = 'capacity'
+                        AND is_nullable = 'NO'
+                    ) THEN
+                        ALTER TABLE vehicles_vehicle ALTER COLUMN capacity DROP NOT NULL;
+                    END IF;
+                END IF;
+                
+                -- Add chassis if it doesn't exist
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'vehicles_vehicle' 
+                    AND column_name = 'chassis'
+                ) THEN
+                    ALTER TABLE vehicles_vehicle ADD COLUMN chassis VARCHAR(50);
+                END IF;
+                
+                -- Add emissions_rating if it doesn't exist
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'vehicles_vehicle' 
+                    AND column_name = 'emissions_rating'
+                ) THEN
+                    ALTER TABLE vehicles_vehicle ADD COLUMN emissions_rating VARCHAR(32);
+                END IF;
+                
+                -- Add gearbox if it doesn't exist
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'vehicles_vehicle' 
+                    AND column_name = 'gearbox'
+                ) THEN
+                    ALTER TABLE vehicles_vehicle ADD COLUMN gearbox VARCHAR(50);
+                END IF;
+                
+                -- Add length if it doesn't exist
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'vehicles_vehicle' 
+                    AND column_name = 'length'
+                ) THEN
+                    ALTER TABLE vehicles_vehicle ADD COLUMN length VARCHAR(50);
                 END IF;
             END $$;
             """,
             reverse_sql=migrations.RunSQL.noop
-        ),
-        # Add the remaining new fields (choices are loaded from JSON files, not hardcoded)
-        # Skip capacity field addition as it already exists in some databases
-        migrations.AddField(
-            model_name="vehicle",
-            name="chassis",
-            field=models.CharField(
-                blank=True,
-                help_text="Vehicle chassis type",
-                max_length=50,
-            ),
-        ),
-        migrations.AddField(
-            model_name="vehicle",
-            name="emissions_rating",
-            field=models.CharField(
-                blank=True,
-                help_text="Vehicle emissions rating",
-                max_length=32,
-            ),
-        ),
-        migrations.AddField(
-            model_name="vehicle",
-            name="gearbox",
-            field=models.CharField(
-                blank=True,
-                help_text="Vehicle gearbox/transmission type",
-                max_length=50,
-            ),
-        ),
-        migrations.AddField(
-            model_name="vehicle",
-            name="length",
-            field=models.CharField(
-                blank=True,
-                help_text="Vehicle length (e.g., '12m', '10.5m', '18m articulated')",
-                max_length=50,
-            ),
         ),
     ]
