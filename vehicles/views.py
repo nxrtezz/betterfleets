@@ -26,14 +26,13 @@ from fleet.completion import (
 )
 from fleet.models import FleetPhotoLog
 from django.db.models import Sum
-from vehicles.realtime import bods_auth, bods_parser
 from django.apps import apps
 from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.admin.utils import flatten_fieldsets
 from django.contrib.auth.models import Permission
 from django.contrib.auth.decorators import login_required
-from django.contrib.gis.geos import Point
+from django.contrib.gis.geos import Point, GEOSException
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, BadRequest
 from django.core.paginator import Paginator
@@ -69,8 +68,9 @@ from django.views.decorators.http import (
 )
 from django.views.generic.detail import DetailView
 import numpy as np
-from haversine import Unit, haversine_vector
+from haversine import haversine
 from redis.exceptions import ConnectionError
+from requests import RequestException
 from sql_util.utils import Exists, SubqueryMax, SubqueryMin
 
 from accounts.models import User
@@ -80,6 +80,7 @@ from busstops.models import (
     DataSource,
     DataChangeLog,
     Operator,
+    OperatorCode,
     OperatorGroup,
     Service,
     ServiceCode,
@@ -87,6 +88,7 @@ from busstops.models import (
 )
 from busstops.utils import (
     build_depot_map_html,
+    get_bounding_box,
     get_operator_depots,
     get_operator_social_links,
     serialize_depot_map_points,
@@ -491,279 +493,6 @@ def get_bustimes_source():
     return DataSource.objects.filter(name=BUSTIMES_SOURCE_NAME).first()
 
 
-def get_bods_source():
-    return DataSource.objects.filter(name="Bus Open Data").first()
-
-
-def _get_bods_datafeed_url(dataset_id=None):
-    """Get the BODS datafeed URL - BODS requires specific dataset IDs"""
-    # BODS datafeed endpoint requires a dataset ID: https://data.bus-data.dft.gov.uk/api/v1/datafeed/{ID}/
-    base_url = "https://data.bus-data.dft.gov.uk/api/v1/datafeed/"
-    if dataset_id:
-        return f"{base_url}{dataset_id}/"
-    return base_url
-
-
-def _get_bods_dataset_ids():
-    """Get available BODS dataset IDs for vehicle location data"""
-    if not settings.BODS_API_KEY:
-        return []
-    
-    request_kwargs = bods_auth.get_bods_request_kwargs()
-    params = request_kwargs.get("params", {}).copy()
-    params["status"] = "published"
-    params["limit"] = 100
-    
-    request_kwargs["params"] = params
-    
-    try:
-        # Query the dataset API to get available datasets
-        url = "https://data.bus-data.dft.gov.uk/api/v1/dataset/"
-        response = requests.get(url, **request_kwargs, timeout=30)
-        response.raise_for_status()
-        
-        data = response.json()
-        dataset_ids = []
-        
-        # Extract dataset IDs from the response
-        for dataset in data.get("results", []):
-            # Only get datasets that are vehicle location (AVL) data
-            dataset_type = dataset.get("dataset_type", "")
-            if dataset_type.lower() in ["avl", "vehicle location", "bus location"]:
-                dataset_id = dataset.get("id")
-                if dataset_id:
-                    dataset_ids.append(dataset_id)
-        
-        logging.info(f"Found {len(dataset_ids)} BODS AVL dataset IDs")
-        return dataset_ids
-        
-    except requests.RequestException as e:
-        logging.warning(f"Could not fetch BODS dataset IDs: {e}")
-        return []
-    except Exception as e:
-        logging.warning(f"Could not parse BODS dataset response: {e}")
-        return []
-
-
-def _get_bods_operator_refs(operator_ids):
-    """Resolve operator IDs to BODS operator refs"""
-    from busstops.models import OperatorCode, Operator
-    
-    refs = set()
-    for operator_id in operator_ids:
-        # Try to find operator by NOC first
-        operators = Operator.objects.filter(noc__iexact=operator_id)
-        if operators.exists():
-            refs.add(operator_id.upper())
-        else:
-            # Try to find by operator code
-            operator_codes = OperatorCode.objects.filter(code__iexact=operator_id)
-            if operator_codes.exists():
-                for oc in operator_codes:
-                    refs.add(oc.code.upper())
-            else:
-                # Use as-is
-                refs.add(operator_id.upper())
-    
-    return sorted(refs)
-
-
-def _get_bods_vehicles(operator_ids=None):
-    """Fetch live vehicles from BODS for given operator IDs, or all vehicles if no operator_ids"""
-    if not settings.BODS_API_KEY:
-        return []
-    
-    # Get available BODS dataset IDs for AVL data
-    dataset_ids = _get_bods_dataset_ids()
-    if not dataset_ids:
-        logging.warning("No BODS AVL dataset IDs found")
-        return []
-    
-    all_vehicles = []
-    
-    # Query each dataset ID
-    for dataset_id in dataset_ids:
-        request_kwargs = bods_auth.get_bods_request_kwargs()
-        params = request_kwargs.get("params", {}).copy()
-        
-        # Add operator refs to params if provided
-        if operator_ids:
-            operator_refs = _get_bods_operator_refs(operator_ids)
-            if operator_refs:
-                params["operatorRef"] = ",".join(operator_refs)
-            else:
-                continue  # Skip this dataset if no matching operators
-        
-        request_kwargs["params"] = params
-        
-        try:
-            url = _get_bods_datafeed_url(dataset_id)
-            response = requests.get(url, **request_kwargs, timeout=30)
-            response.raise_for_status()
-            
-            logging.info(f"BODS dataset {dataset_id} response status: {response.status_code}")
-            
-            # Handle zipped response
-            content_type = response.headers.get("content-type", "")
-            data = bods_parser.maybe_unzip_payload(response.content, content_type)
-            
-            # Parse SIRI XML
-            root, items = bods_parser.parse_vehicle_activity_xml(data)
-            
-            logging.info(f"BODS dataset {dataset_id} returned {len(items)} vehicle activities")
-            
-            # Convert to format compatible with the map
-            for item in items:
-                try:
-                    vehicle_data = _convert_bods_item_to_map_format(item)
-                    if vehicle_data:
-                        all_vehicles.append(vehicle_data)
-                except Exception as e:
-                    logging.warning(f"Could not convert BODS item from dataset {dataset_id}: {e}")
-                    continue
-            
-        except requests.RequestException as e:
-            logging.warning(f"Could not fetch BODS vehicles from dataset {dataset_id}: {e}")
-            continue
-        except Exception as e:
-            logging.warning(f"Could not parse BODS response from dataset {dataset_id}: {e}")
-            continue
-    
-    logging.info(f"Total vehicles from all BODS datasets: {len(all_vehicles)}")
-    return all_vehicles
-
-
-def _convert_bods_item_to_map_format(item):
-    """Convert a BODS SIRI vehicle activity item to map format"""
-    from ciso8601 import parse_datetime
-    from django.contrib.gis.geos import Point
-    from busstops.models import OperatorCode
-    from .models import Vehicle, VehicleCode
-    
-    monitored_journey = item.get("MonitoredVehicleJourney", {})
-    if not monitored_journey:
-        return None
-    
-    # Extract vehicle info with robust matching logic
-    vehicle_ref = monitored_journey.get("VehicleRef", "")
-    operator_ref = monitored_journey.get("OperatorRef", "")
-    
-    # Try to get VehicleUniqueId as fallback
-    try:
-        vehicle_unique_id = item["Extensions"]["VehicleJourney"]["VehicleUniqueId"]
-    except (KeyError, TypeError):
-        vehicle_unique_id = None
-    
-    if not vehicle_ref and vehicle_unique_id:
-        vehicle_ref = vehicle_unique_id
-    
-    # Remove operator prefix if present
-    if vehicle_ref:
-        vehicle_ref = vehicle_ref.removeprefix(f"{operator_ref}-")
-    
-    # Find local vehicle with sophisticated matching (similar to import_bod_avl)
-    vehicle = None
-    if vehicle_ref:
-        try:
-            # Try to find vehicle by code
-            vehicles = Vehicle.objects.filter(code__iexact=vehicle_ref)
-            
-            # If vehicle ref looks like a registration (globally unique)
-            if (
-                not vehicle_ref.isdigit()
-                and vehicle_ref.isupper()
-                and len(vehicle_ref) > 6
-                and not vehicle_ref.startswith("BUS")
-            ):
-                try:
-                    vehicle = vehicles.get()
-                except (Vehicle.DoesNotExist, Vehicle.MultipleObjectsReturned):
-                    pass
-            else:
-                # Try to match by operator if multiple vehicles
-                if vehicles.count() > 1:
-                    operator_codes = OperatorCode.objects.filter(code=operator_ref)
-                    if operator_codes.exists():
-                        operators = [oc.operator for oc in operator_codes]
-                        vehicles = vehicles.filter(operator__in=operators)
-                
-                # Special handling for TFLO (TfL)
-                if operator_ref == "TFLO" and vehicle_ref.startswith("TMP"):
-                    # This is a spare ticket machine
-                    vehicles = vehicles.filter(notes="Spare ticket machine")
-                
-                vehicle = vehicles.first()
-                
-                # If still not found, try VehicleUniqueId
-                if not vehicle and vehicle_unique_id:
-                    vehicles = Vehicle.objects.filter(code__iexact=vehicle_unique_id)
-                    if vehicles.count() > 1:
-                        operator_codes = OperatorCode.objects.filter(code=operator_ref)
-                        if operator_codes.exists():
-                            operators = [oc.operator for oc in operator_codes]
-                            vehicles = vehicles.filter(operator__in=operators)
-                    vehicle = vehicles.first()
-                    
-        except Exception as e:
-            logging.warning(f"Could not find vehicle for {vehicle_ref}: {e}")
-    
-    # Extract location
-    location = monitored_journey.get("VehicleLocation", {})
-    if not location:
-        return None
-    
-    longitude = location.get("Longitude")
-    latitude = location.get("Latitude")
-    if not longitude or not latitude:
-        return None
-    
-    # Extract datetime
-    recorded_at = monitored_journey.get("RecordedAtTime")
-    if not recorded_at:
-        return None
-    
-    try:
-        recorded_datetime = parse_datetime(recorded_at)
-    except Exception:
-        return None
-    
-    # Extract service info
-    line_name = monitored_journey.get("PublishedLineName", "") or monitored_journey.get("LineRef", "")
-    destination = monitored_journey.get("DestinationName", "")
-    
-    # Extract heading
-    heading = None
-    if "Bearing" in location:
-        try:
-            heading = float(location["Bearing"])
-        except (ValueError, TypeError):
-            pass
-    
-    # Build map item
-    map_item = {
-        "id": vehicle.id if vehicle else f"{operator_ref}-{vehicle_ref}",
-        "coordinates": [float(longitude), float(latitude)],
-        "datetime": recorded_datetime.isoformat(),
-        "heading": heading,
-        "destination": destination,
-    }
-    
-    # Add vehicle info if found
-    if vehicle:
-        map_item["vehicle"] = vehicle.get_json()
-    else:
-        # If no vehicle found, don't add vehicle field so it can be filtered out
-        pass
-    
-    # Add service info
-    if line_name:
-        map_item["service"] = {
-            "line_name": line_name,
-        }
-    
-    return map_item
-
-
 def get_remote_vehicle_ids(local_ids):
     codes = VehicleCode.objects.filter(
         scheme=BUSTIMES_SCHEME, vehicle_id__in=local_ids
@@ -823,34 +552,6 @@ def get_bustimes_vehicle_items(request):
     return response.json()
 
 
-def get_bods_vehicle_items(request):
-    """Get live vehicle items from BODS API"""
-    if not settings.BODS_API_KEY:
-        logging.warning("BODS_API_KEY not configured")
-        return []
-    
-    # Get operator IDs from request parameters
-    operator_ids = []
-    if "operator" in request.GET:
-        operator_ids = request.GET.get("operator", "").split(",")
-    
-    # If no operator specified, get all operators with BODS data
-    if not operator_ids:
-        from busstops.models import OperatorCode
-        bods_source = get_bods_source()
-        if bods_source:
-            operator_codes = OperatorCode.objects.filter(source=bods_source)
-            operator_ids = list(set(oc.code for oc in operator_codes))
-    
-    # If still no operator IDs, query BODS without operator restriction
-    # to get all available vehicles
-    if not operator_ids:
-        logging.info("No operator IDs specified, querying BODS without operator filter")
-        return _get_bods_vehicles()
-    
-    return _get_bods_vehicles(operator_ids)
-
-
 def parse_live_datetime(value):
     if isinstance(value, datetime.datetime):
         return value
@@ -862,6 +563,193 @@ def parse_live_datetime(value):
     if timezone.is_naive(parsed):
         parsed = timezone.make_aware(parsed, datetime.timezone.utc)
     return parsed
+
+
+def append_live_location(item, vehicle, journey):
+    if not redis_client or not item.get("coordinates") or not item.get("datetime"):
+        return
+
+    when = parse_live_datetime(item["datetime"])
+    if when is None:
+        return
+
+    delay = item.get("delay")
+    delay_delta = None
+    if delay is not None:
+        delay_delta = datetime.timedelta(seconds=float(delay))
+
+    location = VehicleLocation(
+        datetime=when,
+        latlong=Point(item["coordinates"][0], item["coordinates"][1]),
+        heading=item.get("heading"),
+        delay=delay_delta,
+    )
+
+    if vehicle:
+        location.vehicle = vehicle
+    if journey:
+        location.journey = journey
+
+    try:
+        with transaction.atomic(using=router.db_for_write(VehicleLocation)):
+            location.save()
+    except IntegrityError:
+        pass
+
+    # Update vehicle's latest_journey_id if this is the most recent journey
+    if vehicle and journey and (
+        not vehicle.latest_journey_id
+        or when > vehicle.latest_journey.datetime
+    ):
+        vehicle.latest_journey = journey
+        vehicle.save(update_fields=["latest_journey"])
+
+
+def get_vehicle_locations(
+    *,
+    vehicle_ids=None,
+    service_ids=None,
+    operator_ids=None,
+    trip_id=None,
+    stop_times=None,
+    tzinfo=None,
+):
+    """Fetch live vehicle locations from Redis (and enrich with cached/db journey info).
+
+    Provide exactly one of vehicle_ids, service_ids, or operator_ids.
+
+    `stop_times` (optional) is a pre-fetched list of StopTime objects for `trip_id`,
+    reused when computing progress/delay for the matching live vehicle.
+    """
+    set_names = None
+    if service_ids:
+        set_names = [f"service{service_id}vehicles" for service_id in service_ids]
+    elif operator_ids:
+        set_names = [f"operator{operator_id}vehicles" for operator_id in operator_ids]
+
+    if set_names:
+        vehicle_ids = list(redis_client.sunion(set_names))
+
+    try:
+        vehicle_ids = [int(vehicle_id) for vehicle_id in vehicle_ids]
+    except ValueError:
+        raise BadRequest
+
+    if not vehicle_ids:
+        return []
+
+    vehicle_ids.sort()  # for etag stableness
+
+    vehicle_locations = redis_client.mget(
+        [f"vehicle{vehicle_id}" for vehicle_id in vehicle_ids]
+    )
+    vehicle_locations = [loads(item) if item else item for item in vehicle_locations]
+
+    # remove expired items from 'vehicle_location_locations'
+    to_remove = [
+        vehicle_id
+        for vehicle_id, item in zip(vehicle_ids, vehicle_locations)
+        if not item
+    ]
+
+    if to_remove:
+        redis_client.zrem("vehicle_location_locations", *to_remove)
+
+    journeys = cache.get_many(
+        [f"journey{item['journey_id']}" for item in vehicle_locations if item]
+    )
+
+    # get vehicles from the database IF they have unexpired locations AND weren't in the cache
+    try:
+        vehicles = (
+            Vehicle.objects.select_related("vehicle_type")
+            .annotate(
+                feature_names=features_string_agg,
+                service_line_name=F("latest_journey__trip__route__line_name"),
+                service_slug=F("latest_journey__service__slug"),
+                colour=F("livery__colour"),
+            )
+            .defer("data", "latest_journey_data")
+        ).in_bulk(
+            [
+                vehicle_id
+                for vehicle_id, item in zip(vehicle_ids, vehicle_locations)
+                if item
+                and "vehicle" not in item
+                and f"journey{item['journey_id']}" not in journeys
+            ]
+        )
+    except OperationalError:
+        vehicles = {}
+
+    locations = []
+    journeys_to_cache_later = {}
+
+    for vehicle_id, item in zip(vehicle_ids, vehicle_locations):
+        if item:
+            journey_cache_key = f"journey{item['journey_id']}"
+
+            if "vehicle" in item:
+                # journey-based tracking with no Vehicle record (e.g. FlixBus) -
+                # the 'vehicle' is already in the item
+                pass
+            elif journey_cache_key in journeys:
+                item.update(journeys[journey_cache_key])
+            elif vehicles:
+                try:
+                    vehicle = vehicles[vehicle_id]
+                except KeyError:
+                    continue  # vehicle was deleted?
+                else:
+                    journey = {"vehicle": vehicle.get_json()}
+                    if vehicle.service_slug:
+                        journey["service"] = {
+                            "url": f"/services/{vehicle.service_slug}",
+                            "line_name": vehicle.service_line_name
+                            or item.get("service")
+                            and item["service"]["line_name"],
+                        }
+                    if vehicle.latest_journey_id == item["journey_id"]:
+                        journeys_to_cache_later[journey_cache_key] = journey
+                    else:
+                        logger.warning(
+                            f"{vehicle=} {vehicle.latest_journey_id=} {item['journey_id']=}"
+                        )
+                    item.update(journey)
+
+            matching_trip = trip_id is not None and item.get("trip_id") == trip_id
+            if (
+                "progress" not in item
+                and "trip_id" in item
+                and (len(vehicle_ids) == 1 or matching_trip)
+            ):
+                add_progress_and_delay(
+                    item,
+                    stop_times=stop_times if matching_trip else None,
+                    tzinfo=tzinfo if matching_trip else None,
+                )
+
+        if (
+            service_ids
+            and (not item or item.get("service_id") not in service_ids)
+            or operator_ids
+            and not item
+        ):
+            for set_name in set_names:
+                redis_client.srem(set_name, vehicle_id)
+        elif item:
+            locations.append(item)
+
+    if journeys_to_cache_later:
+        cache.set_many(journeys_to_cache_later, 3600)  # an hour
+
+    return locations
+
+
+def cachable_400():
+    response = HttpResponseBadRequest()
+    patch_cache_control(response, max_age=3600)
+    return response
 
 
 def append_live_location(item, vehicle, journey):
@@ -918,41 +806,7 @@ def append_live_location(item, vehicle, journey):
 
 
 def normalize_bustimes_vehicle_items(items):
-    """Normalize vehicle items from either BODS or bustimes.org format"""
-    # Check if items are already in normalized format (from BODS)
-    if items and all("vehicle" in item or "coordinates" in item for item in items):
-        # Items are already in the right format, but we need to enrich vehicle data
-        # Extract vehicle IDs from the already-normalized BODS items
-        vehicle_ids = []
-        for item in items:
-            if "id" in item and isinstance(item["id"], int):
-                vehicle_ids.append(item["id"])
-        
-        if vehicle_ids:
-            # Enrich vehicle data with proper livery information for vehicles that exist
-            vehicles = (
-                apply_vehicle_schema_compat(
-                    Vehicle.objects.filter(id__in=vehicle_ids)
-                )
-                .select_related("vehicle_type", "livery")
-                .annotate(feature_names=features_string_agg, colour=F("livery__colour"))
-            )
-            vehicles_by_id = vehicles.in_bulk()
-            
-            # Update items with enriched vehicle data for vehicles that exist
-            # Keep all items, even if they don't have matching vehicles
-            for item in items:
-                if "id" in item and isinstance(item["id"], int):
-                    vehicle = vehicles_by_id.get(item["id"])
-                    if vehicle:
-                        # Enrich with correct livery data from database
-                        item["vehicle"] = vehicle.get_json()
-                    # Keep the item even if vehicle doesn't exist locally
-                    # (it will use the BODS-provided vehicle data)
-        
-        return items
-    
-    # Original bustimes.org normalization logic
+    """Normalize vehicle items from bustimes.org format"""
     remote_vehicle_ids = [str(item.get("id")) for item in items if item.get("id")]
     remote_journey_ids = [
         str(item.get("journey_id")) for item in items if item.get("journey_id")
@@ -2306,67 +2160,72 @@ def respond_conditionally(request, response):
 
 @require_safe
 def vehicles_json(request) -> JsonResponse:
-    # Try BODS first if API key is configured
-    if settings.BODS_API_KEY:
-        try:
-            items = get_bods_vehicle_items(request)
-            if items:
-                # Normalize BODS items to match expected format
-                locations = normalize_bustimes_vehicle_items(items)
-            else:
-                # Fallback to bustimes.org if BODS returns no data
-                # logging.info("BODS returned no vehicles, falling back to bustimes.org")
-                # items = get_bustimes_vehicle_items(request)
-                # locations = normalize_bustimes_vehicle_items(items)
-                locations = []
-        except (requests.RequestException, ValueError) as exc:
-            logging.warning("Could not fetch BODS vehicles: %s", exc)
-            # Fallback to bustimes.org
-            # try:
-            #     items = get_bustimes_vehicle_items(request)
-            #     locations = normalize_bustimes_vehicle_items(items)
-            # except (requests.RequestException, ValueError) as exc:
-            #     logging.warning("Could not fetch Bustimes vehicles.json: %s", exc)
-            #     return JsonResponse([], safe=False, status=502)
-            return JsonResponse([], safe=False, status=502)
-    else:
-        # No BODS API key configured, use bustimes.org
-        # try:
-        #     items = get_bustimes_vehicle_items(request)
-        #     locations = normalize_bustimes_vehicle_items(items)
-        # except (requests.RequestException, ValueError) as exc:
-        #     logging.warning("Could not fetch Bustimes vehicles.json: %s", exc)
-        #     return JsonResponse([], safe=False, status=502)
-        return JsonResponse([], safe=False, status=502)
+    try:
+        bounds = get_bounding_box(request)
+    except KeyError:
+        bounds = None
+    except (GEOSException, ValueError):
+        return cachable_400()
 
-    trip = request.GET.get("trip")
-    if trip:
+    vehicle_ids = None
+    service_ids = None
+    operator_ids = None
+
+    if bounds is not None:
+        # ids of vehicles within box
+        xmin, ymin, xmax, ymax = bounds.extent
+
         try:
-            trip = int(trip)
+            # convert to kilometres (only for Redis to convert back to degrees)
+            width = haversine((ymin, xmax), (ymin, xmin))
+            height = haversine((ymin, xmax), (ymax, xmax))
         except ValueError:
-            raise BadRequest
-        locations = [
-            item
-            for item in locations
-            if item.get("trip_id") == trip or item.get("trip_id") == str(trip)
-        ]
+            return cachable_400()
 
-    if len(locations) == 1 or trip:
-        for item in locations:
-            if "progress" not in item and "trip_id" in item:
-                add_progress_and_delay(item)
+        vehicle_ids = redis_client.geosearch(
+            "vehicle_location_locations",
+            longitude=str((xmax + xmin) / 2),
+            latitude=str((ymax + ymin) / 2),
+            unit="km",
+            width=str(width),
+            height=str(height),
+        )
 
-    # Add source metadata to all vehicles
-    for item in locations:
-        item["source"] = "live"
+    elif "service" in request.GET:
+        try:
+            service_ids = [
+                int(service_id) for service_id in request.GET["service"].split(",")
+            ]
+        except ValueError:
+            return cachable_400()
+    elif "operator" in request.GET:
+        operator_ids = request.GET["operator"].split(",")
+    elif "id" in request.GET:
+        # specified vehicle ids
+        vehicle_ids = request.GET["id"].split(",")
+    else:
+        # ids of all vehicles
+        vehicle_ids = redis_client.zrange("vehicle_location_locations", 0, -1)
 
-    response = JsonResponse(locations, safe=False)
-    # Disable caching to ensure fresh data
-    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response["Pragma"] = "no-cache"
-    response["Expires"] = "0"
+    if trip_id := request.GET.get("trip"):
+        try:
+            trip_id = int(trip_id)
+        except ValueError:
+            return cachable_400()
 
-    return response
+    try:
+        locations = get_vehicle_locations(
+            vehicle_ids=vehicle_ids,
+            service_ids=service_ids,
+            operator_ids=operator_ids,
+            trip_id=trip_id,
+        )
+    except BadRequest:
+        return cachable_400()
+
+    response = JsonResponse(locations)
+
+    return respond_conditionally(request, response)
 
 
 def get_dates(vehicle=None, service=None):
