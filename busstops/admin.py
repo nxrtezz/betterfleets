@@ -3712,9 +3712,11 @@ vehicle.garage.name if vehicle.garage else "",
             except models.ServiceColour.DoesNotExist as exc:
                 raise ValueError(f"Unknown colour id '{value}'") from exc
         # Check if it's a hex colour code (e.g. #0055aa or 0055aa)
-        if value.startswith("#") or (len(value) == 6 and value.isalnum()):
-            # Return the hex code as a string (will be used directly for Service.colour)
-            return value
+        # Valid hex: starts with # + 6 hex chars, or exactly 6 hex chars
+        hex_without_hash = value.lstrip("#")
+        if len(hex_without_hash) == 6 and all(c in "0123456789ABCDEFabcdef" for c in hex_without_hash):
+            # Return the hex code with # prefix
+            return f"#{hex_without_hash}"
         colour = models.ServiceColour.objects.filter(name__iexact=value).first()
         if colour:
             return colour
