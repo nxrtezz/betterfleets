@@ -3,7 +3,9 @@ from django.conf import settings
 
 def get_bods_request_kwargs(api_key: str | None = None, auth_mode: str | None = None) -> dict:
     api_key = api_key if api_key is not None else settings.BODS_API_KEY
-    auth_mode = (auth_mode or settings.BODS_API_AUTH_MODE or "query").lower()
+    if isinstance(api_key, str):
+        api_key = api_key.strip()
+    auth_mode = (auth_mode or settings.BODS_API_AUTH_MODE or "query").lower().strip()
     if auth_mode not in {"query", "header", "both"}:
         auth_mode = "query"
 

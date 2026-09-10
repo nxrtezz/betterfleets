@@ -12,6 +12,10 @@ services:
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
       - PYTHONWARNINGS=all
+      - BODS_API_KEY=${BODS_API_KEY-}
+      - BODS_API_AUTH_MODE=${BODS_API_AUTH_MODE-query}
+      - BODS_API_USER_AGENT=${BODS_API_USER_AGENT-betterfleet/1.0 (+https://eeveeit.uk)}
+      - BODS_AVL_BOUNDING_BOX=${BODS_AVL_BOUNDING_BOX-}
     ports:
       - "8000:8000"
     restart: on-failure
@@ -40,6 +44,49 @@ services:
 
   redis:
     image: redis
+
+  # Temporary: one-shot / long-running BODS AVL importer for map Redis seeding.
+  # Usage:
+  #   docker compose run --rm bods_probe ./manage.py debug_bods_probe
+  #   docker compose run --rm bods_probe ./manage.py debug_bods_probe --seed-redis --once
+  #   docker compose up -d bods_avl
+  bods_probe:
+    build: .
+    profiles: ["tools"]
+    entrypoint: ["uv", "run"]
+    environment:
+      - SECRET_KEY=${SECRET_KEY-dev}
+      - DATABASE_URL=${DATABASE_URL-postgis://postgres:postgres@postgres:5432/postgres}
+      - REDIS_URL=${REDIS_URL-redis://redis:6379}
+      - BODS_API_KEY=${BODS_API_KEY-}
+      - BODS_API_AUTH_MODE=${BODS_API_AUTH_MODE-query}
+      - BODS_API_USER_AGENT=${BODS_API_USER_AGENT-betterfleet/1.0 (+https://eeveeit.uk)}
+      - BODS_AVL_BOUNDING_BOX=${BODS_AVL_BOUNDING_BOX-}
+      - PYTHONWARNINGS=all
+    volumes:
+      - .:/app:cached
+    depends_on:
+      - postgres
+      - redis
+
+  bods_avl:
+    build: .
+    profiles: ["tools"]
+    entrypoint: ["uv", "run", "./manage.py", "import_bod_avl"]
+    environment:
+      - SECRET_KEY=${SECRET_KEY-dev}
+      - DATABASE_URL=${DATABASE_URL-postgis://postgres:postgres@postgres:5432/postgres}
+      - REDIS_URL=${REDIS_URL-redis://redis:6379}
+      - BODS_API_KEY=${BODS_API_KEY-}
+      - BODS_API_AUTH_MODE=${BODS_API_AUTH_MODE-query}
+      - BODS_API_USER_AGENT=${BODS_API_USER_AGENT-betterfleet/1.0 (+https://eeveeit.uk)}
+      - BODS_AVL_BOUNDING_BOX=${BODS_AVL_BOUNDING_BOX-}
+    volumes:
+      - .:/app:cached
+    depends_on:
+      - postgres
+      - redis
+    restart: on-failure
 
 volumes:
   postgres_data:

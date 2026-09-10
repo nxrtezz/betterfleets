@@ -112,7 +112,12 @@ class Command(ImportLiveVehiclesCommand):
         
         request_kwargs = bods_auth.get_bods_request_kwargs()
         self.session.headers.update(request_kwargs.get("headers", {}))
-        self._request_params = request_kwargs.get("params")
+        self._request_params = dict(request_kwargs.get("params") or {})
+        # National /datafeed/ without a box returns 403 for many keys;
+        # BODS expects boundingBox=minLon,minLat,maxLon,maxLat
+        bbox = getattr(settings, "BODS_AVL_BOUNDING_BOX", "") or ""
+        if bbox.strip():
+            self._request_params["boundingBox"] = bbox.strip()
 
     @staticmethod
     def get_datetime(item):
@@ -588,11 +593,16 @@ class Command(ImportLiveVehiclesCommand):
 
     def get_items(self):
         response = self.session.get(
-            self.source.url, params=self._request_params, timeout=61
+            self.source.url, params=self._request_params or None, timeout=61
         )
 
         if not response.ok:
-            print(response.headers, response.content, response)
+            print(
+                f"BODS AVL HTTP {response.status_code} "
+                f"params_keys={sorted((self._request_params or {}).keys())} "
+                f"url={self.source.url}"
+            )
+            print(response.headers, response.content[:500], response)
             return []
 
         with sentry_sdk.start_span(name="unzip"):

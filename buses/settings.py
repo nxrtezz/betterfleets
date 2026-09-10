@@ -514,11 +514,14 @@ GTFSR_TRAIN_USER_AGENT = os.environ.get(
 DARWIN_TRAINS_NODE_URL = os.environ.get("DARWIN_TRAINS_NODE_URL", "").strip().rstrip(
     "/"
 )
-BODS_API_KEY = os.environ.get("BODS_API_KEY", "")
-BODS_API_AUTH_MODE = os.environ.get("BODS_API_AUTH_MODE", "query").lower()
+BODS_API_KEY = os.environ.get("BODS_API_KEY", "").strip()
+BODS_API_AUTH_MODE = os.environ.get("BODS_API_AUTH_MODE", "query").lower().strip()
 BODS_API_USER_AGENT = os.environ.get(
     "BODS_API_USER_AGENT", "betterfleet/1.0 (+https://betterfleet.example)"
-)
+).strip()
+# Required for many BODS keys on the national datafeed (403 without it).
+# Format: minLon,minLat,maxLon,maxLat
+BODS_AVL_BOUNDING_BOX = os.environ.get("BODS_AVL_BOUNDING_BOX", "").strip()
 TNDS_USERNAME = os.environ.get("TNDS_USERNAME", "")
 TNDS_PASSWORD = os.environ.get("TNDS_PASSWORD", "")
 ALLOW_VEHICLE_NOTES_OPERATORS = (

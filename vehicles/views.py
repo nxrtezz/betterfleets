@@ -643,7 +643,7 @@ def get_vehicle_locations(
     vehicle_locations = redis_client.mget(
         [f"vehicle{vehicle_id}" for vehicle_id in vehicle_ids]
     )
-    vehicle_locations = [loads(item) if item else item for item in vehicle_locations]
+    vehicle_locations = [json.loads(item) if item else item for item in vehicle_locations]
 
     # remove expired items from 'vehicle_location_locations'
     to_remove = [
