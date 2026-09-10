@@ -3711,6 +3711,10 @@ vehicle.garage.name if vehicle.garage else "",
                 return models.ServiceColour.objects.get(pk=int(value))
             except models.ServiceColour.DoesNotExist as exc:
                 raise ValueError(f"Unknown colour id '{value}'") from exc
+        # Check if it's a hex colour code (e.g. #0055aa or 0055aa)
+        if value.startswith("#") or (len(value) == 6 and value.isalnum()):
+            # Return the hex code as a string (will be used directly for Service.colour)
+            return value
         colour = models.ServiceColour.objects.filter(name__iexact=value).first()
         if colour:
             return colour
@@ -3846,8 +3850,23 @@ vehicle.garage.name if vehicle.garage else "",
                     service = row["service"]
                     values = row["values"].copy()
                     colour = values.pop("colour")
+                    # Handle colour: can be ServiceColour object, hex string, or None
+                    if isinstance(colour, models.ServiceColour):
+                        colour_value = colour.background if colour else ""
+                    elif isinstance(colour, str):
+                        # Ensure hex code starts with # and is valid
+                        if colour:
+                            colour_value = colour if colour.startswith("#") else f"#{colour}"
+                            # Validate hex format
+                            if not (len(colour_value) == 7 and colour_value.startswith("#")):
+                                colour_value = ""
+                        else:
+                            colour_value = ""
+                    else:
+                        colour_value = ""
+                    
                     if service is None:
-                        service = models.Service.objects.create(**values, colour=colour)
+                        service = models.Service.objects.create(**values, colour=colour_value)
                         row["operator"].service_set.add(service)
                         service.update_search_vector()
                         row["service"] = service
@@ -3855,7 +3874,7 @@ vehicle.garage.name if vehicle.garage else "",
                     else:
                         for field, value in values.items():
                             setattr(service, field, value)
-                        service.colour = colour.background if colour else ""
+                        service.colour = colour_value
                         service.save(update_fields=[*values.keys(), "colour", "modified_at"])
                         service.update_search_vector()
                         if not service.operator.filter(pk=row["operator"].pk).exists():
