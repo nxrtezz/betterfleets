@@ -113,63 +113,7 @@
                 </details>
             </div>
         {% endif %}
-        {% if government_authorities %}
-            <div class="pane">
-                <details class="collapsible-section" open>
-                    <summary><h2>Government Authorities</h2></summary>
-                    <ul class="has-smalls">
-                        {% for authority in government_authorities %}
-                            <li>
-                                <a href="{{ authority.get_absolute_url }}">
-                                    <span>{{ authority.short_name|default:authority.name }}</span>
-                                    {% if authority.legal_name and authority.legal_name != authority.name %}
-                                        <small>{{ authority.legal_name }}</small>
-                                    {% elif authority.slogan %}
-                                        <small>{{ authority.slogan }}</small>
-                                    {% endif %}
-                                </a>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </details>
-            </div>
-        {% endif %}
-        {% if manufacturers %}
-            <div class="pane">
-                <details class="collapsible-section" open>
-                    <summary><h2>Manufactors</h2></summary>
-                    <ul class="has-smalls">
-                        {% for manufacturer in manufacturers %}
-                            <li>
-                                <a href="{{ manufacturer.get_absolute_url }}">
-                                    <span>{{ manufacturer.short_name|default:manufacturer.name }}</span>
-                                    {% if manufacturer.legal_name and manufacturer.legal_name != manufacturer.name %}
-                                        <small>{{ manufacturer.legal_name }}</small>
-                                    {% elif manufacturer.slogan %}
-                                        <small>{{ manufacturer.slogan }}</small>
-                                    {% endif %}
-                                </a>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </details>
-            </div>
-        {% endif %}
     </div>
-{% endif %}
-
-{% if pinned_operators %}
-    <h2>Pinned Operators</h2>
-    <ul class="has-smalls">
-        {% for pinned in pinned_operators %}
-            <li>
-                <a href="{{ pinned.operator.get_absolute_url }}">
-                    <span>{{ pinned.operator.name }}</span>
-                    <small>{{ pinned.operator.vehicle_set.count }} vehicle{{ pinned.operator.vehicle_set.count|pluralize }}</small>
-                </a>
-            </li>
-        {% endfor %}
-    </ul>
 {% endif %}
 
 {% if request.user.is_authenticated %}
