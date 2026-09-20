@@ -63,6 +63,27 @@ from .models import (
 from vehicles.models import Vehicle, VehicleNamePage, VehicleType, VehicleTypeGroup
 
 
+class ClerkConfigTests(TestCase):
+    @override_settings(CLERK_PUBLISHABLE_KEY="pk_test_123")
+    def test_clerk_config_returns_public_key(self):
+        response = self.client.get("/clerk/config/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(
+            response.content,
+            {"publishableKey": "pk_test_123", "enabled": True},
+        )
+
+    def test_clerk_config_without_key_is_disabled(self):
+        response = self.client.get("/clerk/config/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(
+            response.content,
+            {"publishableKey": "", "enabled": False},
+        )
+
+
 class ContactTests(TestCase):
     """Tests for the contact form and view"""
 

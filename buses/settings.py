@@ -200,6 +200,8 @@ if "runserver" in sys.argv:
     del DATABASES["default"]["CONN_MAX_AGE"]
 
 AUTH_USER_MODEL = "accounts.User"
+CLERK_PUBLISHABLE_KEY = os.environ.get("CLERK_PUBLISHABLE_KEY", "")
+CLERK_SECRET_KEY = os.environ.get("CLERK_SECRET_KEY", "")
 LOGIN_REDIRECT_URL = "/vehicles"
 LOGOUT_REDIRECT_URL = "/"
 

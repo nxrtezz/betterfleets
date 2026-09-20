@@ -24,6 +24,7 @@
     "typescript": "^5.4.5"
   },
   "dependencies": {
+    "@clerk/react": "^6.16.1",
     "@sentry/react": "^10.28.0",
     "@types/lodash": "^4.14.197",
     "@types/node": "^25.0.8",
@@ -43,6 +44,22 @@
     "wouter": "^3.1.0"
   },
   "alias": {
+    "@clerk/shared/loadClerkJsScript": "./node_modules/@clerk/shared/dist/loadClerkJsScript.js",
+    "@clerk/shared/utils": "./node_modules/@clerk/shared/dist/utils/index.js",
+    "@clerk/shared/react": "./node_modules/@clerk/shared/dist/react/index.js",
+    "@clerk/shared/deprecated": "./node_modules/@clerk/shared/dist/deprecated.js",
+    "@clerk/shared/browser": "./node_modules/@clerk/shared/dist/browser.js",
+    "@clerk/shared/clerkEventBus": "./node_modules/@clerk/shared/dist/clerkEventBus.js",
+    "@clerk/shared/internal/clerk-js/windowNavigate": "./node_modules/@clerk/shared/dist/internal/clerk-js/windowNavigate.js",
+    "@clerk/shared/versionCheck": "./node_modules/@clerk/shared/dist/versionCheck.js",
+    "@clerk/shared/error": "./node_modules/@clerk/shared/dist/error.js",
+    "@clerk/shared/getEnvVariable": "./node_modules/@clerk/shared/dist/getEnvVariable.js",
+    "@clerk/shared/object": "./node_modules/@clerk/shared/dist/object.js",
+    "@clerk/shared/authorization": "./node_modules/@clerk/shared/dist/authorization.js",
+    "@clerk/shared/telemetry": "./node_modules/@clerk/shared/dist/telemetry.js",
+    "@clerk/shared/deriveState": "./node_modules/@clerk/shared/dist/deriveState.js",
+    "@clerk/shared/keys": "./node_modules/@clerk/shared/dist/keys.js",
+    "@clerk/shared/getToken": "./node_modules/@clerk/shared/dist/getToken.js",
     "react-map-gl/maplibre": "@vis.gl/react-maplibre"
   },
   "targets": {

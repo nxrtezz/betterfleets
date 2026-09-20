@@ -306,6 +306,7 @@ window.STADIA_MAPS_API_KEY = "";
                     <line x1="16" y1="6" x2="16" y2="22"></line>
                 </svg>
             </a></li>
+            <li><div id="clerk-auth-root"></div></li>
             {% if request.user.is_authenticated %}
                 <li><a href="{{ url('account_dashboard') }}" class="header-icon profile-button" title="Profile">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -384,43 +385,6 @@ window.STADIA_MAPS_API_KEY = "";
     </p>
 </footer>
 {% endblock footer %}
-
-<script>
-// Clerk Authentication
-(function() {
-    const clerkAuthContainer = document.getElementById('clerk-auth-container');
-    if (!clerkAuthContainer) return;
-
-    // Fetch Clerk config
-    fetch('/clerk/config/')
-        .then(response => response.json())
-        .then(data => {
-            if (data.publishableKey) {
-                // Load Clerk SDK
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js';
-                script.crossOrigin = 'anonymous';
-                script.onload = function() {
-                    if (window.Clerk) {
-                        const clerk = new window.Clerk(data.publishableKey);
-                        
-                        clerk.load().then(() => {
-                            if (clerk.user) {
-                                // Show user button when signed in
-                                clerk.mountUserButton(clerkAuthContainer);
-                            } else {
-                                // Show sign-in/sign-up buttons when signed out
-                                clerk.mountSignIn(clerkAuthContainer);
-                            }
-                        });
-                    }
-                };
-                document.head.appendChild(script);
-            }
-        })
-        .catch(error => console.error('Failed to load Clerk config:', error));
-})();
-</script>
 
 <script>
 (function () {

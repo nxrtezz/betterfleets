@@ -265,10 +265,16 @@ body {
         }
     }
 
-    #clerk-auth-container {
+    #clerk-auth-root {
         float: right;
         margin-left: 1rem;
         display: flex;
+        align-items: center;
+    }
+
+    .clerk-auth-controls {
+        display: inline-flex;
+        gap: .5rem;
         align-items: center;
     }
 }
@@ -2124,4 +2130,3 @@ input[type='submit'] {
 .organisation-division ul {
     margin: 0;
 }
-

@@ -358,6 +358,7 @@ window.STADIA_MAPS_API_KEY = "{{ STADIA_MAPS_API_KEY|default_if_none:''|escapejs
                     <line x1="16" y1="6" x2="16" y2="22"></line>
                 </svg>
             </a></li>
+            <li><div id="clerk-auth-root"></div></li>
             {% if user.is_authenticated %}
                 <li><a href="{% url 'account_dashboard' %}" class="header-icon profile-button" title="Profile">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
