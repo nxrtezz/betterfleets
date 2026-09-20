@@ -138,6 +138,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "accounts.clerk_auth.ClerkAuthenticationMiddleware",
     "busstops.request_context.CurrentRequestMiddleware",
     "busstops.middleware.SiteUsageTrackingMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -204,6 +205,9 @@ CLERK_PUBLISHABLE_KEY = os.environ.get("CLERK_PUBLISHABLE_KEY") or os.environ.ge
     "VITE_CLERK_PUBLISHABLE_KEY", ""
 )
 CLERK_SECRET_KEY = os.environ.get("CLERK_SECRET_KEY", "")
+CLERK_JWT_KEY = os.environ.get("CLERK_JWT_KEY", "")
+CLERK_JWT_ISSUER = os.environ.get("CLERK_JWT_ISSUER", "")
+CLERK_JWT_AUDIENCE = os.environ.get("CLERK_JWT_AUDIENCE", "")
 LOGIN_REDIRECT_URL = "/vehicles"
 LOGOUT_REDIRECT_URL = "/"
 

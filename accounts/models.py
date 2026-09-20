@@ -87,6 +87,7 @@ class ProfileTag(models.Model):
 
 class User(AbstractUser):
     email = models.EmailField(unique=True, verbose_name="email address")
+    clerk_user_id = models.CharField(max_length=64, unique=True, null=True, blank=True)
     trusted = models.BooleanField(null=True)
     display_name = models.CharField(max_length=80, blank=True)
     profile_picture = models.ImageField(

@@ -180,6 +180,8 @@
 
 {% block content %}
 <div class="auth-container">
+    <div id="clerk-sign-in-root"></div>
+    <div class="legacy-auth-form">
     <div class="auth-card">
         <div class="auth-header">
             <h1>{% trans "Welcome Back" %}</h1>
@@ -229,6 +231,7 @@
             <a href="{% url 'account_reset_password' %}">{% trans "Forgot password?" %}</a>
             <p>{% trans "Don't have an account?" %} <a href="{% url 'account_signup' %}">{% trans "Sign up" %}</a></p>
         </div>
+    </div>
     </div>
 </div>
 {% endblock %}

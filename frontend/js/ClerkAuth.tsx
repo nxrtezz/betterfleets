@@ -1,5 +1,6 @@
 import {
   ClerkProvider,
+  SignIn,
   Show,
   SignInButton,
   SignUpButton,
@@ -50,3 +51,15 @@ function AuthControls() {
 }
 
 export default AuthControls;
+
+export function ClerkSignIn() {
+  if (!publishableKey) {
+    return null;
+  }
+
+  return (
+    <ClerkProvider publishableKey={publishableKey}>
+      <SignIn routing="hash" />
+    </ClerkProvider>
+  );
+}
