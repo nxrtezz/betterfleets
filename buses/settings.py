@@ -206,6 +206,7 @@ CLERK_PUBLISHABLE_KEY = os.environ.get("CLERK_PUBLISHABLE_KEY") or os.environ.ge
 )
 CLERK_SECRET_KEY = os.environ.get("CLERK_SECRET_KEY", "")
 CLERK_JWT_KEY = os.environ.get("CLERK_JWT_KEY", "")
+CLERK_JWKS_URL = os.environ.get("CLERK_JWKS_URL", "")
 CLERK_JWT_ISSUER = os.environ.get("CLERK_JWT_ISSUER", "")
 CLERK_JWT_AUDIENCE = os.environ.get("CLERK_JWT_AUDIENCE", "")
 LOGIN_REDIRECT_URL = "/vehicles"

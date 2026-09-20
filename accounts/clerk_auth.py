@@ -3,6 +3,7 @@ import logging
 import jwt
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from jwt import PyJWKClient
 
 from .models import User
 
@@ -18,14 +19,19 @@ def _get_token(request):
 
 def authenticate_clerk_request(request):
     token = _get_token(request)
-    if not token or not settings.CLERK_JWT_KEY:
+    if not token or not (settings.CLERK_JWT_KEY or settings.CLERK_JWKS_URL):
         return None
 
     decode_options = {"verify_aud": bool(settings.CLERK_JWT_AUDIENCE)}
     try:
+        signing_key = settings.CLERK_JWT_KEY
+        if not signing_key:
+            signing_key = PyJWKClient(settings.CLERK_JWKS_URL).get_signing_key_from_jwt(
+                token
+            ).key
         claims = jwt.decode(
             token,
-            settings.CLERK_JWT_KEY,
+            signing_key,
             algorithms=["RS256"],
             audience=settings.CLERK_JWT_AUDIENCE or None,
             issuer=settings.CLERK_JWT_ISSUER or None,
