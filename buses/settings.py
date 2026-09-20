@@ -200,7 +200,9 @@ if "runserver" in sys.argv:
     del DATABASES["default"]["CONN_MAX_AGE"]
 
 AUTH_USER_MODEL = "accounts.User"
-CLERK_PUBLISHABLE_KEY = os.environ.get("CLERK_PUBLISHABLE_KEY", "")
+CLERK_PUBLISHABLE_KEY = os.environ.get("CLERK_PUBLISHABLE_KEY") or os.environ.get(
+    "VITE_CLERK_PUBLISHABLE_KEY", ""
+)
 CLERK_SECRET_KEY = os.environ.get("CLERK_SECRET_KEY", "")
 LOGIN_REDIRECT_URL = "/vehicles"
 LOGOUT_REDIRECT_URL = "/"
@@ -579,5 +581,4 @@ TURNSTILE_SITEKEY = os.environ.get("TURNSTILE_SITEKEY", "0x4AAAAAAAFWiyCqdh2c-5s
 TURNSTILE_SECRET = os.environ.get("TURNSTILE_SECRET")
 
 ABBREVIATE_HOURLY = False  # we override this in some tests, that's all
-
 
