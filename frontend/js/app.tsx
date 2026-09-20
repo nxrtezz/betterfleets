@@ -12,7 +12,6 @@ import LiveVehicleMap from "./LiveVehicleMap";
 import RouteEditor from "./RouteEditor";
 import ServiceMap from "./ServiceMap";
 import BlocksTab from "./BlocksTab";
-import AuthControls from "./ClerkAuth";
 const History = lazy(() => import("./History"));
 const MapRouter = lazy(() => import("./MapRouter"));
 
@@ -77,11 +76,6 @@ const createRootOptions = {
 };
 
 let rootElement: HTMLElement | null;
-if ((rootElement = document.getElementById("clerk-auth-root"))) {
-  const authRoot = createRoot(rootElement, createRootOptions);
-  authRoot.render(<AuthControls />);
-}
-
 if ((rootElement = document.getElementById("history"))) {
   const root = createRoot(rootElement, createRootOptions);
   root.render(

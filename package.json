@@ -73,6 +73,13 @@
         "browsers": "Chrome 90"
       }
     },
+    "clerk-auth": {
+      "source": "frontend/js/clerk-auth-entry.tsx",
+      "distDir": "busstops/static/dist",
+      "engines": {
+        "browsers": "Chrome 90"
+      }
+    },
     "bigmap": {
       "source": [
         "frontend/js/bigmap.js",
