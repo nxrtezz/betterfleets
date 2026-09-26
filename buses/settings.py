@@ -100,7 +100,7 @@ INSTALLED_APPS = [
     "bustimes",
     "disruptions",
     "fares",
-    "fleet",
+    "fleet.apps.FleetConfig",
     "vehicles",
     "vehicle_history",
     "tools",
@@ -286,6 +286,10 @@ REQUEST_WEBHOOK_URL = os.environ.get(
 )
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
 DISCORD_BOT_GUILD_ID = os.environ.get("DISCORD_BOT_GUILD_ID", "").strip()
+DISCORD_TICKET_CHANNEL_ID = os.environ.get("DISCORD_TICKET_CHANNEL_ID", "").strip()
+DISCORD_TICKET_CATEGORY_ID = os.environ.get("DISCORD_TICKET_CATEGORY_ID", "").strip()
+DISCORD_SUPPORT_ROLE_ID = os.environ.get("DISCORD_SUPPORT_ROLE_ID", "").strip()
+DISCORD_ALERT_CHANNEL_ID = os.environ.get("DISCORD_ALERT_CHANNEL_ID", "").strip()
 
 HUEY = {
     "name": "bustimes",

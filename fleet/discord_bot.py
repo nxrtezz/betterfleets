@@ -1,83 +1,53 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
+import re
 
-from django.conf import settings
-from django.db.models import Q
 from asgiref.sync import sync_to_async
+from django.conf import settings
+from django.contrib.auth.models import Group
+from django.db import IntegrityError
+from django.db.models import Count, Q
 
+from accounts.models import DiscordLinkCode, User
+from busstops.models import Operator
 from fleet.completion import (
     create_ride_log,
     find_matching_vehicles,
     format_vehicle_match,
     get_discord_user,
+    get_completion_summary_for_queryset,
     has_vehicle_been_logged,
 )
-from vehicles.models import Vehicle
 from fleet.models import FleetRideLog
+from vehicles.models import Vehicle
 
 
-def create_vehicle_embed(vehicle, logged: bool, status: str) -> dict:
-    """Create a Discord embed for vehicle information."""
+def create_vehicle_embed(vehicle, logged: bool | None = None, status: str = "") -> dict:
     embed = {
         "title": str(vehicle),
-        "color": 0x22C55E if logged else 0xEF4444,  # Green if logged, red if not
-        "fields": []
+        "url": f"https://betterfleets.org{vehicle.get_absolute_url()}",
+        "color": 0x22C55E if logged else 0x2563EB,
+        "fields": [],
     }
-    
-    # Registration (field is called 'reg' in the model)
     if vehicle.reg:
-        embed["fields"].append({
-            "name": "Registration",
-            "value": vehicle.reg,
-            "inline": True
-        })
-    
-    # Fleet number (check both fleet_number and fleet_code)
-    fleet_num = vehicle.fleet_number or vehicle.fleet_code
-    if fleet_num:
-        embed["fields"].append({
-            "name": "Fleet Number",
-            "value": str(fleet_num),
-            "inline": True
-        })
-    
-    # Operator
+        embed["fields"].append({"name": "Registration", "value": vehicle.reg, "inline": True})
+    if vehicle.fleet_number or vehicle.fleet_code:
+        embed["fields"].append(
+            {"name": "Fleet Number", "value": str(vehicle.fleet_number or vehicle.fleet_code), "inline": True}
+        )
     if vehicle.operator:
-        embed["fields"].append({
-            "name": "Operator",
-            "value": str(vehicle.operator),
-            "inline": True
-        })
-    
-    # Livery
+        embed["fields"].append({"name": "Operator", "value": str(vehicle.operator), "inline": True})
     if vehicle.livery:
-        embed["fields"].append({
-            "name": "Livery",
-            "value": str(vehicle.livery),
-            "inline": True
-        })
-    
-    # Vehicle type
+        embed["fields"].append({"name": "Livery", "value": str(vehicle.livery), "inline": True})
     if vehicle.vehicle_type:
-        embed["fields"].append({
-            "name": "Type",
-            "value": str(vehicle.vehicle_type),
-            "inline": True
-        })
-    
-    # Logged status with emoji
-    status_emoji = "✅" if logged else "❌"
-    embed["fields"].append({
-        "name": "Logged Status",
-        "value": f"{status_emoji} {'Logged' if logged else 'Not logged'}",
-        "inline": False
-    })
-    
-    # Add URL if available
-    if hasattr(vehicle, 'get_absolute_url'):
-        embed["url"] = f"https://betterfleets.org{vehicle.get_absolute_url()}"
-    
+        embed["fields"].append({"name": "Type", "value": str(vehicle.vehicle_type), "inline": True})
+    if logged is not None:
+        embed["fields"].append(
+            {
+                "name": "Logged Status",
+                "value": f"{'✅ Logged' if logged else '❌ Not logged'}",
+                "inline": False,
+            }
+        )
     return embed
 
 
@@ -92,126 +62,178 @@ class DiscordCommandResult:
 async def get_authorized_discord_user(discord_user_id: str):
     user = await sync_to_async(get_discord_user)(discord_user_id)
     if user is None:
-        return None, "Your Discord account is not linked to a Better Fleets account."
+        return None, "Your Discord account is not linked to a BetterFleets account."
     return user, ""
+
+
+async def execute_log_command(discord_user_id: str, query: str, noc: str = "") -> DiscordCommandResult:
+    user, error = await get_authorized_discord_user(discord_user_id)
+    if user is None:
+        return DiscordCommandResult("forbidden", error)
+    matches = await sync_to_async(find_matching_vehicles)(query, noc=noc)
+    if not matches:
+        return DiscordCommandResult("not_found", "No matching vehicle found.")
+    if len(matches) > 1:
+        return DiscordCommandResult("multiple", "Multiple vehicles matched your query.", matches)
+    vehicle = matches[0]
+    _, created = await sync_to_async(create_ride_log)(user, vehicle)
+    return DiscordCommandResult(
+        "created" if created else "duplicate",
+        f"{'Logged' if created else 'Already logged'} {format_vehicle_match(vehicle)}.",
+        [vehicle],
+        await sync_to_async(create_vehicle_embed)(vehicle, True, "log"),
+    )
 
 
 async def execute_check_command(discord_user_id: str, query: str, noc: str = "") -> DiscordCommandResult:
     user, error = await get_authorized_discord_user(discord_user_id)
     if user is None:
-        return DiscordCommandResult(status="forbidden", message=error)
-
+        return DiscordCommandResult("forbidden", error)
     matches = await sync_to_async(find_matching_vehicles)(query, noc=noc)
     if not matches:
-        return DiscordCommandResult(status="not_found", message="No matching vehicle found.")
+        return DiscordCommandResult("not_found", "No matching vehicle found.")
     if len(matches) > 1:
-        return DiscordCommandResult(
-            status="multiple",
-            message="Multiple vehicles matched your query.",
-            matches=matches,
-        )
-
+        return DiscordCommandResult("multiple", "Multiple vehicles matched your query.", matches)
     vehicle = matches[0]
     logged = await sync_to_async(has_vehicle_been_logged)(user, vehicle)
-    embed = await sync_to_async(create_vehicle_embed)(vehicle, logged, "check")
     return DiscordCommandResult(
-        status="logged" if logged else "not_logged",
-        message=f"You have {'logged' if logged else 'not logged'} {format_vehicle_match(vehicle)}.",
-        matches=[vehicle],
-        embed=embed,
+        "logged" if logged else "not_logged",
+        f"You have {'logged' if logged else 'not logged'} {format_vehicle_match(vehicle)}.",
+        [vehicle],
+        await sync_to_async(create_vehicle_embed)(vehicle, logged, "check"),
     )
 
 
 async def execute_unlog_command(discord_user_id: str, query: str, noc: str = "") -> DiscordCommandResult:
     user, error = await get_authorized_discord_user(discord_user_id)
     if user is None:
-        return DiscordCommandResult(status="forbidden", message=error)
-
+        return DiscordCommandResult("forbidden", error)
     matches = await sync_to_async(find_matching_vehicles)(query, noc=noc)
     if not matches:
-        return DiscordCommandResult(status="not_found", message="No matching vehicle found.")
+        return DiscordCommandResult("not_found", "No matching vehicle found.")
     if len(matches) > 1:
-        return DiscordCommandResult(
-            status="multiple",
-            message="Multiple vehicles matched your query.",
-            matches=matches,
-        )
-
+        return DiscordCommandResult("multiple", "Multiple vehicles matched your query.", matches)
     vehicle = matches[0]
     deleted, _ = await sync_to_async(FleetRideLog.objects.filter(user=user, vehicle=vehicle).delete)()
-    logged = False  # After unlogging, it's not logged
-    embed = await sync_to_async(create_vehicle_embed)(vehicle, logged, "unlog")
-    if deleted:
-        return DiscordCommandResult(
-            status="deleted",
-            message=f"Unlogged {format_vehicle_match(vehicle)}.",
-            matches=[vehicle],
-            embed=embed,
-        )
     return DiscordCommandResult(
-        status="not_logged",
-        message=f"You had not logged {format_vehicle_match(vehicle)}.",
-        matches=[vehicle],
-        embed=embed,
+        "deleted" if deleted else "not_logged",
+        f"{'Unlogged' if deleted else 'You had not logged'} {format_vehicle_match(vehicle)}.",
+        [vehicle],
+        await sync_to_async(create_vehicle_embed)(vehicle, False, "unlog"),
     )
 
 
-async def execute_completion_command(discord_user_id: str, noc: str = "") -> DiscordCommandResult:
+async def execute_completion_command(discord_user_id: str, noc: str) -> DiscordCommandResult:
     user, error = await get_authorized_discord_user(discord_user_id)
     if user is None:
-        return DiscordCommandResult(status="forbidden", message=error)
-
-    if not noc:
-        return DiscordCommandResult(status="error", message="Please provide an operator NOC or slug.")
-
-    from busstops.models import Operator
-
+        return DiscordCommandResult("forbidden", error)
     try:
-        operator = await sync_to_async(Operator.objects.get)(Q(noc__iexact=noc) | Q(slug__iexact=noc))
+        operator = await sync_to_async(Operator.objects.get)(
+            Q(noc__iexact=noc) | Q(slug__iexact=noc)
+        )
     except Operator.DoesNotExist:
-        return DiscordCommandResult(status="not_found", message="Operator not found.")
-
-    from fleet.completion import get_completion_summary_for_queryset
-
-    vehicles = await sync_to_async(lambda: Vehicle.objects.filter(operator=operator))()
+        return DiscordCommandResult("not_found", "Operator not found.")
+    vehicles = await sync_to_async(list)(Vehicle.objects.filter(operator=operator))
     summary = await sync_to_async(get_completion_summary_for_queryset)(vehicles, user)
-
-    message = (
-        f"**{operator.name} Completion**\n"
-        f"Logged: {summary.logged}/{summary.total} ({summary.percentage:.1f}%)"
+    return DiscordCommandResult(
+        "success",
+        f"{operator.name}: {summary.logged}/{summary.total} ({summary.percentage:.1f}%)",
     )
-    return DiscordCommandResult(status="success", message=message)
 
 
-async def execute_log_command(discord_user_id: str, query: str, noc: str = "") -> DiscordCommandResult:
+def _vehicle_lookup(reg, fleet_number, operator):
+    query = Vehicle.objects.select_related("operator", "vehicle_type", "livery")
+    filters = Q()
+    if reg:
+        filters |= Q(reg__iexact=reg)
+    if fleet_number:
+        try:
+            filters |= Q(fleet_number=int(fleet_number))
+        except ValueError:
+            filters |= Q(fleet_code__iexact=fleet_number)
+    if not filters:
+        return []
+    query = query.filter(filters)
+    if operator:
+        query = query.filter(
+            Q(operator__noc__iexact=operator)
+            | Q(operator__slug__iexact=operator)
+            | Q(operator__name__iexact=operator)
+        )
+    return list(query.order_by("id")[:10])
+
+
+async def execute_vehicle_lookup(discord_user_id, reg, fleet_number, operator):
     user, error = await get_authorized_discord_user(discord_user_id)
     if user is None:
-        return DiscordCommandResult(status="forbidden", message=error)
-
-    matches = await sync_to_async(find_matching_vehicles)(query, noc=noc)
+        return DiscordCommandResult("forbidden", error)
+    matches = await sync_to_async(_vehicle_lookup)(reg, fleet_number, operator)
     if not matches:
-        return DiscordCommandResult(status="not_found", message="No matching vehicle found.")
+        return DiscordCommandResult("not_found", "No vehicle matched those filters.")
     if len(matches) > 1:
-        return DiscordCommandResult(
-            status="multiple",
-            message="Multiple vehicles matched your query.",
-            matches=matches,
-        )
+        return DiscordCommandResult("multiple", "Multiple vehicles matched those filters.", matches)
+    return DiscordCommandResult("success", "Vehicle found.", matches, create_vehicle_embed(matches[0]))
 
-    vehicle = matches[0]
-    _, created = await sync_to_async(create_ride_log)(user, vehicle)
-    logged = True  # After logging, it's logged
-    embed = await sync_to_async(create_vehicle_embed)(vehicle, logged, "log")
-    return DiscordCommandResult(
-        status="created" if created else "duplicate",
-        message=f"{'Logged' if created else 'Already logged'} {format_vehicle_match(vehicle)}.",
-        matches=[vehicle],
-        embed=embed,
-    )
+
+def _vehicle_count(vehicle_type, operator, livery):
+    query = Vehicle.objects.all()
+    if vehicle_type:
+        query = query.filter(Q(vehicle_type__name__icontains=vehicle_type) | Q(vehicle_type__style__iexact=vehicle_type))
+    if operator:
+        query = query.filter(
+            Q(operator__noc__iexact=operator)
+            | Q(operator__slug__iexact=operator)
+            | Q(operator__name__icontains=operator)
+        )
+    if livery:
+        query = query.filter(livery__name__icontains=livery)
+    return query.filter(withdrawn=False).count()
+
+
+async def execute_count_command(discord_user_id, vehicle_type, operator, livery):
+    user, error = await get_authorized_discord_user(discord_user_id)
+    if user is None:
+        return DiscordCommandResult("forbidden", error)
+    count = await sync_to_async(_vehicle_count)(vehicle_type, operator, livery)
+    return DiscordCommandResult("success", f"{count:,} active vehicles match the supplied filters.")
+
+
+def _user_lookup(username):
+    return User.objects.annotate(
+        edits=Count("edited_revisions", filter=Q(edited_revisions__pending=False)),
+        photos=Count("photo", distinct=True),
+        rides=Count("fleet_ride_logs", distinct=True),
+    ).filter(
+        Q(username__iexact=username)
+        | Q(display_name__iexact=username)
+        | Q(email__iexact=username)
+    ).first()
+
+
+async def execute_user_command(discord_user_id, username):
+    user, error = await get_authorized_discord_user(discord_user_id)
+    if user is None:
+        return DiscordCommandResult("forbidden", error)
+    target = await sync_to_async(_user_lookup)(username)
+    if target is None:
+        return DiscordCommandResult("not_found", "BetterFleets user not found.")
+    embed = {
+        "title": target.get_display_name(),
+        "url": f"https://betterfleets.org{target.get_absolute_url()}",
+        "color": 0x2563EB,
+        "fields": [
+            {"name": "Username", "value": target.username or "—", "inline": True},
+            {"name": "Edits", "value": f"{target.edits:,}", "inline": True},
+            {"name": "Photos", "value": f"{target.photos:,}", "inline": True},
+            {"name": "Ride logs", "value": f"{target.rides:,}", "inline": True},
+        ],
+    }
+    return DiscordCommandResult("success", "User found.", embed=embed)
 
 
 def build_bot():
     try:
+        import asyncio
         import discord
         from discord import app_commands
     except ImportError as exc:  # pragma: no cover
@@ -221,151 +243,215 @@ def build_bot():
     client = discord.Client(intents=intents)
     tree = app_commands.CommandTree(client)
 
+    def embed(title, description="", color=0x2563EB):
+        return discord.Embed(title=title, description=description, color=color)
+
+    def result_embed(result):
+        if result.embed:
+            return discord.Embed.from_dict(result.embed)
+        return embed(
+            "BetterFleets",
+            result.message,
+            0x22C55E if result.status in {"success", "created", "deleted", "logged"} else 0xEF4444,
+        )
+
     class MatchChooser(discord.ui.View):
-        def __init__(self, *, action: str, discord_user_id: str, matches):
+        def __init__(self, action, discord_user_id, matches):
             super().__init__(timeout=120)
             self.action = action
             self.discord_user_id = discord_user_id
-            options = [
-                discord.SelectOption(label=format_vehicle_match(vehicle)[:100], value=str(vehicle.pk))
-                for vehicle in matches[:25]
-            ]
             select = discord.ui.Select(
                 placeholder="Choose a vehicle",
-                options=options,
+                options=[
+                    discord.SelectOption(label=format_vehicle_match(vehicle)[:100], value=str(vehicle.pk))
+                    for vehicle in matches[:25]
+                ],
             )
 
-            async def _callback(interaction: discord.Interaction):
-                selected_id = int(select.values[0])
-                vehicle = next(vehicle for vehicle in matches if vehicle.pk == selected_id)
-                if self.action == "log":
-                    user, error = await get_authorized_discord_user(self.discord_user_id)
-                    if user is None:
-                        result = DiscordCommandResult(status="forbidden", message=error)
-                    else:
-                        _, created = await sync_to_async(create_ride_log)(user, vehicle)
-                        logged = True
-                        embed = await sync_to_async(create_vehicle_embed)(vehicle, logged, "log")
-                        result = DiscordCommandResult(
-                            status="created" if created else "duplicate",
-                            message=(
-                                f"Logged {format_vehicle_match(vehicle)}."
-                                if created
-                                else f"You already logged {format_vehicle_match(vehicle)}."
-                            ),
-                            matches=[vehicle],
-                            embed=embed,
-                        )
+            async def callback(interaction):
+                vehicle = next(vehicle for vehicle in matches if str(vehicle.pk) == select.values[0])
+                if action == "log":
+                    result = await execute_log_command(discord_user_id, str(vehicle), "")
                 else:
-                    user, error = await get_authorized_discord_user(self.discord_user_id)
-                    if user is None:
-                        result = DiscordCommandResult(status="forbidden", message=error)
-                    else:
-                        is_logged = await sync_to_async(has_vehicle_been_logged)(user, vehicle)
-                        embed = await sync_to_async(create_vehicle_embed)(vehicle, is_logged, "check")
-                        result = DiscordCommandResult(
-                            status="logged" if is_logged else "not_logged",
-                            message=(
-                                f"You have logged {format_vehicle_match(vehicle)}."
-                                if is_logged
-                                else f"You have not logged {format_vehicle_match(vehicle)}."
-                            ),
-                            matches=[vehicle],
-                            embed=embed,
-                        )
-                if result.embed:
-                    embed = discord.Embed.from_dict(result.embed)
-                    await interaction.response.send_message(result.message, embed=embed, ephemeral=True)
-                else:
-                    await interaction.response.send_message(result.message, ephemeral=True)
+                    result = await execute_check_command(discord_user_id, str(vehicle), "")
+                await interaction.response.send_message(embed=result_embed(result), ephemeral=True)
 
-            select.callback = _callback
+            select.callback = callback
             self.add_item(select)
 
-    async def _send_result(interaction: "discord.Interaction", result: DiscordCommandResult, action: str):
-        if result.status == "multiple":
+    async def send_result(interaction, result, action=None):
+        if result.status == "multiple" and action:
             await interaction.response.send_message(
-                result.message,
-                view=MatchChooser(
-                    action=action,
-                    discord_user_id=str(interaction.user.id),
-                    matches=result.matches or [],
-                ),
+                embed=embed("Multiple matches", result.message, 0xF59E0B),
+                view=MatchChooser(action, str(interaction.user.id), result.matches or []),
                 ephemeral=True,
             )
-            return
-        if result.embed:
-            embed = discord.Embed.from_dict(result.embed)
-            await interaction.response.send_message(result.message, embed=embed, ephemeral=True)
         else:
-            await interaction.response.send_message(result.message, ephemeral=True)
+            await interaction.response.send_message(embed=result_embed(result), ephemeral=True)
 
-    @tree.command(name="log", description="Log a vehicle as ridden.")
-    async def log_vehicle(interaction: "discord.Interaction", query: str, noc: str = ""):
-        result = await execute_log_command(str(interaction.user.id), query, noc=noc)
-        await _send_result(interaction, result, "log")
+    class CloseTicketView(discord.ui.View):
+        def __init__(self):
+            super().__init__(timeout=None)
 
-    @tree.command(name="check", description="Check whether you have logged a vehicle.")
-    async def check_vehicle(interaction: "discord.Interaction", query: str, noc: str = ""):
-        result = await execute_check_command(str(interaction.user.id), query, noc=noc)
-        await _send_result(interaction, result, "check")
+        @discord.ui.button(label="Close ticket", style=discord.ButtonStyle.danger, custom_id="betterfleets:close-ticket")
+        async def close(self, interaction, button):
+            await interaction.response.send_message(embed=embed("Ticket closed", "This ticket is being closed."), ephemeral=True)
+            await asyncio.sleep(1)
+            await interaction.channel.delete(reason=f"Closed by {interaction.user}")
 
-    @tree.command(name="unlog", description="Unlog a vehicle.")
-    async def unlog_vehicle(interaction: "discord.Interaction", query: str, noc: str = ""):
-        result = await execute_unlog_command(str(interaction.user.id), query, noc=noc)
-        await _send_result(interaction, result, "unlog")
+    class TicketModal(discord.ui.Modal, title="BetterFleets ticket"):
+        description = discord.ui.TextInput(
+            label="What do you need help with?",
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=2000,
+        )
 
-    @tree.command(name="completion", description="View completion stats for an operator.")
-    async def completion_stats(interaction: "discord.Interaction", noc: str):
-        result = await execute_completion_command(str(interaction.user.id), noc=noc)
-        await interaction.response.send_message(result.message, ephemeral=True)
+        def __init__(self, matter):
+            super().__init__()
+            self.matter = matter
 
-    @tree.command(name="link", description="Link your Discord account to your BetterFleets account.")
-    async def link_account(interaction: "discord.Interaction", code: str):
-        from accounts.models import DiscordLinkCode
+        async def on_submit(self, interaction):
+            guild = interaction.guild
+            if guild is None:
+                await interaction.response.send_message(embed=embed("Ticket error", "Tickets can only be opened in a server.", 0xEF4444), ephemeral=True)
+                return
+            category = guild.get_channel(int(settings.DISCORD_TICKET_CATEGORY_ID)) if settings.DISCORD_TICKET_CATEGORY_ID.isdigit() else None
+            support_role = guild.get_role(int(settings.DISCORD_SUPPORT_ROLE_ID)) if settings.DISCORD_SUPPORT_ROLE_ID.isdigit() else None
+            overwrites = {
+                guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+            }
+            if support_role:
+                overwrites[support_role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
+            name = re.sub(r"[^a-z0-9-]+", "-", f"{self.matter}-{interaction.user.name}".lower()).strip("-")[:90]
+            channel = await guild.create_text_channel(name or "ticket", category=category, overwrites=overwrites)
+            await channel.send(
+                embed=embed(
+                    f"{self.matter} ticket",
+                    f"Opened by {interaction.user.mention}\n\n{self.description.value}",
+                    0x5865F2,
+                ),
+                view=CloseTicketView(),
+            )
+            await interaction.response.send_message(embed=embed("Ticket opened", f"Your ticket is {channel.mention}."), ephemeral=True)
 
-        discord_user_id = str(interaction.user.id)
-        discord_username = str(interaction.user)
+    class TicketView(discord.ui.View):
+        def __init__(self):
+            super().__init__(timeout=None)
 
-        def _link_account():
-            try:
-                link_code = DiscordLinkCode.objects.select_related('user').get(
-                    code=code.upper(), is_used=False
-                )
-            except DiscordLinkCode.DoesNotExist:
-                return None, "Invalid or expired code. Please generate a new code from your account settings."
-
-            user = link_code.user
-            user.discord_user_id = discord_user_id
-            user.discord_username = discord_username
-            user.save(update_fields=["discord_user_id", "discord_username"])
-
-            link_code.is_used = True
-            link_code.save(update_fields=["is_used"])
-
-            return user.get_display_name(), None
-
-        display_name, error = await sync_to_async(_link_account)()
-
-        if error:
-            await interaction.response.send_message(error, ephemeral=True)
-        else:
-            await interaction.response.send_message(
-                f"Successfully linked your Discord account to {display_name}!",
-                ephemeral=True
+        @discord.ui.button(label="Open a ticket", style=discord.ButtonStyle.primary, custom_id="betterfleets:open-ticket")
+        async def open_ticket(self, interaction, button):
+            select = discord.ui.Select(
+                placeholder="What is your ticket about?",
+                options=[discord.SelectOption(label=matter, value=matter) for matter in ("Bug", "Request", "Report", "Account", "Other")],
             )
 
+            async def select_callback(select_interaction):
+                await select_interaction.response.send_modal(TicketModal(select.values[0]))
+
+            select.callback = select_callback
+            view = discord.ui.View()
+            view.add_item(select)
+            await interaction.response.send_message(embed=embed("Ticket matter", "Choose the matter for your ticket."), view=view, ephemeral=True)
+
+    @tree.command(name="vehicle", description="Look up a BetterFleets vehicle.")
+    @app_commands.describe(reg="Registration", fleet_number="Fleet number or fleet code", operator="Operator NOC, slug, or name")
+    async def vehicle_command(interaction, reg: str = "", fleet_number: str = "", operator: str = ""):
+        await send_result(interaction, await execute_vehicle_lookup(str(interaction.user.id), reg, fleet_number, operator))
+
+    @tree.command(name="count", description="Count active BetterFleets vehicles.")
+    async def count_command(interaction, vehicle_type: str = "", operator: str = "", livery: str = ""):
+        await send_result(interaction, await execute_count_command(str(interaction.user.id), vehicle_type, operator, livery))
+
+    @tree.command(name="user", description="Look up a BetterFleets user.")
+    async def user_command(interaction, username: str):
+        await send_result(interaction, await execute_user_command(str(interaction.user.id), username))
+
+    @tree.command(name="log", description="Log a vehicle as ridden.")
+    async def log_vehicle(interaction, query: str, noc: str = ""):
+        await send_result(interaction, await execute_log_command(str(interaction.user.id), query, noc), "log")
+
+    @tree.command(name="check", description="Check whether you have logged a vehicle.")
+    async def check_vehicle(interaction, query: str, noc: str = ""):
+        await send_result(interaction, await execute_check_command(str(interaction.user.id), query, noc), "check")
+
+    @tree.command(name="unlog", description="Unlog a vehicle.")
+    async def unlog_vehicle(interaction, query: str, noc: str = ""):
+        await send_result(interaction, await execute_unlog_command(str(interaction.user.id), query, noc))
+
+    @tree.command(name="completion", description="View completion stats for an operator.")
+    async def completion_stats(interaction, noc: str):
+        await send_result(interaction, await execute_completion_command(str(interaction.user.id), noc))
+
+    @tree.command(name="link", description="Link your Discord account to BetterFleets.")
+    async def link_account(interaction, code: str):
+        def link():
+            link_code = DiscordLinkCode.objects.select_related("user").filter(
+                code=code.upper(), is_used=False
+            ).first()
+            if not link_code or not link_code.is_valid():
+                return None, "Invalid or expired code. Please generate a new code."
+            user = link_code.user
+            try:
+                user.username = interaction.user.name
+                user.discord_user_id = str(interaction.user.id)
+                user.discord_username = interaction.user.name
+                user.save(update_fields=["username", "discord_user_id", "discord_username"])
+            except IntegrityError:
+                return None, "That Discord username is already used by another BetterFleets account."
+            link_code.is_used = True
+            link_code.save(update_fields=["is_used"])
+            return user, None
+
+        user, error = await sync_to_async(link)()
+        if error:
+            await interaction.response.send_message(embed=embed("Link failed", error, 0xEF4444), ephemeral=True)
+            return
+        role_names = await sync_to_async(list)(Group.objects.filter(user=user).values_list("name", flat=True))
+        guild = interaction.guild
+        if guild is None and settings.DISCORD_BOT_GUILD_ID.isdigit():
+            guild = client.get_guild(int(settings.DISCORD_BOT_GUILD_ID))
+        missing = []
+        if guild:
+            group_names = set(role_names)
+            all_group_names = set(
+                await sync_to_async(list)(Group.objects.values_list("name", flat=True))
+            )
+            for role in guild.roles:
+                if role.name in all_group_names:
+                    if role.name in group_names and role not in interaction.user.roles:
+                        await interaction.user.add_roles(role, reason="BetterFleets group synchronization")
+                    elif role.name not in group_names and role in interaction.user.roles:
+                        await interaction.user.remove_roles(role, reason="BetterFleets group synchronization")
+            missing = [name for name in group_names if not discord.utils.get(guild.roles, name=name)]
+        suffix = f" Missing Discord roles: {', '.join(missing)}." if missing else ""
+        await interaction.response.send_message(
+            embed=embed("Account linked", f"Your BetterFleets account is now linked as **{user.username}**.{suffix}", 0x22C55E),
+            ephemeral=True,
+        )
+
     @client.event
-    async def on_ready():  # pragma: no cover
+    async def on_ready():
         guild_id = settings.DISCORD_BOT_GUILD_ID
         if guild_id.isdigit():
             guild = discord.Object(id=int(guild_id))
             tree.clear_commands(guild=guild)
             tree.copy_global_to(guild=guild)
             await tree.sync(guild=guild)
-            print(f"Commands synced cleanly for guild {guild_id}")
+            ticket_channel = client.get_channel(int(settings.DISCORD_TICKET_CHANNEL_ID)) if settings.DISCORD_TICKET_CHANNEL_ID.isdigit() else None
+            if ticket_channel:
+                async for message in ticket_channel.history(limit=20):
+                    if message.author == client.user and message.embeds and message.embeds[0].title == "BetterFleets tickets":
+                        break
+                else:
+                    await ticket_channel.send(
+                        embed=embed("BetterFleets tickets", "Use the button below to open a private support ticket.", 0x5865F2),
+                        view=TicketView(),
+                    )
         else:
             await tree.sync()
-            print("Commands synced globally")
 
+    client.add_view(TicketView())
+    client.add_view(CloseTicketView())
     return client

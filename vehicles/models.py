@@ -637,6 +637,11 @@ class Vehicle(models.Model):
     external_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
     is_manual = models.BooleanField(default=False)
     manual_updated_at = models.DateTimeField(null=True, blank=True)
+    first_tracked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this vehicle was first observed in live tracking.",
+    )
     source = models.ForeignKey(DataSource, models.SET_NULL, null=True, blank=True)
     operator = models.ForeignKey(Operator, models.SET_NULL, null=True, blank=True)
     operated_by = models.ForeignKey(
