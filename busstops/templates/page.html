@@ -285,33 +285,6 @@ window.STADIA_MAPS_API_KEY = "{{ STADIA_MAPS_API_KEY|default_if_none:''|escapejs
 </script>
 
 {% block head %}
-<style>
-    .site-name { line-height: 1.5em !important; font-size: 24px; }
-    .site-header { background: var(--brand-color); position: relative; overflow: hidden; }
-    .site-header a { color: var(--header-text-color); padding: 16px; line-height: 1; display: inline-block; }
-    .site-header a:hover { background-color: var(--brand-color-darker); text-decoration: none; }
-    .site-header__inner { margin: 0 auto; }
-    .narrow .site-header__inner { width: 47.5em; }
-    .wide .site-header__inner { width: 62.5em; }
-    .site-header ul { margin: 0 0 0 auto; }
-    .site-header ul li { display: flex; }
-    .site-header ul a { padding: .75rem; line-height: 1.5em; }
-    .site-header .header-icon svg { vertical-align: middle; }
-    .site-header .search { float: right; }
-    .site-header .search label { padding: 16px; line-height: 1.5; display: block; }
-    .site-header .search label input { z-index: 1; border-radius: 0; margin: 0; position: absolute; top: -48px; }
-    .site-header .search label input:focus { border-width: 12px 16px; width: 100%; top: 0; left: 0; }
-    .site-header .search label + input { display: none; }
-    .site-header ul + .search label { padding-right: 8px; }
-    @media (width >= 30em) {
-        .site-header .search { padding-right: 1em; position: relative; top: .7em; }
-        .site-header .search label { float: left; width: 8em; padding: 0; position: relative; }
-        .site-header .search input[type="search"] { border: 1px solid var(--brand-color-darker); border-top-left-radius: .5em; border-bottom-left-radius: .5em; width: 100%; top: 0; left: 0; }
-        .site-header .search label input:focus { border-width: 1px; }
-        .site-header .search input[type="submit"] { background: var(--brand-color-darker); border: 1px solid var(--brand-color-darker); float: right; border-top-left-radius: 0; border-bottom-left-radius: 0; margin: 0; display: block; top: 0; }
-        .site-header ul + .search { padding-right: .5em; }
-    }
-</style>
 {% endblock %}
 
 {% block fuse %}
@@ -342,8 +315,12 @@ window.STADIA_MAPS_API_KEY = "{{ STADIA_MAPS_API_KEY|default_if_none:''|escapejs
 {% block header %}
 <header class="site-header">
     <div class="site-header__inner">
-        <a href="/" class="site-name">BetterFleets</a>
         <ul class="site-nav__list">
+            <li><a href="/" class="header-icon" title="Home" aria-label="Home">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m3 10 9-7 9 7"></path><path d="M5 9v11h14V9"></path><path d="M9 20v-6h6v6"></path>
+                </svg>
+            </a></li>
             <li class="site-header__search">
                 <button type="button" class="header-icon" title="Search" aria-label="Search" aria-expanded="false" aria-controls="site-header-search-form">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -364,6 +341,11 @@ window.STADIA_MAPS_API_KEY = "{{ STADIA_MAPS_API_KEY|default_if_none:''|escapejs
                     <line x1="16" y1="6" x2="16" y2="22"></line>
                 </svg>
             </a></li>
+            <li><a href="/accounts/dashboard/" class="header-icon" title="Settings" aria-label="Settings">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.4 1.4-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-2v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-1.4-1.4.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H7v-2h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 1.4-1.4.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V7h2v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.4 1.4-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v2h-.2a1.7 1.7 0 0 0-1.6 1z"></path>
+                </svg>
+            </a></li>
             <li><div id="clerk-auth-root"></div></li>
         </ul>
     </div>
@@ -381,8 +363,11 @@ window.STADIA_MAPS_API_KEY = "{{ STADIA_MAPS_API_KEY|default_if_none:''|escapejs
     <ul>
         <li><a href="/requests">Requests</a></li>
         <li><a href="/rules">Rules</a></li>
-        <li><a href="/vehicles/edits?status=approved">Changelog</a></li>
+        {% if request.user.is_authenticated and request.user.trusted or request.user.is_superuser %}
         <li><a href="/vehicles/edits?status=pending">Pending edits</a></li>
+        {% else %}
+        <li><a href="/vehicles/edits?status=approved">Changelog</a></li>
+        {% endif %}
         <li><a href="https://discord.gg/QfmMuYH88Q">Discord</a></li>
         <li class="clerk-login-status-item"><div id="clerk-login-status-root"></div></li>
         <li><a href="/data">Data & Privacy</a></li>

@@ -197,12 +197,9 @@ body {
     .site-header__inner {
         align-items: center;
         display: flex;
+        justify-content: center;
         margin: 0 auto;
         min-height: 3.5rem;
-
-        .site-name {
-            flex: 0 0 auto;
-        }
     }
 
     ul {
@@ -211,7 +208,6 @@ body {
         flex: 0 1 auto;
         gap: .25rem;
         margin: 0;
-        margin-left: auto;
         white-space: nowrap;
 
         li {
