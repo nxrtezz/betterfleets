@@ -1,4 +1,5 @@
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 
@@ -14,6 +15,10 @@ def liveries_cache_update(sender, instance, **kwargs):
 def vehicle_cache_update(sender, instance, created, **kwargs):
     if not created and instance.latest_journey_id:
         cache.delete(f"journey{instance.latest_journey_id}")
+    if created:
+        from fleet.notifications import notify_new_vehicle
+
+        transaction.on_commit(lambda: notify_new_vehicle(instance.pk))
 
 
 @receiver(m2m_changed, sender=Vehicle.features.through)
