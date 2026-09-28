@@ -506,6 +506,7 @@ def overland_ingest(request, uuid):
     return JsonResponse({"result": "ok"})
 
 
+@csrf_exempt
 @require_safe
 def overland_json(request):
     locations = []

@@ -2158,6 +2158,7 @@ def respond_conditionally(request, response):
     )
 
 
+@csrf_exempt
 @require_safe
 def vehicles_json(request) -> JsonResponse:
     try:
