@@ -10,6 +10,9 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Site domain for links in notifications and emails
+SITE_DOMAIN = os.environ.get("SITE_DOMAIN", "eeveeit.uk")
+
 
 def load_dotenv_file(path):
     if not path.exists():
