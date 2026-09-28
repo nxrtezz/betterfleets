@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-import logging
+import json
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, render
 from django.http import JsonResponse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_POST, require_safe
 from django.views.decorators.csrf import csrf_exempt
 
@@ -30,7 +32,7 @@ from fleet.completion import (
     compute_achievements,
 )
 from fleet.transittracker_scraper import run_import
-from fleet.models import LiveVehicleLocation, PinnedOperator
+from fleet.models import OverlandSubscription, PinnedOperator
 
 User = get_user_model()
 
@@ -428,161 +430,110 @@ def transittracker_preview(request):
         }, status=500)
 
 
-def manual_tracking_simulation(request):
-    """
-    View for manual tracking simulation where users can create and control
-    simulated vehicle movements using snap-to-road routing.
-    """
-    if not request.user.is_authenticated:
-        raise PermissionDenied
+def overland_generator(request):
+    if (
+        not request.user.is_authenticated
+        or not request.user.has_perm("fleet.use_overland")
+    ):
+        raise PermissionDenied("Overland tracking permission required.")
 
-    return render(
-        request,
-        "manual_tracking_simulation.html",
-        {},
-    )
-
-
-def live_location_tracking(request):
-    """
-    View for live location tracking where users can select a vehicle
-    and the site grabs their live location to show as the bus on vehicle tracking.
-    """
-    if not request.user.is_authenticated:
-        raise PermissionDenied
-
-    # Handle POST request to save location
     if request.method == "POST":
-        vehicle_id = request.POST.get("vehicle_id")
-        latitude = request.POST.get("latitude")
-        longitude = request.POST.get("longitude")
-        headcode = request.POST.get("headcode", "").strip()
+        vehicle_slug = request.POST.get("vehicle_slug", "").strip()
         destination = request.POST.get("destination", "").strip()
-        rotation = request.POST.get("rotation", "").strip()
-        lateness = request.POST.get("lateness", "").strip()
-
-        if not vehicle_id or not latitude or not longitude:
-            return JsonResponse({"success": False, "error": "Missing required fields"}, status=400)
-
+        route_number = request.POST.get("route_number", "").strip()
+        trip_id = request.POST.get("trip_id", "").strip()
+        if not vehicle_slug:
+            return render(request, "overland_generator.html", {"error": "Select a vehicle."})
         try:
-            vehicle = Vehicle.objects.get(id=vehicle_id)
-            # Delete previous live locations for this vehicle
-            LiveVehicleLocation.objects.filter(vehicle=vehicle).delete()
-            # Create new live location
-            LiveVehicleLocation.objects.create(
-                vehicle=vehicle,
-                latitude=latitude,
-                longitude=longitude,
-                headcode=headcode,
-                destination=destination,
-                rotation=int(rotation) if rotation else None,
-                lateness=int(lateness) if lateness else None,
-            )
-            return JsonResponse({"success": True})
+            vehicle = Vehicle.objects.get(slug=vehicle_slug)
         except Vehicle.DoesNotExist:
-            return JsonResponse({"success": False, "error": "Vehicle not found"}, status=404)
-        except Exception as e:
-            return JsonResponse({"success": False, "error": str(e)}, status=500)
+            return render(request, "overland_generator.html", {"error": "Vehicle not found."})
 
-    # GET request - show the form
-    vehicle_id = request.GET.get("vehicle_id")
-    selected_vehicle = None
+        import secrets
+        auth_key = secrets.token_urlsafe(32)
+        subscription = OverlandSubscription.objects.create(
+            user=request.user,
+            vehicle=vehicle,
+            destination=destination,
+            route_number=route_number,
+            trip_id=trip_id,
+            auth_key_hash=OverlandSubscription.hash_auth_key(auth_key),
+        )
+        from urllib.parse import urlencode
+        endpoint = f"https://eeveeit.uk/overland/{subscription.uuid}"
+        endpoint += "?" + urlencode({
+            "vehicle": vehicle.slug,
+            "destination": destination,
+            "route": route_number,
+            "auth": auth_key,
+            "trip": trip_id,
+        })
+        return render(request, "overland_generator.html", {
+            "endpoint": endpoint,
+            "vehicle": vehicle,
+        })
 
-    if vehicle_id:
-        try:
-            selected_vehicle = Vehicle.objects.get(id=vehicle_id)
-        except Vehicle.DoesNotExist:
-            pass
-
-    # Handle vehicle search
-    query = request.GET.get("q", "").strip()
-    if query and not selected_vehicle:
-        from fleet.completion import find_matching_vehicles
-        vehicles = find_matching_vehicles(query)
-        if vehicles:
-            selected_vehicle = vehicles[0]
-
-    context = {
-        "selected_vehicle": selected_vehicle,
-    }
-
-    return render(
-        request,
-        "live_location_tracking.html",
-        context,
-    )
+    return render(request, "overland_generator.html", {})
 
 
+@csrf_exempt
 @require_POST
-def swap_vehicle_tracking(request):
-    """
-    Swap live tracking data from one vehicle to another.
-    Includes both manual tracking (LiveVehicleLocation) and Bustimes API data (latest_journey_data).
-    """
-    if not request.user.is_authenticated:
-        raise PermissionDenied
-
-    source_vehicle_id = request.POST.get("source_vehicle", "").strip()
-    target_vehicle_id = request.POST.get("target_vehicle", "").strip()
-
-    if not source_vehicle_id or not target_vehicle_id:
-        return JsonResponse({"success": False, "error": "Missing source or target vehicle"}, status=400)
+def overland_ingest(request, uuid):
+    subscription = get_object_or_404(OverlandSubscription, uuid=uuid)
+    auth_key = request.GET.get("auth", "")
+    if not auth_key or not subscription.check_auth_key(auth_key):
+        return JsonResponse({"error": "Invalid auth key"}, status=403)
 
     try:
-        # Find source vehicle by reg, fleet_code, or fleet_number
-        source_vehicle = (
-            Vehicle.objects.filter(reg__iexact=source_vehicle_id).first()
-            or Vehicle.objects.filter(fleet_code__iexact=source_vehicle_id).first()
-            or Vehicle.objects.filter(fleet_number=source_vehicle_id).first()
-        )
-        
-        # Find target vehicle by reg, fleet_code, or fleet_number
-        target_vehicle = (
-            Vehicle.objects.filter(reg__iexact=target_vehicle_id).first()
-            or Vehicle.objects.filter(fleet_code__iexact=target_vehicle_id).first()
-            or Vehicle.objects.filter(fleet_number=target_vehicle_id).first()
-        )
+        payload = json.loads(request.body)
+        location = payload["locations"][-1]
+        coordinates = location["geometry"]["coordinates"]
+        properties = location.get("properties", {})
+        longitude, latitude = coordinates
+        timestamp = properties.get("timestamp")
+        parsed_timestamp = parse_datetime(timestamp) if timestamp else timezone.now()
+        if parsed_timestamp is None:
+            return JsonResponse({"error": "Invalid timestamp"}, status=400)
+        subscription.latitude = latitude
+        subscription.longitude = longitude
+        heading = properties.get("course") or properties.get("heading")
+        subscription.heading = round(float(heading)) if heading is not None else None
+        subscription.last_timestamp = parsed_timestamp
+        subscription.save(update_fields=["latitude", "longitude", "heading", "last_timestamp", "updated_at"])
+    except (KeyError, TypeError, ValueError, IndexError, json.JSONDecodeError):
+        return JsonResponse({"error": "Invalid Overland payload"}, status=400)
 
-        if not source_vehicle:
-            return JsonResponse({"success": False, "error": f"Source vehicle '{source_vehicle_id}' not found"}, status=404)
-        
-        if not target_vehicle:
-            return JsonResponse({"success": False, "error": f"Target vehicle '{target_vehicle_id}' not found"}, status=404)
+    return JsonResponse({"result": "ok"})
 
-        # Check for manual tracking data
-        source_location = LiveVehicleLocation.objects.filter(vehicle=source_vehicle).first()
-        
-        # Check for Bustimes API tracking data
-        source_journey_data = source_vehicle.latest_journey_data
-        
-        if not source_location and not source_journey_data:
-            return JsonResponse({"success": False, "error": f"Source vehicle '{source_vehicle_id}' has no live tracking data (manual or Bustimes)"}, status=404)
 
-        # Swap manual tracking data if present
-        if source_location:
-            # Delete existing live location for target vehicle
-            LiveVehicleLocation.objects.filter(vehicle=target_vehicle).delete()
-
-            # Create new live location for target vehicle with source's data
-            LiveVehicleLocation.objects.create(
-                vehicle=target_vehicle,
-                latitude=source_location.latitude,
-                longitude=source_location.longitude,
-                headcode=source_location.headcode,
-                destination=source_location.destination,
-                rotation=source_location.rotation,
-                lateness=source_location.lateness,
-            )
-
-        # Swap Bustimes API tracking data if present
-        if source_journey_data:
-            target_vehicle.latest_journey_data = source_journey_data
-            target_vehicle.save()
-
-        return JsonResponse({"success": True})
-
-    except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=500)
+@require_safe
+def overland_json(request):
+    locations = []
+    cutoff = timezone.now() - timedelta(minutes=10)
+    for subscription in OverlandSubscription.objects.filter(
+        last_timestamp__gte=cutoff
+    ).select_related("vehicle", "vehicle__operator", "vehicle__livery"):
+        if subscription.latitude is None or subscription.longitude is None or not subscription.last_timestamp:
+            continue
+        vehicle = subscription.vehicle
+        item = {
+            "id": vehicle.id,
+            "coordinates": [float(subscription.longitude), float(subscription.latitude)],
+            "heading": subscription.heading,
+            "datetime": subscription.last_timestamp.isoformat(),
+            "destination": subscription.destination,
+            "trip_id": int(subscription.trip_id) if subscription.trip_id.isdigit() else None,
+            "service_id": None,
+            "service": {"line_name": subscription.route_number} if subscription.route_number else None,
+            "operator": {
+                "name": vehicle.operator.name,
+                "url": vehicle.operator.get_absolute_url(),
+            } if vehicle.operator else None,
+            "vehicle": vehicle.get_json(),
+            "source": "overland",
+        }
+        locations.append(item)
+    return JsonResponse(locations, safe=False)
 
 
 @require_POST
@@ -606,348 +557,3 @@ def toggle_pin_operator(request):
         return JsonResponse({"success": True, "pinned": False})
 
     return JsonResponse({"success": True, "pinned": True})
-
-
-@require_safe
-def live_tracking_json(request):
-    """
-    API endpoint for manual live tracking data.
-    Returns vehicles tracked via /fleet/live-tracking in the same format as vehicles.json
-    """
-    from fleet.models import LiveVehicleLocation, ManualTrackingSimulation
-    from vehicles.models import Vehicle
-    
-    locations = []
-    
-    try:
-        # Get all live vehicle locations
-        live_locations = LiveVehicleLocation.objects.select_related('vehicle').prefetch_related(
-            'vehicle__livery',
-            'vehicle__operator',
-        ).all()
-        
-        for live_location in live_locations:
-            vehicle = live_location.vehicle
-            
-            # Build vehicle data in the format expected by VehicleMarker
-            vehicle_data = {
-                "id": vehicle.id,
-                "coordinates": [float(live_location.longitude), float(live_location.latitude)],
-                "heading": live_location.rotation,
-                "datetime": live_location.created_at.isoformat(),
-                "destination": live_location.destination or "",
-                "trip_id": None,
-                "service_id": None,
-                "service": None,
-                "operator": {
-                    "name": vehicle.operator.name if vehicle.operator else "",
-                    "url": vehicle.operator.get_absolute_url() if vehicle.operator else "",
-                } if vehicle.operator else None,
-                "vehicle": vehicle.get_json(),
-                "source": "manual",
-                "is_manual": True,  # Marker to identify manually tracked vehicles
-            }
-            
-            # Add delay if available
-            if live_location.lateness is not None:
-                vehicle_data["delay"] = live_location.lateness
-            
-            locations.append(vehicle_data)
-            
-        # Get active manual tracking simulations
-        active_simulations = ManualTrackingSimulation.objects.filter(
-            is_active=True
-        ).select_related('vehicle', 'vehicle__operator').prefetch_related('vehicle__livery')
-        
-        for simulation in active_simulations:
-            vehicle = simulation.vehicle
-            position = simulation.current_position
-            
-            if position:
-                vehicle_data = {
-                    "id": f"manual_sim_{simulation.id}",
-                    "coordinates": [position.get("lng"), position.get("lat")],
-                    "heading": position.get("heading"),
-                    "datetime": simulation.modified_at.isoformat(),
-                    "destination": simulation.name,
-                    "trip_id": None,
-                    "service_id": simulation.service.id if simulation.service else None,
-                    "service": {
-                        "url": simulation.service.get_absolute_url() if simulation.service else "",
-                        "line_name": simulation.service.line_name if simulation.service else "",
-                    } if simulation.service else None,
-                    "operator": {
-                        "name": vehicle.operator.name if vehicle.operator else "",
-                        "url": vehicle.operator.get_absolute_url() if vehicle.operator else "",
-                    } if vehicle.operator else None,
-                    "vehicle": vehicle.get_json(),
-                    "source": "manual_simulation",
-                    "is_manual": True,
-                    "simulation_id": simulation.id,
-                }
-                locations.append(vehicle_data)
-                
-    except Exception as e:
-        logging.error("Error fetching manual tracking data: %s", e)
-        locations = []
-    
-    response = JsonResponse(locations, safe=False)
-    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response['Pragma'] = 'no-cache'
-    response['Expires'] = '0'
-    
-    return response
-
-
-@require_safe
-def vehicle_search_json(request):
-    """
-    API endpoint for searching vehicles by registration, fleet number, or code.
-    Returns JSON results for use in vehicle selection forms.
-    """
-    query = request.GET.get("q", "").strip()
-    operator_id = request.GET.get("operator_id")
-    
-    vehicles = Vehicle.objects.select_related('operator', 'livery')
-    
-    if operator_id:
-        vehicles = vehicles.filter(operator_id=operator_id)
-    
-    if query:
-        vehicles = vehicles.filter(
-            Q(registration__icontains=query) |
-            Q(fleet_number__icontains=query) |
-            Q(fleet_code__icontains=query) |
-            Q(code__icontains=query)
-        )
-    
-    vehicles = vehicles[:50]
-    
-    results = []
-    for vehicle in vehicles:
-        results.append({
-            "id": vehicle.id,
-            "registration": vehicle.registration or "",
-            "fleet_number": vehicle.fleet_number or "",
-            "fleet_code": vehicle.fleet_code or "",
-            "code": vehicle.code or "",
-            "name": str(vehicle),
-            "operator": vehicle.operator.name if vehicle.operator else "",
-            "operator_id": vehicle.operator.id if vehicle.operator else None,
-            "url": vehicle.get_absolute_url(),
-        })
-    
-    return JsonResponse(results, safe=False)
-
-
-@require_POST
-def create_manual_simulation(request):
-    """
-    Create a new manual tracking simulation route.
-    
-    Accepts JSON payload with:
-    - vehicle_id: ID of the vehicle to simulate
-    - name: Name for the simulation
-    - route_type: 'stops' or 'service'
-    - stops: List of stop coordinates (for stop-based routes)
-    - service_id: Service ID (for service-based routes)
-    - direction: 'inbound' or 'outbound' (for service-based routes)
-    - speed_multiplier: Speed multiplier (default 1.0)
-    """
-    if not request.user.is_authenticated:
-        return JsonResponse({"success": False, "error": "Authentication required"}, status=401)
-    
-    try:
-        import json
-        data = json.loads(request.body)
-    except:
-        data = request.POST
-    
-    vehicle_id = data.get("vehicle_id")
-    name = data.get("name")
-    route_type = data.get("route_type", "stops")
-    speed_multiplier = data.get("speed_multiplier", 1.0)
-    
-    if not vehicle_id or not name:
-        return JsonResponse({"success": False, "error": "Missing required fields"}, status=400)
-    
-    try:
-        vehicle = Vehicle.objects.get(id=vehicle_id)
-    except Vehicle.DoesNotExist:
-        return JsonResponse({"success": False, "error": "Vehicle not found"}, status=404)
-    
-    # Create simulation
-    simulation = ManualTrackingSimulation(
-        vehicle=vehicle,
-        name=name,
-        route_type=route_type,
-        speed_multiplier=float(speed_multiplier),
-        created_by=request.user,
-    )
-    
-    # Handle route type specific data
-    if route_type == "service":
-        service_id = data.get("service_id")
-        direction = data.get("direction")
-        
-        if not service_id:
-            return JsonResponse({"success": False, "error": "service_id required for service-based routes"}, status=400)
-        
-        from busstops.models import Service
-        try:
-            service = Service.objects.get(id=service_id)
-            simulation.service = service
-            simulation.direction = direction
-            
-            # Get stops from service route
-            # This will be processed asynchronously to fetch OSRM route
-        except Service.DoesNotExist:
-            return JsonResponse({"success": False, "error": "Service not found"}, status=404)
-            
-    elif route_type == "stops":
-        stops = data.get("stops", [])
-        if not stops or len(stops) < 2:
-            return JsonResponse({"success": False, "error": "At least 2 stops required for stop-based routes"}, status=400)
-        
-        simulation.stops = stops
-    
-    simulation.save()
-    
-    # Trigger OSRM route calculation asynchronously
-    # This will be handled by a background task or on next request
-    
-    return JsonResponse({
-        "success": True,
-        "simulation_id": simulation.id,
-        "message": "Simulation created. Route calculation will be processed."
-    })
-
-
-@require_POST
-def update_manual_simulation(request, simulation_id):
-    """
-    Update an existing manual tracking simulation.
-    
-    Can update:
-    - is_active: Start/stop simulation
-    - progress: Set progress (0.0 to 1.0)
-    - speed_multiplier: Change speed
-    - current_position: Manual position update
-    """
-    if not request.user.is_authenticated:
-        return JsonResponse({"success": False, "error": "Authentication required"}, status=401)
-    
-    try:
-        import json
-        data = json.loads(request.body)
-    except:
-        data = request.POST
-    
-    try:
-        simulation = ManualTrackingSimulation.objects.get(id=simulation_id)
-    except ManualTrackingSimulation.DoesNotExist:
-        return JsonResponse({"success": False, "error": "Simulation not found"}, status=404)
-    
-    # Update fields
-    if "is_active" in data:
-        simulation.is_active = bool(data["is_active"])
-        if simulation.is_active and not simulation.started_at:
-            simulation.started_at = timezone.now()
-    
-    if "progress" in data:
-        simulation.progress = float(data["progress"])
-    
-    if "speed_multiplier" in data:
-        simulation.speed_multiplier = float(data["speed_multiplier"])
-    
-    if "current_position" in data:
-        simulation.current_position = data["current_position"]
-    
-    simulation.save()
-    
-    return JsonResponse({"success": True, "simulation_id": simulation.id})
-
-
-@require_POST
-def calculate_simulation_route(request, simulation_id):
-    """
-    Calculate OSRM route for a simulation.
-    
-    This endpoint triggers OSRM routing for the simulation's stops
-    and stores the route geometry and segments with speed limits.
-    """
-    if not request.user.is_authenticated:
-        return JsonResponse({"success": False, "error": "Authentication required"}, status=401)
-    
-    try:
-        simulation = ManualTrackingSimulation.objects.get(id=simulation_id)
-    except ManualTrackingSimulation.DoesNotExist:
-        return JsonResponse({"success": False, "error": "Simulation not found"}, status=404)
-    
-    # Get OSRM server URL from settings
-    osrm_url = getattr(settings, 'OSRM_SERVER_URL', 'http://localhost:5000')
-    
-    try:
-        # Build coordinates from stops
-        if simulation.route_type == "stops":
-            coordinates = ";".join([f"{s['lng']},{s['lat']}" for s in simulation.stops])
-        elif simulation.route_type == "service" and simulation.service:
-            # Get stops from service
-            from bustimes.models import Route, Trip, StopTime
-            route = Route.objects.filter(service=simulation.service).first()
-            if route:
-                # Get a trip for the correct direction
-                trip = Trip.objects.filter(
-                    route=route,
-                    inbound=(simulation.direction == "inbound")
-                ).first()
-                if trip:
-                    stop_times = trip.stoptime_set.select_related('stop').order_by('sequence')
-                    coordinates = ";".join([
-                        f"{st.stop.longitude},{st.stop.latitude}" 
-                        for st in stop_times if st.stop and st.stop.location
-                    ])
-                else:
-                    return JsonResponse({"success": False, "error": "No trip found for service/direction"}, status=400)
-            else:
-                return JsonResponse({"success": False, "error": "No route found for service"}, status=400)
-        else:
-            return JsonResponse({"success": False, "error": "No stops available for routing"}, status=400)
-        
-        # Call OSRM
-        import requests
-        osrm_response = requests.get(
-            f"{osrm_url}/route/v1/driving/{coordinates}?overview=full&geometries=geojson",
-            timeout=30
-        )
-        
-        if osrm_response.status_code != 200:
-            return JsonResponse({"success": False, "error": f"OSRM request failed: {osrm_response.status_code}"}, status=500)
-        
-        osrm_data = osrm_response.json()
-        
-        if osrm_data.get("code") != "Ok":
-            return JsonResponse({"success": False, "error": f"OSRM error: {osrm_data.get('code')}"}, status=500)
-        
-        # Store route geometry
-        route = osrm_data["routes"][0]
-        simulation.route_geometry = route["geometry"]
-        
-        # Calculate segments with speed limits
-        # For now, use OSRM's segment data with default speed limits
-        # In future, integrate with road speed limit data
-        simulation.route_segments = []
-        simulation.save()
-        
-        return JsonResponse({
-            "success": True,
-            "distance": route["distance"],
-            "duration": route["duration"],
-            "message": "Route calculated successfully"
-        })
-        
-    except requests.RequestException as e:
-        return JsonResponse({"success": False, "error": f"OSRM request failed: {str(e)}"}, status=500)
-    except Exception as e:
-        logging.error("Error calculating simulation route: %s", e)
-        return JsonResponse({"success": False, "error": str(e)}, status=500)

@@ -5205,56 +5205,6 @@ def siri_post(request, uuid):
     )
 
 
-@csrf_exempt
-@require_POST
-def overland(request, uuid):
-    subscription = get_object_or_404(SiriSubscription, uuid=uuid)
-
-    data = json.loads(request.body)
-
-    for item in data["locations"][-1:]:
-        when = item["properties"]["timestamp"]
-        device_id = item["properties"]["device_id"]
-        operator, vehicle, line_name, journey_ref = device_id.split(":")
-        lon, lat = item["geometry"]["coordinates"]
-        activity = {
-            "RecordedAtTime": when,
-            "MonitoredVehicleJourney": {
-                "OperatorRef": operator,
-                "VehicleRef": vehicle,
-                "PublishedLineName": line_name,
-                "VehicleJourneyRef": journey_ref,
-                "VehicleLocation": {
-                    "Longitude": lon,
-                    "Latitude": lat,
-                },
-            },
-        }
-
-        handle_siri_post(
-            uuid,
-            {
-                "Siri": {
-                    "ServiceDelivery": {
-                        "ResponseTimestamp": when,
-                        "VehicleMonitoringDelivery": {
-                            "VehicleActivity": [activity],
-                        },
-                    }
-                }
-            },
-        )
-
-    cache.set(
-        subscription.get_status_key().replace("_status", "_last_post"),
-        {"headers": request.headers, "body": request.body.decode()},
-        None,
-    )
-
-    # https://github.com/aaronpk/Overland-iOS#api
-    return JsonResponse({"result": "ok"})
-
-
 @require_POST
 def clear_operator_logs(request, slug):
     """

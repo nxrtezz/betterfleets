@@ -64,17 +64,8 @@ urlpatterns = [
     path("fleet/transittracker-import/check-username", fleet_views.transittracker_check_username, name="transittracker_check_username"),
     path("fleet/transittracker-import/get-operators", fleet_views.transittracker_get_operators, name="transittracker_get_operators"),
     path("fleet/transittracker-import/preview", fleet_views.transittracker_preview, name="transittracker_preview"),
-    path("custom-tracking", fleet_views.live_location_tracking, name="live_location_tracking"),
-    path("custom-tracking/simulation", fleet_views.manual_tracking_simulation, name="manual_tracking_simulation"),
-    path("custom-tracking/vehicles.json", fleet_views.vehicle_search_json, name="vehicle_search_json"),
-    path("custom-tracking.json", fleet_views.live_tracking_json, name="live_tracking_json"),
-    path("custom-tracking/swap", fleet_views.swap_vehicle_tracking, name="swap_vehicle_tracking"),
-    path("custom-tracking/simulation/create", fleet_views.create_manual_simulation, name="create_manual_simulation"),
-    path("custom-tracking/simulation/<int:simulation_id>/update", fleet_views.update_manual_simulation, name="update_manual_simulation"),
-    path("custom-tracking/simulation/<int:simulation_id>/calculate-route", fleet_views.calculate_simulation_route, name="calculate_simulation_route"),
-    path("fleet/live-tracking", RedirectView.as_view(url='/custom-tracking', permanent=True)),
-    path("fleet/live-tracking.json", RedirectView.as_view(url='/custom-tracking.json', permanent=True)),
-    path("fleet/live-tracking/swap", RedirectView.as_view(url='/custom-tracking/swap', permanent=True)),
+    path("overland", fleet_views.overland_generator, name="overland_generator"),
+    path("overland.json", fleet_views.overland_json, name="overland_json"),
     path("staff/stats", views.staff_stats, name="staff_stats"),
     path("staff/theme-lab", views.theme_lab, name="theme_lab"),
     path("timetable-source-stats.json", views.timetable_source_stats),
@@ -275,6 +266,5 @@ urlpatterns = [
     path("", include(vehicles_urls)),
     path("", include(disruptions_urls)),
 ]
-
 
 

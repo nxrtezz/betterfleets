@@ -146,6 +146,6 @@ urlpatterns = [
     path("maps", views.get_redirect_view("map", permanent=True)),
     path("map/old", TemplateView.as_view(template_name="map_classic.html")),
     path("siri/<uuid:uuid>", views.siri_post, name="siri_post"),
-    path("overland/<uuid:uuid>", views.overland),
+    path("overland/<uuid:uuid>", fleet_views.overland_ingest),
     path("operators/pin", fleet_views.toggle_pin_operator, name="toggle_pin_operator"),
 ]

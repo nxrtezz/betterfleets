@@ -32,7 +32,7 @@ import { Route } from "./TripMap";
 import TripTimetable, { type Trip, tripFromJourney } from "./TripTimetable";
 import VehiclePopup from "./VehiclePopup";
 import { getBounds, getFont } from "./utils";
-import { vehiclesApiUrl, manualTrackingApiUrl, simulatedVehiclesApiUrl } from "./vehiclesApi";
+import { overlandApiUrl, vehiclesApiUrl } from "./vehiclesApi";
 
 import { decodeTimeAwarePolyline } from "./time-aware-polyline";
 
@@ -240,7 +240,7 @@ function Stops({
 }
 
 function fetchJson(url: string) {
-  return fetch(`/${url}`, {
+  return fetch(url, {
     credentials: "omit",
   }).then(
     (response) => {
@@ -623,7 +623,7 @@ export default function BigMap(
 
       vehiclesAbortController.current = new AbortController();
 
-      // Fetch from all three data sources in parallel
+      // Fetch BODS and Overland data in parallel.
       const fetchVehicles = async (apiUrl: string, queryString: string) => {
         try {
           const response = await fetch(`${apiUrl}${queryString}`, {
@@ -640,27 +640,23 @@ export default function BigMap(
       };
 
       // Fetch all sources in parallel - one failure won't prevent others
-      const [liveVehicles, manualVehicles, simulatedVehicles] = await Promise.all([
+      const [liveVehicles, overlandVehicles] = await Promise.all([
         fetchVehicles(vehiclesApiUrl, url).catch(() => []),
-        fetchVehicles(manualTrackingApiUrl, "").catch(() => []),
-        fetchVehicles(simulatedVehiclesApiUrl, "").catch(() => []),
+        fetchVehicles(overlandApiUrl, "").catch(() => []),
       ]);
 
-      // Merge and deduplicate vehicles by ID
-      // Manual tracking and simulation use different ID formats, so no conflict with live
+      // Prefer BODS when a vehicle is present in both feeds.
       const vehicleMap = new Map<string, VehicleLocation>();
       
       const addVehicle = (vehicle: VehicleLocation) => {
         const id = String(vehicle.id);
-        // Prefer live data over manual/simulation for same vehicle
-        if (!vehicleMap.has(id) || vehicle.source === "live") {
+        if (!vehicleMap.has(id) || vehicle.source !== "overland") {
           vehicleMap.set(id, vehicle);
         }
       };
 
       liveVehicles.forEach(addVehicle);
-      manualVehicles.forEach(addVehicle);
-      simulatedVehicles.forEach(addVehicle);
+      overlandVehicles.forEach(addVehicle);
 
       const allVehicles = Array.from(vehicleMap.values());
 
