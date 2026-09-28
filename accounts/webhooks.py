@@ -98,8 +98,8 @@ def handle_user_created(data):
         logger.error(f"No email found for Clerk user {clerk_user_id}")
         return HttpResponseBadRequest("No email in user data")
 
-    first_name = data.get('first_name', '')
-    last_name = data.get('last_name', '')
+    first_name = data.get('first_name') or ''
+    last_name = data.get('last_name') or ''
     username = primary_email.split('@')[0]
 
     try:
@@ -151,8 +151,8 @@ def handle_user_updated(data):
             user.username = primary_email.split('@')[0]
         
         # Update name fields
-        user.first_name = data.get('first_name', '')
-        user.last_name = data.get('last_name', '')
+        user.first_name = data.get('first_name') or ''
+        user.last_name = data.get('last_name') or ''
         
         user.save()
         logger.info(f"Updated Django user for Clerk user {clerk_user_id}")

@@ -116,8 +116,8 @@ class Command(BaseCommand):
             clerk_user = user_data["clerk_user"]
             primary_email = user_data["primary_email"]
 
-            first_name = clerk_user.get("first_name", "")
-            last_name = clerk_user.get("last_name", "")
+            first_name = clerk_user.get("first_name") or ""
+            last_name = clerk_user.get("last_name") or ""
             username = primary_email.split("@")[0]
             clerk_user_id = clerk_user.get("id")
 
@@ -155,8 +155,8 @@ class Command(BaseCommand):
             try:
                 django_user.email = primary_email
                 django_user.username = primary_email.split("@")[0]
-                django_user.first_name = clerk_user.get("first_name", "")
-                django_user.last_name = clerk_user.get("last_name", "")
+                django_user.first_name = clerk_user.get("first_name") or ""
+                django_user.last_name = clerk_user.get("last_name") or ""
                 django_user.save()
                 self.stdout.write(
                     self.style.SUCCESS(f"Updated user: {primary_email}")
