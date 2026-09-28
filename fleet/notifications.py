@@ -8,7 +8,10 @@ logger = logging.getLogger(__name__)
 
 
 def vehicle_url(vehicle):
-    return f"https://betterfleets.org{vehicle.get_absolute_url()}"
+    # Use the actual site domain instead of hardcoded betterfleets.org
+    from django.conf import settings
+    domain = getattr(settings, 'SITE_DOMAIN', 'eeveeit.uk')
+    return f"https://{domain}{vehicle.get_absolute_url()}"
 
 
 def vehicle_embed(vehicle, title, description):
