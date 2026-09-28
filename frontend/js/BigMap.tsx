@@ -94,7 +94,7 @@ function shouldShowStops(zoom?: number) {
 }
 
 function shouldShowVehicles(zoom?: number) {
-  return zoom && zoom >= 6;
+  return zoom && zoom >= 4; // Lowered from 6 to 4 to show vehicles at wider zoom levels
 }
 
 export enum MapMode {
