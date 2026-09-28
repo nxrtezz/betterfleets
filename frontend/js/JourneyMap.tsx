@@ -21,14 +21,6 @@ import VehiclePopup from "./VehiclePopup";
 import { getBounds, getFont } from "./utils";
 import { vehiclesApiUrl } from "./vehiclesApi";
 
-type VehicleJourneyLocation = {
-  id: number;
-  coordinates: [number, number];
-  // delta: number | null;
-  direction?: number | null;
-  datetime: string;
-};
-
 export type StopTime = {
   id: number;
   atco_code: string;
@@ -39,6 +31,14 @@ export type StopTime = {
   heading: number;
   coordinates?: [number, number] | null;
   actual_departure_time: string;
+};
+
+export type VehicleJourneyLocation = {
+  id: number;
+  coordinates: [number, number];
+  // delta: number | null;
+  direction?: number | null;
+  datetime: string;
 };
 
 export type VehicleJourney = {
@@ -503,8 +503,8 @@ export default function JourneyMap({
 
   const bounds = React.useMemo(() => {
     if (journey) {
-      const bounds = getBounds(journey.stops, (item) => item.coordinates);
-      return getBounds(journey.locations, (item) => item.coordinates, bounds);
+      const bounds = getBounds(journey.stops, (item: StopTime) => item.coordinates);
+      return getBounds(journey.locations, (item: VehicleJourneyLocation) => item.coordinates, bounds);
     }
   }, [journey]);
 

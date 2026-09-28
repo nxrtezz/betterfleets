@@ -24,12 +24,12 @@ import VehicleMarker, {
   getClickedVehicleMarkerId,
 } from "./VehicleMarker";
 
-import { JourneyStops, Locations, type VehicleJourney } from "./JourneyMap";
+import { JourneyStops, Locations, type StopTime, type VehicleJourney, type VehicleJourneyLocation } from "./JourneyMap";
 import LoadingSorry from "./LoadingSorry";
 import BusTimesMap, { ThemeContext } from "./Map";
 import StopPopup, { type Stop } from "./StopPopup";
 import { Route } from "./TripMap";
-import TripTimetable, { type Trip, tripFromJourney } from "./TripTimetable";
+import TripTimetable, { type Trip, type TripTime, tripFromJourney } from "./TripTimetable";
 import VehiclePopup from "./VehiclePopup";
 import { getBounds, getFont } from "./utils";
 import { vehiclesApiUrl } from "./vehiclesApi";
@@ -538,12 +538,12 @@ export default function BigMap(
 
   const bounds = useMemo(() => {
     if (trip) {
-      return getBounds(trip.times, (time) => time.stop.location);
+      return getBounds(trip.times, (time: TripTime) => time.stop.location);
     }
     if (journey) {
-      const _bounds = getBounds(journey.stops, (item) => item.coordinates);
+      const _bounds = getBounds(journey.stops, (item: StopTime) => item.coordinates);
       // maybe extend bounds
-      return getBounds(journey.locations, (item) => item.coordinates, _bounds);
+      return getBounds(journey.locations, (item: VehicleJourneyLocation) => item.coordinates, _bounds);
     }
   }, [trip, journey]);
 
@@ -654,7 +654,7 @@ export default function BigMap(
         props.mode === MapMode.Operator &&
         !initialViewState.current
       ) {
-        const bounds = getBounds(allVehicles, (item) => item.coordinates);
+        const bounds = getBounds(allVehicles, (item: VehicleLocation) => item.coordinates);
         if (bounds) {
           initialViewState.current = {
             bounds,
