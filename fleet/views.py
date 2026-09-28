@@ -500,6 +500,34 @@ def overland_ingest(request, uuid):
         subscription.heading = round(float(heading)) if heading is not None else None
         subscription.last_timestamp = parsed_timestamp
         subscription.save(update_fields=["latitude", "longitude", "heading", "last_timestamp", "updated_at"])
+        
+        # Create or update VehicleJourney for tracking
+        from vehicles.models import VehicleJourney
+        vehicle = subscription.vehicle
+        
+        # Try to find existing journey for today
+        today = parsed_timestamp.date()
+        existing_journey = VehicleJourney.objects.filter(
+            vehicle=vehicle,
+            datetime__date=today,
+            code__contains=subscription.route_number or ""
+        ).first()
+        
+        if existing_journey:
+            # Update existing journey
+            existing_journey.datetime = parsed_timestamp
+            existing_journey.destination = subscription.destination
+            existing_journey.save(update_fields=["datetime", "destination"])
+        else:
+            # Create new journey
+            VehicleJourney.objects.create(
+                vehicle=vehicle,
+                datetime=parsed_timestamp,
+                destination=subscription.destination,
+                code=subscription.route_number or "Overland",
+                route_name=subscription.route_number or "Overland Tracking"
+            )
+            
     except (KeyError, TypeError, ValueError, IndexError, json.JSONDecodeError):
         return JsonResponse({"error": "Invalid Overland payload"}, status=400)
 

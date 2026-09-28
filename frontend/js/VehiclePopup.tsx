@@ -145,7 +145,6 @@ export default function VehiclePopup({
         <div>{item.vehicle.features.replace("<br>", ", ")}</div>
       )}
       <div>{line_name}</div>
-      {operator && <div>{operator}</div>}
       {!isTrain && item.seats && (
         <div>
           <svg
