@@ -502,7 +502,6 @@ def overland_ingest(request, uuid):
         subscription.save(update_fields=["latitude", "longitude", "heading", "last_timestamp", "updated_at"])
         
         # Create or update VehicleJourney for tracking
-        from vehicles.models import VehicleJourney, DataSource
         from django.core.cache import cache
         vehicle = subscription.vehicle
         
