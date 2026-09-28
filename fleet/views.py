@@ -508,32 +508,8 @@ def overland_ingest(request, uuid):
 
 @require_safe
 def overland_json(request):
-    locations = []
-    cutoff = timezone.now() - timedelta(minutes=10)
-    for subscription in OverlandSubscription.objects.filter(
-        last_timestamp__gte=cutoff
-    ).select_related("vehicle", "vehicle__operator", "vehicle__livery"):
-        if subscription.latitude is None or subscription.longitude is None or not subscription.last_timestamp:
-            continue
-        vehicle = subscription.vehicle
-        item = {
-            "id": vehicle.id,
-            "coordinates": [float(subscription.longitude), float(subscription.latitude)],
-            "heading": subscription.heading,
-            "datetime": subscription.last_timestamp.isoformat(),
-            "destination": subscription.destination,
-            "trip_id": int(subscription.trip_id) if subscription.trip_id.isdigit() else None,
-            "service_id": None,
-            "service": {"line_name": subscription.route_number} if subscription.route_number else None,
-            "operator": {
-                "name": vehicle.operator.name,
-                "url": vehicle.operator.get_absolute_url(),
-            } if vehicle.operator else None,
-            "vehicle": vehicle.get_json(),
-            "source": "overland",
-        }
-        locations.append(item)
-    return JsonResponse(locations, safe=False)
+    # This endpoint is deprecated - all data now goes through vehicles.json
+    return JsonResponse([], safe=False)
 
 
 @require_POST
