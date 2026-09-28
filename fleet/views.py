@@ -502,14 +502,21 @@ def overland_ingest(request, uuid):
         subscription.save(update_fields=["latitude", "longitude", "heading", "last_timestamp", "updated_at"])
         
         # Create or update VehicleJourney for tracking
-        from vehicles.models import VehicleJourney
+        from vehicles.models import VehicleJourney, DataSource
+        from django.core.cache import cache
         vehicle = subscription.vehicle
+        
+        # Get or create Overland data source
+        data_source, _ = DataSource.objects.get_or_create(
+            name="Overland",
+            defaults={"url": "https://overland.tech"}
+        )
         
         # Try to find existing journey for today
         today = parsed_timestamp.date()
         existing_journey = VehicleJourney.objects.filter(
             vehicle=vehicle,
-            datetime__date=today,
+            date=today,
             code__contains=subscription.route_number or ""
         ).first()
         
@@ -517,16 +524,37 @@ def overland_ingest(request, uuid):
             # Update existing journey
             existing_journey.datetime = parsed_timestamp
             existing_journey.destination = subscription.destination
-            existing_journey.save(update_fields=["datetime", "destination"])
+            existing_journey.route_name = subscription.route_number or "Overland"
+            existing_journey.code = subscription.route_number or "Overland"
+            existing_journey.save(update_fields=["datetime", "destination", "route_name", "code"])
+            journey_id = existing_journey.id
         else:
-            # Create new journey
-            VehicleJourney.objects.create(
+            # Create new journey with proper fields for journeys table
+            new_journey = VehicleJourney.objects.create(
                 vehicle=vehicle,
                 datetime=parsed_timestamp,
+                date=today,
                 destination=subscription.destination,
                 code=subscription.route_number or "Overland",
-                route_name=subscription.route_number or "Overland Tracking"
+                route_name=subscription.route_number or "Overland",
+                source=data_source,
+                direction=""
             )
+            journey_id = new_journey.id
+        
+        # Store location data in Redis for map history
+        journey_redis_key = f"journey{journey_id}"
+        location_data = {
+            "coordinates": [float(longitude), float(latitude)],
+            "datetime": parsed_timestamp.isoformat(),
+            "heading": subscription.heading,
+            "destination": subscription.destination
+        }
+        cache.set(journey_redis_key, location_data, timeout=3600)  # 1 hour
+        
+        # Update vehicle's latest journey
+        vehicle.latest_journey_id = journey_id
+        vehicle.save(update_fields=["latest_journey_id"])
             
     except (KeyError, TypeError, ValueError, IndexError, json.JSONDecodeError):
         return JsonResponse({"error": "Invalid Overland payload"}, status=400)
