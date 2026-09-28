@@ -438,7 +438,7 @@ window.STADIA_MAPS_API_KEY = "{{ STADIA_MAPS_API_KEY|default_if_none:''|escapejs
 })();
 </script>
 
-<script src="{% static 'dist/js/clerk-auth-entry.js' %}"></script>
+{% block clerk_auth %}<script src="{% static 'dist/js/clerk-auth-entry.js' %}"></script>{% endblock clerk_auth %}
 
 <script>
 (function () {
