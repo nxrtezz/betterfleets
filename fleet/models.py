@@ -1,5 +1,8 @@
 from django.conf import settings
 from django.db import models
+from django.utils.crypto import constant_time_compare
+import hashlib
+import uuid
 from busstops.models import Operator
 
 
@@ -172,27 +175,44 @@ class FleetPhotoLog(models.Model):
         return f"{self.user} photographed {self.vehicle}"
 
 
-class LiveVehicleLocation(models.Model):
+class OverlandSubscription(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        models.CASCADE,
+        related_name="overland_subscriptions",
+    )
     vehicle = models.ForeignKey(
         "vehicles.Vehicle",
         models.CASCADE,
-        related_name="live_locations",
+        related_name="overland_subscriptions",
     )
-    latitude = models.DecimalField(max_digits=9, decimal_places=6)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6)
-    headcode = models.CharField(max_length=16, blank=True)
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     destination = models.CharField(max_length=255, blank=True)
-    rotation = models.IntegerField(null=True, blank=True, help_text="Vehicle heading in degrees (0-360)")
-    lateness = models.IntegerField(null=True, blank=True, help_text="Lateness in minutes (negative for early)")
+    route_number = models.CharField(max_length=64, blank=True)
+    trip_id = models.CharField(max_length=128, blank=True)
+    auth_key_hash = models.CharField(max_length=64)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    heading = models.IntegerField(null=True, blank=True)
+    last_timestamp = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ("-created_at",)
-        verbose_name = "live vehicle location"
-        verbose_name_plural = "live vehicle locations"
+        ordering = ("-updated_at",)
+        permissions = [
+            ("use_overland", "Can generate Overland tracking URLs"),
+        ]
+
+    @staticmethod
+    def hash_auth_key(auth_key):
+        return hashlib.sha256(auth_key.encode()).hexdigest()
+
+    def check_auth_key(self, auth_key):
+        return constant_time_compare(self.auth_key_hash, self.hash_auth_key(auth_key))
 
     def __str__(self):
-        return f"{self.vehicle} at {self.latitude}, {self.longitude}"
+        return f"{self.vehicle} Overland tracking"
 
 
 class PinnedOperator(models.Model):
@@ -221,118 +241,3 @@ class PinnedOperator(models.Model):
 
     def __str__(self):
         return f"{self.user} pinned {self.operator}"
-
-
-class ManualTrackingSimulation(models.Model):
-    """
-    Simulation routes for manual tracking using snap-to-road routing.
-    
-    Allows users to create simulated vehicle movements along routes
-    using OSRM routing with speed limits, either by selecting bus stops
-    or by selecting operator/service/direction.
-    """
-    vehicle = models.ForeignKey(
-        "vehicles.Vehicle",
-        models.CASCADE,
-        related_name="manual_simulations",
-        help_text='The vehicle to simulate tracking for'
-    )
-    name = models.CharField(
-        max_length=255,
-        help_text='Name for this simulation route'
-    )
-    route_type = models.CharField(
-        max_length=20,
-        choices=[
-            ('stops', 'Selected Bus Stops'),
-            ('service', 'Service Route'),
-        ],
-        default='stops',
-        help_text='How the route is defined'
-    )
-    
-    # For service-based routes
-    service = models.ForeignKey(
-        "busstops.Service",
-        models.CASCADE,
-        null=True,
-        blank=True,
-        related_name='manual_simulations',
-        help_text='Service for service-based routes'
-    )
-    direction = models.CharField(
-        max_length=10,
-        choices=[
-            ('inbound', 'Inbound'),
-            ('outbound', 'Outbound'),
-        ],
-        blank=True,
-        help_text='Direction for service-based routes'
-    )
-    
-    # For stop-based routes
-    stops = models.JSONField(
-        default=list,
-        blank=True,
-        help_text='Ordered list of stop coordinates [{"lat": 51.5, "lng": -0.1, "stop_id": 123}, ...]'
-    )
-    
-    # Route geometry and timing
-    route_geometry = models.JSONField(
-        null=True,
-        blank=True,
-        help_text='OSRM route geometry as GeoJSON LineString'
-    )
-    route_segments = models.JSONField(
-        default=list,
-        blank=True,
-        help_text='Route segments with speed limits and timing data'
-    )
-    
-    # Simulation state
-    is_active = models.BooleanField(
-        default=False,
-        help_text='Whether the simulation is currently running'
-    )
-    current_position = models.JSONField(
-        null=True,
-        blank=True,
-        help_text='Current vehicle position {"lat": 51.5, "lng": -0.1, "heading": 90}'
-    )
-    started_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text='When the simulation started'
-    )
-    progress = models.FloatField(
-        default=0,
-        help_text='Progress along route (0.0 to 1.0)'
-    )
-    
-    # Speed multiplier (1.0 = real speed, 2.0 = 2x speed, etc.)
-    speed_multiplier = models.FloatField(
-        default=1.0,
-        help_text='Speed multiplier for simulation (1.0 = normal speed)'
-    )
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    modified_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        models.CASCADE,
-        related_name='manual_simulations',
-        help_text='User who created this simulation'
-    )
-
-    class Meta:
-        ordering = ("-created_at",)
-        indexes = [
-            models.Index(fields=['vehicle']),
-            models.Index(fields=['is_active']),
-            models.Index(fields=['service']),
-        ]
-        verbose_name = "manual tracking simulation"
-        verbose_name_plural = "manual tracking simulations"
-
-    def __str__(self):
-        return f"{self.name} ({self.vehicle})"

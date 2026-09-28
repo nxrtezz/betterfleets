@@ -1,0 +1,39 @@
+{% extends "page.html" %}
+
+{% block title %}Generate Overland endpoint - Better Fleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+  <h1>Generate Overland endpoint</h1>
+  <p>Use this URL in Overland to share a phone's live location for a vehicle.</p>
+
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+  {% if endpoint %}
+    <p><strong>Copy this endpoint into Overland:</strong></p>
+    <textarea readonly rows="4" style="width: 100%">{{ endpoint }}</textarea>
+    <p>The auth key is shown only here. Generate another endpoint if it is lost.</p>
+  {% else %}
+    <form method="post">
+      {% csrf_token %}
+      <p>
+        <label for="vehicle_slug">Vehicle slug</label>
+        <input id="vehicle_slug" name="vehicle_slug" required>
+      </p>
+      <p>
+        <label for="destination">Destination</label>
+        <input id="destination" name="destination">
+      </p>
+      <p>
+        <label for="route_number">Route number</label>
+        <input id="route_number" name="route_number">
+      </p>
+      <p>
+        <label for="trip_id">Trip ID</label>
+        <input id="trip_id" name="trip_id">
+      </p>
+      <button type="submit">Generate endpoint</button>
+    </form>
+  {% endif %}
+{% endblock content %}
