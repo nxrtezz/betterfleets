@@ -209,6 +209,7 @@ CLERK_JWT_KEY = os.environ.get("CLERK_JWT_KEY", "")
 CLERK_JWKS_URL = os.environ.get("CLERK_JWKS_URL", "")
 CLERK_JWT_ISSUER = os.environ.get("CLERK_JWT_ISSUER", "")
 CLERK_JWT_AUDIENCE = os.environ.get("CLERK_JWT_AUDIENCE", "")
+CLERK_WEBHOOK_SIGNING_SECRET = os.environ.get("CLERK_WEBHOOK_SIGNING_SECRET", "")
 LOGIN_REDIRECT_URL = "/vehicles"
 LOGOUT_REDIRECT_URL = "/"
 

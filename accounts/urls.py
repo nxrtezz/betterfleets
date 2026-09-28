@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.urls import path
 
 from . import views
+from . import webhooks
 
 urlpatterns = [
     path("login/", views.clerk_login, name="clerk_login"),
@@ -21,4 +22,6 @@ urlpatterns = [
     path("email/", login_required(views.account_email), name="account_email"),
     path("password/", login_required(views.account_password), name="account_password"),
     path("sessions/", login_required(views.account_sessions), name="account_sessions"),
+    # Clerk webhook endpoint
+    path("webhooks/clerk/", webhooks.clerk_webhook, name="clerk_webhook"),
 ]
