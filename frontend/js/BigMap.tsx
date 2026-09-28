@@ -32,7 +32,7 @@ import { Route } from "./TripMap";
 import TripTimetable, { type Trip, tripFromJourney } from "./TripTimetable";
 import VehiclePopup from "./VehiclePopup";
 import { getBounds, getFont } from "./utils";
-import { overlandApiUrl, vehiclesApiUrl } from "./vehiclesApi";
+import { vehiclesApiUrl } from "./vehiclesApi";
 
 import { decodeTimeAwarePolyline } from "./time-aware-polyline";
 
@@ -623,7 +623,7 @@ export default function BigMap(
 
       vehiclesAbortController.current = new AbortController();
 
-      // Fetch BODS and Overland data in parallel.
+      // Fetch vehicles (now includes both BODS and Overland data)
       const fetchVehicles = async (apiUrl: string, queryString: string) => {
         try {
           const fullUrl = `${apiUrl}${queryString}`;
@@ -644,26 +644,7 @@ export default function BigMap(
         }
       };
 
-      // Fetch all sources in parallel - one failure won't prevent others
-      const [liveVehicles, overlandVehicles] = await Promise.all([
-        fetchVehicles(vehiclesApiUrl, url).catch(() => []),
-        fetchVehicles(overlandApiUrl, "").catch(() => []),
-      ]);
-
-      // Prefer BODS when a vehicle is present in both feeds.
-      const vehicleMap = new Map<string, VehicleLocation>();
-      
-      const addVehicle = (vehicle: VehicleLocation) => {
-        const id = String(vehicle.id);
-        if (!vehicleMap.has(id) || vehicle.source !== "overland") {
-          vehicleMap.set(id, vehicle);
-        }
-      };
-
-      liveVehicles.forEach(addVehicle);
-      overlandVehicles.forEach(addVehicle);
-
-      const allVehicles = Array.from(vehicleMap.values());
+      const allVehicles = await fetchVehicles(vehiclesApiUrl, url);
 
       if (props.mode === MapMode.Slippy && _bounds) {
         vehiclesHighWaterMark.current = _bounds;

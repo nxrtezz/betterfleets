@@ -12,7 +12,7 @@ import subprocess
 import xmltodict
 import requests
 from collections import defaultdict
-from fleet.models import PinnedOperator
+from fleet.models import PinnedOperator, OverlandSubscription
 from fleet.exporters.xlsx import build_basic_fleet_workbook, workbook_bytes
 from fleet.completion import (
     annotate_logged_state,
@@ -2222,6 +2222,52 @@ def vehicles_json(request) -> JsonResponse:
         )
     except BadRequest:
         return cachable_400()
+
+    # Add Overland vehicles
+    
+    cutoff = timezone.now() - timedelta(minutes=10)
+    overland_query = OverlandSubscription.objects.filter(
+        last_timestamp__gte=cutoff
+    ).select_related("vehicle", "vehicle__operator", "vehicle__livery")
+    
+    # Filter by bounds if provided
+    if bounds is not None:
+        overland_query = overland_query.filter(
+            latitude__gte=bounds.extent[1],
+            latitude__lte=bounds.extent[3],
+            longitude__gte=bounds.extent[0],
+            longitude__lte=bounds.extent[2],
+        )
+    
+    # Filter by operator if specified
+    if operator_ids:
+        overland_query = overland_query.filter(vehicle__operator_id__in=operator_ids)
+    
+    # Filter by specific vehicle IDs if specified
+    if vehicle_ids:
+        overland_query = overland_query.filter(vehicle_id__in=vehicle_ids)
+    
+    for subscription in overland_query:
+        if subscription.latitude is None or subscription.longitude is None or not subscription.last_timestamp:
+            continue
+        vehicle = subscription.vehicle
+        overland_item = {
+            "id": vehicle.id,
+            "coordinates": [float(subscription.longitude), float(subscription.latitude)],
+            "heading": subscription.heading,
+            "datetime": subscription.last_timestamp.isoformat(),
+            "destination": subscription.destination,
+            "trip_id": int(subscription.trip_id) if subscription.trip_id and subscription.trip_id.isdigit() else None,
+            "service_id": None,
+            "service": {"line_name": subscription.route_number} if subscription.route_number else None,
+            "operator": {
+                "name": vehicle.operator.name,
+                "url": vehicle.operator.get_absolute_url(),
+            } if vehicle.operator else None,
+            "vehicle": vehicle.get_json(),
+            "source": "overland",
+        }
+        locations.append(overland_item)
 
     response = JsonResponse(locations, safe=False)
 
