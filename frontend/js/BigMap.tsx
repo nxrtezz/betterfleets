@@ -626,15 +626,20 @@ export default function BigMap(
       // Fetch BODS and Overland data in parallel.
       const fetchVehicles = async (apiUrl: string, queryString: string) => {
         try {
-          const response = await fetch(`${apiUrl}${queryString}`, {
+          const fullUrl = `${apiUrl}${queryString}`;
+          console.log(`Fetching ${fullUrl}`);
+          const response = await fetch(fullUrl, {
             credentials: "omit",
             signal: vehiclesAbortController.current?.signal,
           });
+          console.log(`${fullUrl} response:`, response.status);
           if (response.ok || response.status === 404) {
             return await response.json();
           }
+          console.warn(`${fullUrl} returned ${response.status}`);
           return [];
-        } catch {
+        } catch (error) {
+          console.error(`Error fetching ${apiUrl}:`, error);
           return [];
         }
       };
