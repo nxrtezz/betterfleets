@@ -45,8 +45,14 @@ class Command(BaseCommand):
             )
 
         clerk_users = response.json()
-        total_count = clerk_users.get("total_count", 0)
-        users_data = clerk_users.get("data", [])
+        
+        # Handle different API response structures
+        if isinstance(clerk_users, list):
+            users_data = clerk_users
+            total_count = len(users_data)
+        else:
+            total_count = clerk_users.get("total_count", 0)
+            users_data = clerk_users.get("data", [])
 
         self.stdout.write(f"Found {total_count} total users in Clerk")
         self.stdout.write(f"Processing {len(users_data)} users (limit: {options['limit']})")
