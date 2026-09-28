@@ -124,6 +124,7 @@ from .tasks import handle_siri_post
 from .utils import apply_revision, get_revision, redis_client  # calculate_bearing,
 from fleet.models import FleetRideLog, FleetDrivingLog
 
+logger = logging.getLogger(__name__)
 
 REQUEST_SOURCES = {
     "vehicle_request": "Vehicle",
