@@ -13,7 +13,7 @@ from django.views.decorators.http import require_POST, require_safe
 from django.views.decorators.csrf import csrf_exempt
 
 from busstops.models import Operator
-from vehicles.models import Vehicle
+from vehicles.models import Vehicle, VehicleJourney
 from fleet.completion import (
     get_overall_operator_rankings,
     get_overall_type_rankings,
@@ -542,8 +542,9 @@ def overland_ingest(request, uuid):
             )
             journey_id = new_journey.id
         
-        # Store location data in Redis for map history
-        journey_redis_key = f"journey{journey_id}"
+        # Store location data in Redis for map history using the journey's UUID
+        journey_obj = VehicleJourney.objects.get(id=journey_id)
+        journey_redis_key = journey_obj.get_redis_key()
         location_data = {
             "coordinates": [float(longitude), float(latitude)],
             "datetime": parsed_timestamp.isoformat(),
@@ -555,6 +556,15 @@ def overland_ingest(request, uuid):
         # Update vehicle's latest journey
         vehicle.latest_journey_id = journey_id
         vehicle.save(update_fields=["latest_journey_id"])
+        
+        # Add vehicle to Redis tracking for "Track this bus" button
+        vehicle_redis_key = f"vehicle{vehicle.id}"
+        vehicle_data = {
+            "journey_id": journey_id,
+            "datetime": parsed_timestamp.isoformat(),
+            "coordinates": [float(longitude), float(latitude)]
+        }
+        cache.set(vehicle_redis_key, vehicle_data, timeout=3600)  # 1 hour
             
     except (KeyError, TypeError, ValueError, IndexError, json.JSONDecodeError):
         return JsonResponse({"error": "Invalid Overland payload"}, status=400)
