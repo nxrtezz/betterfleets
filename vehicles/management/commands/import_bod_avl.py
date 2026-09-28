@@ -680,6 +680,9 @@ class Command(ImportLiveVehiclesCommand):
                 span.set_data("count", len(changed_journey_items))
                 self.handle_items(changed_journey_items, changed_journey_identities)
 
+            # Save vehicle locations to Redis
+            self.save()
+
             time_taken = (timezone.now() - now).total_seconds()
 
             # stats for last 50 updates:
