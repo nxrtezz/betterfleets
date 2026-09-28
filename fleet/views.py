@@ -13,7 +13,7 @@ from django.views.decorators.http import require_POST, require_safe
 from django.views.decorators.csrf import csrf_exempt
 
 from busstops.models import Operator
-from vehicles.models import Vehicle, VehicleJourney
+from vehicles.models import Vehicle, VehicleJourney, DataSource
 from fleet.completion import (
     get_overall_operator_rankings,
     get_overall_type_rankings,
