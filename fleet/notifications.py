@@ -37,15 +37,13 @@ def vehicle_embed(vehicle, title, description):
 
 
 def send_alert_embed(embed):
-    channel_id = settings.DISCORD_ALERT_CHANNEL_ID
-    token = settings.DISCORD_BOT_TOKEN
-    if not channel_id or not token:
+    webhook_url = settings.DISCORD_NOTIFICATIONS_WEBHOOK_URL
+    if not webhook_url:
         return
 
     try:
         response = requests.post(
-            f"https://discord.com/api/v10/channels/{channel_id}/messages",
-            headers={"Authorization": f"Bot {token}"},
+            webhook_url,
             json={"embeds": [embed]},
             timeout=10,
         )
