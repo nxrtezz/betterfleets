@@ -169,7 +169,13 @@ class Command(ImportLiveVehiclesCommand):
         operators = self.get_operator(operator_ref)
 
         if operator_ref == "TFLO":
-            defaults["livery_id"] = 262
+            # Only set livery_id if it exists in the database
+            try:
+                from busstops.models import Livery
+                if Livery.objects.filter(id=262).exists():
+                    defaults["livery_id"] = 262
+            except Exception:
+                pass
             defaults["operator_id"] = operator_ref
             if vehicle_ref.startswith("TMP"):
                 defaults["notes"] = "Spare ticket machine"
