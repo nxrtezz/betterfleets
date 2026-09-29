@@ -2766,6 +2766,62 @@ class VehicleDetailView(DetailView):
                 vehicle=vehicle,
             )
             review.delete()
+        elif (
+            self.request.user.is_superuser
+            and "toggle_lock" in self.request.POST
+        ):
+            vehicle.locked = not vehicle.locked
+            vehicle.save(update_fields=["locked"])
+            messages.success(
+                self.request,
+                f"Vehicle {'locked' if vehicle.locked else 'unlocked'}."
+            )
+            return self.get(*args, **kwargs)
+        elif (
+            self.request.user.is_superuser
+            and "delete_vehicle" in self.request.POST
+        ):
+            vehicle.delete()
+            messages.success(self.request, "Vehicle deleted.")
+            return redirect("/")
+        elif (
+            self.request.user.is_superuser
+            and "merge_vehicle" in self.request.POST
+        ):
+            target_id = self.request.POST.get("merge_vehicle")
+            target_vehicle = get_object_or_404(Vehicle, pk=target_id)
+            
+            # Merge logic: move all related data from current vehicle to target vehicle
+            # This includes journeys, photos, revisions, etc.
+            from django.db import transaction
+            
+            with transaction.atomic():
+                # Move vehicle journeys
+                VehicleJourney.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                
+                # Move photos (many-to-many relationship)
+                from photos.models import Photo
+                for photo in vehicle.photo_set.all():
+                    photo.vehicles.remove(vehicle)
+                    photo.vehicles.add(target_vehicle)
+                
+                # Move vehicle revisions
+                VehicleRevision.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                
+                # Move reviews
+                VehicleReview.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                
+                # Move fleet logs
+                from fleet.models import FleetRideLog, FleetDrivingLog, FleetPhotoLog
+                FleetRideLog.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                FleetDrivingLog.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                FleetPhotoLog.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                
+                # Delete the merged vehicle
+                vehicle.delete()
+            
+            messages.success(self.request, f"Vehicle merged with {target_vehicle}.")
+            return redirect(target_vehicle.get_absolute_url())
 
         return self.get(*args, **kwargs)
 
@@ -4791,7 +4847,6 @@ def request_log_action(request, log_id, action):
             raise PermissionDenied
         if action == "apply":
             from busstops.data_changes import apply_pending_change
-            from django.contrib import messages
 
             try:
                 log = apply_pending_change(log, user=request.user)
@@ -5281,3 +5336,46 @@ def clear_operator_logs(request, slug):
     )
 
     return redirect(operator.get_vehicles_url())
+
+
+@login_required
+def search_vehicles_merge(request):
+    """
+    Search for vehicles to merge with.
+    Only accessible to superusers.
+    """
+    if not request.user.is_superuser:
+        raise PermissionDenied
+
+    query = request.GET.get("q", "")
+    exclude_id = request.GET.get("exclude", "")
+
+    if len(query) < 2:
+        return JsonResponse({"vehicles": []})
+
+    vehicles = apply_vehicle_schema_compat(
+        Vehicle.objects.select_related("operator", "vehicle_type")
+    )
+
+    if exclude_id:
+        vehicles = vehicles.exclude(id=exclude_id)
+
+    # Search by registration, fleet code, or fleet number
+    vehicles = vehicles.filter(
+        Q(reg__icontains=query)
+        | Q(fleet_code__icontains=query)
+        | Q(fleet_number__icontains=query)
+    )[:10]
+
+    results = []
+    for vehicle in vehicles:
+        results.append({
+            "id": vehicle.id,
+            "reg": vehicle.reg,
+            "fleet_code": vehicle.fleet_code,
+            "fleet_number": vehicle.fleet_number,
+            "operator": str(vehicle.operator) if vehicle.operator else "",
+            "vehicle_type": str(vehicle.vehicle_type) if vehicle.vehicle_type else "",
+        })
+
+    return JsonResponse({"vehicles": results})

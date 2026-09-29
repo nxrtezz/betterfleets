@@ -99,6 +99,7 @@ urlpatterns = [
     ),
     path("vehicles", views.vehicles),
     path("vehicles/sorn", views.sorn_vehicles, name="sorn_vehicles"),
+    path("vehicles/search-merge", views.search_vehicles_merge, name="search_vehicles_merge"),
     path("vehicles/sorn-untaxed", views.operator_sorn_untaxed, name="operator_sorn_untaxed"),
     path("vehicles.json", views.vehicles_json),
     path("vehicles/simple-map-data.json", views.vehicles_json),
