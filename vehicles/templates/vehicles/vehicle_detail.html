@@ -224,7 +224,7 @@
             background: #fee2e2;
         }
 
-        /* ── Merge modal ───────────────────────────────────────────── */
+        /* ── Update vehicle modal ───────────────────────────────────── */
         .merge-modal {
             display: none;
             position: fixed;
@@ -535,7 +535,7 @@
                                         Delete
                                     </button>
                                     <button class="vehicle-menu-item" onclick="showMergeModal()">
-                                        Merge
+                                        Update Existing
                                     </button>
                                 </div>
                             </div>
@@ -555,7 +555,7 @@
                                         Delete
                                     </button>
                                     <button class="vehicle-menu-item" onclick="showMergeModal()">
-                                        Merge
+                                        Update Existing
                                     </button>
                                 </div>
                             </div>
@@ -581,7 +581,7 @@
                                         Delete
                                     </button>
                                     <button class="vehicle-menu-item" onclick="showMergeModal()">
-                                        Merge
+                                        Update Existing
                                     </button>
                                 </div>
                             </div>
@@ -898,11 +898,11 @@
     <div class="merge-modal" id="mergeModal">
         <div class="merge-modal-content">
             <div class="merge-modal-header">
-                <h3 class="merge-modal-title">Merge Vehicle</h3>
+                <h3 class="merge-modal-title">Update Existing Vehicle</h3>
                 <button class="merge-modal-close" onclick="hideMergeModal()">&times;</button>
             </div>
-            <p>Merge an existing vehicle into <strong>{{ vehicle }}</strong>. This vehicle will keep its code:</p>
-            <input type="text" class="merge-modal-search" id="mergeSearch" placeholder="Search for existing vehicle to merge..." oninput="searchVehicles(this.value)">
+            <p>Update an existing vehicle with the code from <strong>{{ vehicle }}</strong>. The existing vehicle will keep all its data (livery, reg, etc):</p>
+            <input type="text" class="merge-modal-search" id="mergeSearch" placeholder="Search for existing vehicle to update..." oninput="searchVehicles(this.value)">
             <div class="merge-modal-results" id="mergeResults">
                 <div style="padding: 1rem; text-align: center; color: var(--secondary-text-color);">
                     Type to search for vehicles
@@ -1100,7 +1100,7 @@
             }
 
             function mergeVehicle(targetId) {
-                if (confirm('Are you sure you want to merge the selected vehicle into this one? This vehicle will keep its code. This action cannot be undone.')) {
+                if (confirm('Are you sure you want to update the selected vehicle with the code from this one? The existing vehicle will keep all its data (livery, reg, etc). This action cannot be undone.')) {
                     const form = document.createElement('form');
                     form.method = 'POST';
                     form.action = window.location.href;

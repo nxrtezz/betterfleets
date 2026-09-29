@@ -2791,38 +2791,47 @@ class VehicleDetailView(DetailView):
             target_id = self.request.POST.get("merge_vehicle")
             target_vehicle = get_object_or_404(Vehicle, pk=target_id)
             
-            # Merge logic: move all related data from existing vehicle to the new tracked vehicle
-            # The current vehicle (new tracked) keeps its code/slug
-            # The target vehicle (existing) gets deleted after its data is moved
+            # Merge logic: keep code from current vehicle (new tracked), 
+            # keep all other data from existing vehicle (target)
+            # Update existing vehicle with the new code, then delete current vehicle
             from django.db import transaction
             
             with transaction.atomic():
-                # Move vehicle journeys from existing to new
-                VehicleJourney.objects.filter(vehicle=target_vehicle).update(vehicle=vehicle)
+                # Save the code/slug from the current vehicle
+                new_code = vehicle.code
+                new_slug = vehicle.slug
                 
-                # Move photos (many-to-many relationship) from existing to new
+                # Move vehicle journeys from current to existing
+                VehicleJourney.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                
+                # Move photos (many-to-many relationship) from current to existing
                 from photos.models import Photo
-                for photo in target_vehicle.photo_set.all():
-                    photo.vehicles.remove(target_vehicle)
-                    photo.vehicles.add(vehicle)
+                for photo in vehicle.photo_set.all():
+                    photo.vehicles.remove(vehicle)
+                    photo.vehicles.add(target_vehicle)
                 
-                # Move vehicle revisions from existing to new
-                VehicleRevision.objects.filter(vehicle=target_vehicle).update(vehicle=vehicle)
+                # Move vehicle revisions from current to existing
+                VehicleRevision.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
                 
-                # Move reviews from existing to new
-                VehicleReview.objects.filter(vehicle=target_vehicle).update(vehicle=vehicle)
+                # Move reviews from current to existing
+                VehicleReview.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
                 
-                # Move fleet logs from existing to new
+                # Move fleet logs from current to existing
                 from fleet.models import FleetRideLog, FleetDrivingLog, FleetPhotoLog
-                FleetRideLog.objects.filter(vehicle=target_vehicle).update(vehicle=vehicle)
-                FleetDrivingLog.objects.filter(vehicle=target_vehicle).update(vehicle=vehicle)
-                FleetPhotoLog.objects.filter(vehicle=target_vehicle).update(vehicle=vehicle)
+                FleetRideLog.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                FleetDrivingLog.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                FleetPhotoLog.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
                 
-                # Delete the existing vehicle (target)
-                target_vehicle.delete()
+                # Update existing vehicle with the new code
+                target_vehicle.code = new_code
+                target_vehicle.slug = new_slug
+                target_vehicle.save(update_fields=["code", "slug"])
+                
+                # Delete the current vehicle (new tracked)
+                vehicle.delete()
             
-            messages.success(self.request, f"Merged {target_vehicle} into this vehicle.")
-            return redirect(vehicle.get_absolute_url())
+            messages.success(self.request, f"Updated {target_vehicle} with code from this vehicle.")
+            return redirect(target_vehicle.get_absolute_url())
 
         return self.get(*args, **kwargs)
 
