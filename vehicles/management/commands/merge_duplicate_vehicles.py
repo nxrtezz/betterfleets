@@ -132,7 +132,33 @@ class Command(BaseCommand):
                 
                 if not dry_run:
                     try:
-                        # Update target vehicle's code to match source vehicle's code
+                        # Check if updating the code would violate the unique constraint
+                        conflicting_vehicle = Vehicle.objects.filter(
+                            code__iexact=code,
+                            operator=target_vehicle.operator
+                        ).exclude(id=target_vehicle.id).first()
+                        
+                        if conflicting_vehicle:
+                            # There's already a vehicle with this code for the same operator
+                            # We need to delete the conflicting vehicle instead
+                            self.stdout.write(
+                                f"    Found conflicting vehicle {conflicting_vehicle.id} with code '{code}', deleting it first"
+                            )
+                            
+                            # Move journeys from conflicting vehicle to target
+                            from vehicles.models import VehicleJourney
+                            VehicleJourney.objects.filter(vehicle=conflicting_vehicle).update(vehicle=target_vehicle)
+                            
+                            # Move VehicleCode records from conflicting vehicle to target
+                            conflicting_codes = VehicleCode.objects.filter(vehicle=conflicting_vehicle)
+                            for conflicting_code in conflicting_codes:
+                                conflicting_code.vehicle = target_vehicle
+                                conflicting_code.save()
+                            
+                            # Delete the conflicting vehicle
+                            conflicting_vehicle.delete()
+                        
+                        # Now update target vehicle's code to match source vehicle's code
                         old_code = target_vehicle.code
                         target_vehicle.code = code
                         target_vehicle.save(update_fields=['code'])

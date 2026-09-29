@@ -424,7 +424,16 @@ def find_or_merge_vehicle(operator, code, reg=None):
             ).filter(operator_query)
         
         if vehicles_by_fleet.exists():
-            # Return the best match
+            # Check if there's already a vehicle with the target code for this operator
+            # If so, we'll need to handle that conflict
+            conflicting_vehicle = None
+            if operator:
+                conflicting_vehicle = Vehicle.objects.filter(
+                    code__iexact=code,
+                    operator=operator
+                ).first()
+            
+            # Return the best match (the conflicting vehicle if it exists, otherwise the fleet match)
             vehicles_by_fleet = list(vehicles_by_fleet)
             vehicles_by_fleet.sort(
                 key=lambda v: (
@@ -433,6 +442,12 @@ def find_or_merge_vehicle(operator, code, reg=None):
                 ),
                 reverse=True
             )
+            
+            # If there's a conflicting vehicle with the target code, return that one
+            # since it already has the correct code
+            if conflicting_vehicle:
+                return conflicting_vehicle
+            
             return vehicles_by_fleet[0]
     
     # No existing vehicle found
