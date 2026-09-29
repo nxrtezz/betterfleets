@@ -1993,13 +1993,6 @@ class StopPointDetailView(DetailView):
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
-        group = (
-            StopGroup.objects.filter(active=True, stops=self.object)
-            .order_by("name")
-            .first()
-        )
-        if group:
-            return redirect(group)
         context = self.get_context_data(object=self.object)
         return self.render_to_response(context)
 
@@ -2021,9 +2014,7 @@ class StopPointDetailView(DetailView):
             self.object.locality,
         ]
 
-        if not (self.object.active or context["services"]):
-            return context
-
+        # Always attempt to get departures, even if stop is inactive or has no current services
         context.update(get_departures_context(self.object, services, self.request.GET))
 
         text = ", ".join(

@@ -46,13 +46,15 @@
 
 <div class="asides">
 
-{% if services or is_train_station %}
+{% if departures or is_train_station %}
     {% if is_train_station %}
         {% include 'train_departures.html' with departures=departures %}
     {% else %}
         {% include 'departures.html' with departures=departures %}
     {% endif %}
+{% endif %}
 
+{% if services %}
     <div class="aside">
         <h2>{% include 'modes.html' with modes=modes noun='services' %}</h2>
         {% include 'service_list.html' with services=services class="has-smalls" %}
