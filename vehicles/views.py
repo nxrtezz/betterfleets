@@ -2822,13 +2822,13 @@ class VehicleDetailView(DetailView):
                 FleetDrivingLog.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
                 FleetPhotoLog.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
                 
-                # Update existing vehicle with the new code
+                # Delete the current vehicle first to free up the slug
+                vehicle.delete()
+                
+                # Update existing vehicle with the new code/slug
                 target_vehicle.code = new_code
                 target_vehicle.slug = new_slug
                 target_vehicle.save(update_fields=["code", "slug"])
-                
-                # Delete the current vehicle (new tracked)
-                vehicle.delete()
             
             messages.success(self.request, f"Updated {target_vehicle} with code from this vehicle.")
             return redirect(target_vehicle.get_absolute_url())
