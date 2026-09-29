@@ -901,8 +901,8 @@
                 <h3 class="merge-modal-title">Merge Vehicle</h3>
                 <button class="merge-modal-close" onclick="hideMergeModal()">&times;</button>
             </div>
-            <p>Merge <strong>{{ vehicle }}</strong> with another vehicle. The selected vehicle will keep its code:</p>
-            <input type="text" class="merge-modal-search" id="mergeSearch" placeholder="Search by registration or fleet number..." oninput="searchVehicles(this.value)">
+            <p>Merge an existing vehicle into <strong>{{ vehicle }}</strong>. This vehicle will keep its code:</p>
+            <input type="text" class="merge-modal-search" id="mergeSearch" placeholder="Search for existing vehicle to merge..." oninput="searchVehicles(this.value)">
             <div class="merge-modal-results" id="mergeResults">
                 <div style="padding: 1rem; text-align: center; color: var(--secondary-text-color);">
                     Type to search for vehicles
@@ -1100,7 +1100,7 @@
             }
 
             function mergeVehicle(targetId) {
-                if (confirm('Are you sure you want to merge this vehicle with the selected one? This action cannot be undone.')) {
+                if (confirm('Are you sure you want to merge the selected vehicle into this one? This vehicle will keep its code. This action cannot be undone.')) {
                     const form = document.createElement('form');
                     form.method = 'POST';
                     form.action = window.location.href;

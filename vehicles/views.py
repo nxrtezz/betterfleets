@@ -2791,38 +2791,38 @@ class VehicleDetailView(DetailView):
             target_id = self.request.POST.get("merge_vehicle")
             target_vehicle = get_object_or_404(Vehicle, pk=target_id)
             
-            # Merge logic: move all related data from current vehicle to target vehicle
-            # This includes journeys, photos, revisions, etc.
-            # The target vehicle keeps its code/slug
+            # Merge logic: move all related data from existing vehicle to the new tracked vehicle
+            # The current vehicle (new tracked) keeps its code/slug
+            # The target vehicle (existing) gets deleted after its data is moved
             from django.db import transaction
             
             with transaction.atomic():
-                # Move vehicle journeys
-                VehicleJourney.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                # Move vehicle journeys from existing to new
+                VehicleJourney.objects.filter(vehicle=target_vehicle).update(vehicle=vehicle)
                 
-                # Move photos (many-to-many relationship)
+                # Move photos (many-to-many relationship) from existing to new
                 from photos.models import Photo
-                for photo in vehicle.photo_set.all():
-                    photo.vehicles.remove(vehicle)
-                    photo.vehicles.add(target_vehicle)
+                for photo in target_vehicle.photo_set.all():
+                    photo.vehicles.remove(target_vehicle)
+                    photo.vehicles.add(vehicle)
                 
-                # Move vehicle revisions
-                VehicleRevision.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                # Move vehicle revisions from existing to new
+                VehicleRevision.objects.filter(vehicle=target_vehicle).update(vehicle=vehicle)
                 
-                # Move reviews
-                VehicleReview.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                # Move reviews from existing to new
+                VehicleReview.objects.filter(vehicle=target_vehicle).update(vehicle=vehicle)
                 
-                # Move fleet logs
+                # Move fleet logs from existing to new
                 from fleet.models import FleetRideLog, FleetDrivingLog, FleetPhotoLog
-                FleetRideLog.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
-                FleetDrivingLog.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
-                FleetPhotoLog.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                FleetRideLog.objects.filter(vehicle=target_vehicle).update(vehicle=vehicle)
+                FleetDrivingLog.objects.filter(vehicle=target_vehicle).update(vehicle=vehicle)
+                FleetPhotoLog.objects.filter(vehicle=target_vehicle).update(vehicle=vehicle)
                 
-                # Delete the merged vehicle (source vehicle)
-                vehicle.delete()
+                # Delete the existing vehicle (target)
+                target_vehicle.delete()
             
-            messages.success(self.request, f"Vehicle merged with {target_vehicle}.")
-            return redirect(target_vehicle.get_absolute_url())
+            messages.success(self.request, f"Merged {target_vehicle} into this vehicle.")
+            return redirect(vehicle.get_absolute_url())
 
         return self.get(*args, **kwargs)
 
