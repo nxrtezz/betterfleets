@@ -177,14 +177,12 @@
             <li><a href="{{ vehicle.get_edit_url }}">Edit</a></li>
         {% endif %}
         {% if request.user.is_authenticated %}
-            <li><a href="#" onclick="suggestPhoto(); return false;">Suggest photo</a></li>
+            <li><a href="#" onclick="showSuggestPhotoModal(); return false;">Suggest photo</a></li>
         {% endif %}
         {% if vehicle.is_editable and request.user.view_advanced %}
             <li><a href="{{ vehicle.get_edit_url }}?advanced">Advanced Edit</a></li>
         {% endif %}
-        {% if vehicle.is_editable and request.user.trusted %}
-            <li><a href="{% url 'vehicle_compare' vehicle.id %}">Compare</a></li>
-        {% endif %}
+
 
         <li><a href="/vehicles/edits?show=all&q=&operator=&vehicle={{ vehicle.id }}&user=&status=approved">History</a></li>
 

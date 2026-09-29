@@ -537,6 +537,17 @@
                                     <button class="vehicle-menu-item" onclick="showMergeModal()">
                                         Update Existing
                                     </button>
+                                    {% with photos=vehicle.photo_set.all %}
+                                        {% if photos %}
+                                            <button class="vehicle-menu-item vehicle-menu-item--danger" onclick="deletePhoto()">
+                                                Delete Photo
+                                            </button>
+                                        {% else %}
+                                            <button class="vehicle-menu-item" onclick="addPhoto()">
+                                                Add Photo
+                                            </button>
+                                        {% endif %}
+                                    {% endwith %}
                                 </div>
                             </div>
                         {% endif %}
@@ -557,6 +568,17 @@
                                     <button class="vehicle-menu-item" onclick="showMergeModal()">
                                         Update Existing
                                     </button>
+                                    {% with photos=vehicle.photo_set.all %}
+                                        {% if photos %}
+                                            <button class="vehicle-menu-item vehicle-menu-item--danger" onclick="deletePhoto()">
+                                                Delete Photo
+                                            </button>
+                                        {% else %}
+                                            <button class="vehicle-menu-item" onclick="addPhoto()">
+                                                Add Photo
+                                            </button>
+                                        {% endif %}
+                                    {% endwith %}
                                 </div>
                             </div>
                         {% endif %}
@@ -583,6 +605,17 @@
                                     <button class="vehicle-menu-item" onclick="showMergeModal()">
                                         Update Existing
                                     </button>
+                                    {% with photos=vehicle.photo_set.all %}
+                                        {% if photos %}
+                                            <button class="vehicle-menu-item vehicle-menu-item--danger" onclick="deletePhoto()">
+                                                Delete Photo
+                                            </button>
+                                        {% else %}
+                                            <button class="vehicle-menu-item" onclick="addPhoto()">
+                                                Add Photo
+                                            </button>
+                                        {% endif %}
+                                    {% endwith %}
                                 </div>
                             </div>
                         {% endif %}
@@ -912,6 +945,34 @@
     </div>
 {% endif %}
 
+{% if request.user.is_authenticated %}
+    <div class="merge-modal" id="suggestPhotoModal">
+        <div class="merge-modal-content">
+            <div class="merge-modal-header">
+                <h3 class="merge-modal-title">Suggest Photo</h3>
+                <button class="merge-modal-close" onclick="hideSuggestPhotoModal()">&times;</button>
+            </div>
+            <form action="{{ request.path }}" method="POST" id="suggestPhotoForm">
+                {% csrf_token %}
+                <p style="margin-bottom: 1rem;">Suggest a Flickr photo for <strong>{{ vehicle }}</strong>:</p>
+                <div style="margin-bottom: 1rem;">
+                    <label for="flickrUrl" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Flickr URL</label>
+                    <input type="url" id="flickrUrl" name="flickr_url" class="merge-modal-search" placeholder="https://www.flickr.com/photos/..." required>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label for="photoCaption" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Caption (optional)</label>
+                    <input type="text" id="photoCaption" name="caption" class="merge-modal-search" placeholder="Optional caption">
+                </div>
+                <div style="margin-bottom: 1.5rem;">
+                    <label for="photoCredit" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Credit (optional)</label>
+                    <input type="text" id="photoCredit" name="credit" class="merge-modal-search" placeholder="Optional credit">
+                </div>
+                <button type="submit" class="vehicle-menu-item" style="width: 100%; padding: 0.75rem; background: var(--accent-color); color: var(--accent-text-color); border: none; border-radius: 0.25rem; font-weight: 600; cursor: pointer;">Submit Photo Suggestion</button>
+            </form>
+        </div>
+    </div>
+{% endif %}
+
 {% endblock content %}
 
 {% block foot %}
@@ -1119,6 +1180,166 @@
                     document.body.appendChild(form);
                     form.submit();
                 }
+            }
+
+            function addPhoto() {
+                showAddPhotoModal();
+            }
+
+            function deletePhoto() {
+                if (confirm('Are you sure you want to delete the photo for this vehicle? This action cannot be undone.')) {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = window.location.href;
+                    
+                    const csrfToken = document.querySelector('[name="csrfmiddlewaretoken"]');
+                    if (csrfToken) {
+                        form.appendChild(csrfToken.cloneNode());
+                    }
+                    
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'delete_photo';
+                    input.value = '1';
+                    form.appendChild(input);
+                    
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            }
+
+            function showSuggestPhotoModal() {
+                document.getElementById('suggestPhotoModal').classList.add('show');
+            }
+
+            function hideSuggestPhotoModal() {
+                document.getElementById('suggestPhotoModal').classList.remove('show');
+                document.getElementById('suggestPhotoForm').reset();
+            }
+
+            function showAddPhotoModal() {
+                const modal = document.createElement('div');
+                modal.className = 'merge-modal show';
+                modal.id = 'addPhotoModal';
+                modal.innerHTML = `
+                    <div class="merge-modal-content">
+                        <div class="merge-modal-header">
+                            <h3 class="merge-modal-title">Add Photo</h3>
+                            <button class="merge-modal-close" onclick="hideAddPhotoModal()">&times;</button>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <button type="button" onclick="uploadPhotoFile()" style="padding: 1rem; background: var(--accent-color); color: var(--accent-text-color); border: none; border-radius: 0.25rem; font-weight: 600; cursor: pointer;">
+                                Upload Photo File
+                            </button>
+                            <button type="button" onclick="showFlickrInput()" style="padding: 1rem; background: var(--border-color); color: var(--text-color); border: none; border-radius: 0.25rem; font-weight: 600; cursor: pointer;">
+                                Use Flickr URL
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+
+            function hideAddPhotoModal() {
+                const modal = document.getElementById('addPhotoModal');
+                if (modal) {
+                    modal.remove();
+                }
+            }
+
+            function uploadPhotoFile() {
+                hideAddPhotoModal();
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.onchange = function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const formData = new FormData();
+                        formData.append('image', file);
+                        formData.append('vehicle_id', '{{ vehicle.id }}');
+                        formData.append('csrfmiddlewaretoken', document.querySelector('[name="csrfmiddlewaretoken"]').value);
+                        
+                        fetch('/vehicles/add-photo/', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                location.reload();
+                            } else {
+                                alert('Error uploading photo: ' + (data.error || 'Unknown error'));
+                            }
+                        })
+                        .catch(error => {
+                            alert('Error uploading photo: ' + error.message);
+                        });
+                    }
+                };
+                input.click();
+            }
+
+            function showFlickrInput() {
+                hideAddPhotoModal();
+                const modal = document.createElement('div');
+                modal.className = 'merge-modal show';
+                modal.id = 'flickrPhotoModal';
+                modal.innerHTML = `
+                    <div class="merge-modal-content">
+                        <div class="merge-modal-header">
+                            <h3 class="merge-modal-title">Add Photo from Flickr</h3>
+                            <button class="merge-modal-close" onclick="hideFlickrPhotoModal()">&times;</button>
+                        </div>
+                        <form id="flickrPhotoForm" onsubmit="submitFlickrPhoto(event)">
+                            <div style="margin-bottom: 1rem;">
+                                <label for="flickrUrl" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Flickr URL</label>
+                                <input type="url" id="flickrUrl" name="flickr_url" class="merge-modal-search" placeholder="https://www.flickr.com/photos/..." required>
+                            </div>
+                            <div style="margin-bottom: 1rem;">
+                                <label for="photoCaption" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Caption (optional)</label>
+                                <input type="text" id="photoCaption" name="caption" class="merge-modal-search" placeholder="Optional caption">
+                            </div>
+                            <div style="margin-bottom: 1.5rem;">
+                                <label for="photoCredit" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Credit (optional)</label>
+                                <input type="text" id="photoCredit" name="credit" class="merge-modal-search" placeholder="Optional credit">
+                            </div>
+                            <button type="submit" style="width: 100%; padding: 0.75rem; background: var(--accent-color); color: var(--accent-text-color); border: none; border-radius: 0.25rem; font-weight: 600; cursor: pointer;">Add Photo</button>
+                        </form>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+
+            function hideFlickrPhotoModal() {
+                const modal = document.getElementById('flickrPhotoModal');
+                if (modal) {
+                    modal.remove();
+                }
+            }
+
+            function submitFlickrPhoto(event) {
+                event.preventDefault();
+                const form = event.target;
+                const formData = new FormData(form);
+                formData.append('vehicle_id', '{{ vehicle.id }}');
+                formData.append('csrfmiddlewaretoken', document.querySelector('[name="csrfmiddlewaretoken"]').value);
+                
+                fetch('/vehicles/add-photo/', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error adding photo: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    alert('Error adding photo: ' + error.message);
+                });
             }
 
             // Close modal on escape key

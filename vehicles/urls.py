@@ -123,6 +123,7 @@ urlpatterns = [
     path("vehicles/<int:id>/edit", views.edit_vehicle),
     path("vehicles/<slug>/edit", views.edit_vehicle, name="vehicle_edit"),
     path("vehicles/<int:id>/compare", views.vehicle_compare, name="vehicle_compare"),
+    path("vehicles/add-photo/", views.add_vehicle_photo, name="add_vehicle_photo"),
     path(
         "vehicles/<int:id>/debug",
         views.latest_journey_debug,

@@ -2253,6 +2253,13 @@ def vehicles_json(request) -> JsonResponse:
         if subscription.latitude is None or subscription.longitude is None or not subscription.last_timestamp:
             continue
         vehicle = subscription.vehicle
+        
+        # Get tracking trail from Redis if available
+        trail_data = []
+        if vehicle.latest_journey_id:
+            trail_redis_key = f"journey_trail_{vehicle.latest_journey_id}"
+            trail_data = cache.get(trail_redis_key, [])
+        
         overland_item = {
             "id": vehicle.id,
             "coordinates": [float(subscription.longitude), float(subscription.latitude)],
@@ -2268,6 +2275,7 @@ def vehicles_json(request) -> JsonResponse:
             } if vehicle.operator else None,
             "vehicle": vehicle.get_json(),
             "source": "overland",
+            "trail": trail_data,  # Include tracking trail for map display
         }
         locations.append(overland_item)
 
@@ -2832,8 +2840,115 @@ class VehicleDetailView(DetailView):
             
             messages.success(self.request, f"Updated {target_vehicle} with code from this vehicle.")
             return redirect(target_vehicle.get_absolute_url())
+        elif (
+            self.request.user.is_superuser
+            and "delete_photo" in self.request.POST
+        ):
+            from photos.models import Photo
+            photos = vehicle.photo_set.all()
+            if photos:
+                photos.delete()
+                messages.success(self.request, "Photo deleted.")
+            else:
+                messages.info(self.request, "No photo to delete.")
+            return self.get(*args, **kwargs)
+        elif (
+            self.request.user.is_authenticated
+            and "flickr_url" in self.request.POST
+            and "suggest_photo" not in self.request.POST
+        ):
+            # Handle photo suggestion
+            from photos.models import Photo
+            flickr_url = self.request.POST.get("flickr_url", "").strip()
+            caption = self.request.POST.get("caption", "").strip()
+            credit = self.request.POST.get("credit", "").strip()
+            
+            if not flickr_url:
+                messages.error(self.request, "Flickr URL is required.")
+                return self.get(*args, **kwargs)
+            
+            if "flickr.com" not in flickr_url.lower():
+                messages.error(self.request, "Only Flickr URLs are allowed.")
+                return self.get(*args, **kwargs)
+            
+            # Create a photo suggestion request
+            create_request_log(
+                user=self.request.user,
+                source="photo_suggestion",
+                target_model=Vehicle,
+                target_pk=vehicle.pk,
+                target_repr=str(vehicle),
+                operation="add_photo",
+                changes={
+                    "flickr_url": {"to": flickr_url},
+                    "caption": {"to": caption} if caption else None,
+                    "credit": {"to": credit} if credit else None,
+                },
+                fields={
+                    "flickr_url": flickr_url,
+                    "caption": caption,
+                    "credit": credit,
+                },
+                summary=f"Photo suggestion for {vehicle} by {self.request.user.username}",
+                status=None,
+            )
+            
+            messages.success(self.request, "Photo suggestion submitted for review.")
+            return self.get(*args, **kwargs)
 
         return self.get(*args, **kwargs)
+
+
+@login_required
+def add_vehicle_photo(request):
+    """Handle adding photos to vehicles (either file upload or Flickr URL)."""
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "Only POST requests allowed"})
+    
+    try:
+        from photos.models import Photo
+        
+        # Get vehicle
+        vehicle_id = request.POST.get("vehicle_id")
+        if not vehicle_id:
+            return JsonResponse({"success": False, "error": "Vehicle ID required"})
+        
+        vehicle = get_object_or_404(Vehicle, pk=vehicle_id)
+        
+        # Check if user has permission
+        if not request.user.is_superuser:
+            return JsonResponse({"success": False, "error": "Permission denied"})
+        
+        # Handle file upload
+        if "image" in request.FILES:
+            photo = Photo()
+            photo.image = request.FILES["image"]
+            photo.user = request.user
+            photo.caption = request.POST.get("caption", "")
+            photo.credit = request.POST.get("credit", "")
+            photo.save()
+            photo.vehicles.add(vehicle)
+            return JsonResponse({"success": True, "message": "Photo uploaded successfully"})
+        
+        # Handle Flickr URL
+        flickr_url = request.POST.get("flickr_url", "").strip()
+        if flickr_url:
+            if "flickr.com" not in flickr_url.lower():
+                return JsonResponse({"success": False, "error": "Only Flickr URLs are allowed"})
+            
+            photo = Photo()
+            photo.flickr_url = flickr_url
+            photo.caption = request.POST.get("caption", "")
+            photo.credit = request.POST.get("credit", "")
+            photo.user = request.user
+            photo.save()
+            photo.vehicles.add(vehicle)
+            return JsonResponse({"success": True, "message": "Photo added successfully"})
+        
+        return JsonResponse({"success": False, "error": "No image or Flickr URL provided"})
+    
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)})
 
 
 class VehicleNamePageDetailView(DetailView):

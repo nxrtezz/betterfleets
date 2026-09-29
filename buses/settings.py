@@ -274,8 +274,8 @@ if os.environ.get("READ_ONLY_DB_HOST"):
 DATA_UPLOAD_MAX_MEMORY_SIZE = None
 # Large historical fleet inlines (many vehicles × many fields per row) exceed Django’s default cap.
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 50_000
-# Allow photo uploads up to 50MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
+# Allow photo uploads up to 256MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 256 * 1024 * 1024  # 256MB
 
 REDIS_URL = os.environ.get("REDIS_URL")
 DISCORD_NOTIFICATIONS_WEBHOOK_URL = os.environ.get(

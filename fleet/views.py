@@ -552,6 +552,19 @@ def overland_ingest(request, uuid):
         }
         cache.set(journey_redis_key, location_data, timeout=3600)  # 1 hour
         
+        # Store multiple location points for tracking trail by appending to a list
+        trail_redis_key = f"journey_trail_{journey_id}"
+        existing_trail = cache.get(trail_redis_key, [])
+        existing_trail.append({
+            "coordinates": [float(longitude), float(latitude)],
+            "datetime": parsed_timestamp.isoformat(),
+            "heading": subscription.heading
+        })
+        # Keep only last 100 points to avoid memory issues
+        if len(existing_trail) > 100:
+            existing_trail = existing_trail[-100:]
+        cache.set(trail_redis_key, existing_trail, timeout=3600)  # 1 hour
+        
         # Update vehicle's latest journey
         vehicle.latest_journey_id = journey_id
         vehicle.save(update_fields=["latest_journey_id"])
