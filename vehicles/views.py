@@ -2793,6 +2793,7 @@ class VehicleDetailView(DetailView):
             
             # Merge logic: move all related data from current vehicle to target vehicle
             # This includes journeys, photos, revisions, etc.
+            # The target vehicle keeps its code/slug
             from django.db import transaction
             
             with transaction.atomic():
@@ -2817,7 +2818,7 @@ class VehicleDetailView(DetailView):
                 FleetDrivingLog.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
                 FleetPhotoLog.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
                 
-                # Delete the merged vehicle
+                # Delete the merged vehicle (source vehicle)
                 vehicle.delete()
             
             messages.success(self.request, f"Vehicle merged with {target_vehicle}.")
@@ -5354,7 +5355,7 @@ def search_vehicles_merge(request):
         return JsonResponse({"vehicles": []})
 
     vehicles = apply_vehicle_schema_compat(
-        Vehicle.objects.select_related("operator", "vehicle_type")
+        Vehicle.objects.select_related("operator", "vehicle_type", "livery")
     )
 
     if exclude_id:
@@ -5376,6 +5377,8 @@ def search_vehicles_merge(request):
             "fleet_number": vehicle.fleet_number,
             "operator": str(vehicle.operator) if vehicle.operator else "",
             "vehicle_type": str(vehicle.vehicle_type) if vehicle.vehicle_type else "",
+            "withdrawn": vehicle.withdrawn,
+            "livery": str(vehicle.livery) if vehicle.livery else "",
         })
 
     return JsonResponse({"vehicles": results})

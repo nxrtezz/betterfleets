@@ -316,6 +316,12 @@
             color: var(--secondary-text-color);
         }
 
+        .merge-modal-result-withdrawn {
+            color: #666;
+            font-size: 0.8em;
+            font-style: italic;
+        }
+
         /* ── Fleet number heading ─────────────────────────────────────── */
         .vehicle-fleet-num {
             font-size: 1.35rem;
@@ -895,7 +901,7 @@
                 <h3 class="merge-modal-title">Merge Vehicle</h3>
                 <button class="merge-modal-close" onclick="hideMergeModal()">&times;</button>
             </div>
-            <p>Merge <strong>{{ vehicle }}</strong> with another vehicle:</p>
+            <p>Merge <strong>{{ vehicle }}</strong> with another vehicle. The selected vehicle will keep its code:</p>
             <input type="text" class="merge-modal-search" id="mergeSearch" placeholder="Search by registration or fleet number..." oninput="searchVehicles(this.value)">
             <div class="merge-modal-results" id="mergeResults">
                 <div style="padding: 1rem; text-align: center; color: var(--secondary-text-color);">
@@ -1070,8 +1076,16 @@
                                 let html = '';
                                 data.vehicles.forEach(function(v) {
                                     html += `<div class="merge-modal-result" onclick="mergeVehicle(${v.id})">`;
-                                    html += `<div class="merge-modal-result-reg">${v.reg || v.fleet_code || v.fleet_number || 'Unknown'}</div>`;
-                                    html += `<div class="merge-modal-result-details">${v.operator || ''} ${v.vehicle_type || ''}</div>`;
+                                    html += `<div class="merge-modal-result-reg">${v.reg || v.fleet_code || v.fleet_number || 'Unknown'}`;
+                                    if (v.withdrawn) {
+                                        html += ` <span class="merge-modal-result-withdrawn">(withdrawn)</span>`;
+                                    }
+                                    html += `</div>`;
+                                    html += `<div class="merge-modal-result-details">${v.operator || ''} ${v.vehicle_type || ''}`;
+                                    if (v.livery) {
+                                        html += ` • ${v.livery}`;
+                                    }
+                                    html += `</div>`;
                                     html += '</div>';
                                 });
                                 document.getElementById('mergeResults').innerHTML = html;
@@ -1115,11 +1129,14 @@
             });
 
             // Close modal when clicking outside
-            document.getElementById('mergeModal').addEventListener('click', function(event) {
-                if (event.target === this) {
-                    hideMergeModal();
-                }
-            });
+            const mergeModal = document.getElementById('mergeModal');
+            if (mergeModal) {
+                mergeModal.addEventListener('click', function(event) {
+                    if (event.target === this) {
+                        hideMergeModal();
+                    }
+                });
+            }
         </script>
     {% endif %}
 {% endblock foot %}
