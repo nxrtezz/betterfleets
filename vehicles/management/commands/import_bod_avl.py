@@ -24,6 +24,7 @@ from bustimes.models import Route, Trip
 
 from ...models import Vehicle, VehicleJourney, VehicleLocation
 from ...realtime import bods_auth, bods_parser, matcher
+from ...utils import find_or_merge_vehicle, is_stagecoach_operator
 from ..import_live_vehicles import ImportLiveVehiclesCommand, Status
 
 
@@ -224,18 +225,33 @@ class Command(ImportLiveVehiclesCommand):
 
         vehicles = vehicles.filter(condition)
 
-        try:
-            vehicle, created = vehicles.get_or_create(defaults)
-        except (Vehicle.MultipleObjectsReturned, IntegrityError) as e:
-            print(e, operator_ref, vehicle_ref)
-            vehicle = vehicles.first()
+        # Try to find or merge existing vehicle with the same code
+        operator = defaults.get("operator")
+        reg = defaults.get("reg")
+        existing_vehicle = find_or_merge_vehicle(operator, vehicle_ref, reg)
+        
+        if existing_vehicle:
+            vehicle = existing_vehicle
             created = False
-        else:
+            # Update fleet_code/fleet_number if needed
             if "fleet_code" in defaults and not vehicle.fleet_code:
                 vehicle.fleet_code = defaults["fleet_code"]
                 if "fleet_number" in defaults:
                     vehicle.fleet_number = defaults["fleet_number"]
                 vehicle.save(update_fields=["fleet_code", "fleet_number"])
+        else:
+            try:
+                vehicle, created = vehicles.get_or_create(defaults)
+            except (Vehicle.MultipleObjectsReturned, IntegrityError) as e:
+                print(e, operator_ref, vehicle_ref)
+                vehicle = vehicles.first()
+                created = False
+            else:
+                if "fleet_code" in defaults and not vehicle.fleet_code:
+                    vehicle.fleet_code = defaults["fleet_code"]
+                    if "fleet_number" in defaults:
+                        vehicle.fleet_number = defaults["fleet_number"]
+                    vehicle.save(update_fields=["fleet_code", "fleet_number"])
 
         return vehicle, created
 

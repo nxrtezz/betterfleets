@@ -3,8 +3,9 @@ import math
 from django.core.cache import caches
 from django.conf import settings
 from django.core.cache.backends.base import InvalidCacheBackendError
+from django.db.models import Q
 
-from .models import VehicleRevision, VehicleRevisionFeature
+from .models import Vehicle, VehicleRevision, VehicleRevisionFeature
 
 try:
     redis_client = caches["redis"]._cache.get_client()
@@ -323,3 +324,171 @@ def apply_revision(revision, features=None):
             vehicle.features.add(feature.feature_id)
         else:
             vehicle.features.remove(feature.feature_id)
+
+
+def is_stagecoach_operator(operator):
+    """Check if an operator is a Stagecoach operator."""
+    if not operator:
+        return False
+    return operator.name.startswith("Stagecoach ") or operator.name == "Stagecoach"
+
+
+def get_stagecoach_operators():
+    """Get all Stagecoach operators."""
+    from busstops.models import Operator
+    return Operator.objects.filter(name__startswith="Stagecoach ")
+
+
+def merge_vehicles(source_vehicle, target_vehicle):
+    """
+    Merge source_vehicle into target_vehicle, preserving codes and data.
+    
+    This function:
+    - Moves all VehicleCode records from source to target
+    - Copies important data from source to target if target is missing it
+    - Handles related records (journeys, etc.)
+    - Deletes the source vehicle after merging
+    
+    Returns the target vehicle.
+    """
+    from .models import VehicleCode, VehicleJourney
+    
+    # Collect all codes from source vehicle
+    source_codes = VehicleCode.objects.filter(vehicle=source_vehicle)
+    
+    # Get existing codes on target to avoid duplicates
+    target_codes = set(
+        VehicleCode.objects.filter(vehicle=target_vehicle).values_list(
+            'code', 'scheme'
+        )
+    )
+    
+    # Move codes from source to target (avoiding duplicates)
+    for code in source_codes:
+        if (code.code, code.scheme) not in target_codes:
+            code.vehicle = target_vehicle
+            code.save()
+    
+    # Copy important fields from source to target if target is missing them
+    fields_to_copy = [
+        'reg', 'fleet_number', 'fleet_code', 'vehicle_type', 'colours', 
+        'livery', 'name', 'branding', 'notes', 'year_of_manufacture',
+        'joined_fleet', 'left_fleet', 'prev_registration'
+    ]
+    
+    update_fields = []
+    for field in fields_to_copy:
+        source_value = getattr(source_vehicle, field, None)
+        target_value = getattr(target_vehicle, field, None)
+        
+        # Only copy if target is missing the data but source has it
+        if source_value and not target_value:
+            setattr(target_vehicle, field, source_value)
+            update_fields.append(field)
+    
+    # Handle boolean fields - only set to True if source has True and target is False
+    boolean_fields = ['withdrawn', 'preserved', 'vor', 'awaiting_delivery', 
+                      'trainer_vehicle', 'demonstrator', 'fleet_support_vehicle']
+    for field in boolean_fields:
+        source_value = getattr(source_vehicle, field, False)
+        target_value = getattr(target_vehicle, field, False)
+        if source_value and not target_value:
+            setattr(target_vehicle, field, True)
+            update_fields.append(field)
+    
+    # Copy latest journey if source has one and target doesn't
+    if source_vehicle.latest_journey and not target_vehicle.latest_journey:
+        target_vehicle.latest_journey = source_vehicle.latest_journey
+        target_vehicle.latest_journey_data = source_vehicle.latest_journey_data
+        update_fields.extend(['latest_journey', 'latest_journey_data'])
+    
+    # Handle garage assignment
+    if source_vehicle.garage and not target_vehicle.garage:
+        target_vehicle.garage = source_vehicle.garage
+        update_fields.append('garage')
+    
+    # Save the target vehicle with merged data
+    if update_fields:
+        target_vehicle.save(update_fields=update_fields)
+    
+    # Reassign vehicle journeys from source to target
+    VehicleJourney.objects.filter(vehicle=source_vehicle).update(vehicle=target_vehicle)
+    
+    # Delete the source vehicle
+    source_vehicle.delete()
+    
+    return target_vehicle
+
+
+def find_or_merge_vehicle(operator, code, reg=None):
+    """
+    Find an existing vehicle for the given operator and code, or merge if duplicates exist.
+    
+    For non-Stagecoach operators:
+    - First looks for a vehicle with the same code and reg
+    - If not found, looks for a vehicle with the same code (no reg)
+    - If multiple vehicles with same code exist, merges them
+    
+    For Stagecoach operators:
+    - Searches across all Stagecoach operators for the code
+    - Merges vehicles found across different Stagecoach operators
+    
+    Returns the vehicle to use (existing or merged).
+    """
+    from busstops.models import Operator
+    
+    is_stagecoach = is_stagecoach_operator(operator)
+    
+    # Build base query for finding vehicles by code
+    code_query = Q(code__iexact=code)
+    
+    if is_stagecoach:
+        # For Stagecoach, search across all Stagecoach operators
+        stagecoach_operators = get_stagecoach_operators()
+        vehicles = Vehicle.objects.filter(
+            code_query,
+            operator__in=stagecoach_operators
+        )
+    else:
+        # For non-Stagecoach, search within the same operator (and group if applicable)
+        operator_query = Q(operator=operator)
+        if operator and operator.group_id:
+            operator_query |= Q(operator__group_id=operator.group_id)
+        vehicles = Vehicle.objects.filter(code_query, operator_query)
+    
+    # If we have a reg, try to find exact match first
+    if reg:
+        exact_match = vehicles.filter(reg__iexact=reg).first()
+        if exact_match:
+            return exact_match
+    
+    # Get all vehicles with this code
+    vehicles_with_code = list(vehicles)
+    
+    if not vehicles_with_code:
+        # No existing vehicle found
+        return None
+    
+    if len(vehicles_with_code) == 1:
+        # Single vehicle found, return it
+        return vehicles_with_code[0]
+    
+    # Multiple vehicles found with same code - need to merge
+    # Keep the one with the most complete data (prefer one with reg)
+    vehicles_with_code.sort(
+        key=lambda v: (
+            bool(v.reg),  # Prefer vehicles with reg
+            bool(v.vehicle_type),  # Prefer vehicles with type
+            bool(v.fleet_number),  # Prefer vehicles with fleet number
+        ),
+        reverse=True
+    )
+    
+    target_vehicle = vehicles_with_code[0]
+    source_vehicles = vehicles_with_code[1:]
+    
+    # Merge all source vehicles into the target
+    for source_vehicle in source_vehicles:
+        merge_vehicles(source_vehicle, target_vehicle)
+    
+    return target_vehicle

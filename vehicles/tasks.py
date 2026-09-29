@@ -27,6 +27,7 @@ from .models import (
     VehicleRevision,
     VehicleCode,
 )
+from .utils import find_or_merge_vehicle, is_stagecoach_operator
 
 logger = logging.getLogger(__name__)
 
@@ -97,31 +98,37 @@ def log_vehicle_journey(service, data, time, destination, source_name, url, trip
     if vehicle_code:
         vehicle = vehicle_code.vehicle
     else:
-        # get or create vehicle
-        defaults = {"source": data_source, "operator": operator, "code": vehicle}
-
-        operator_query = Q(operator=operator)
-        if operator.group_id:
-            operator_query |= Q(operator__group=operator.group_id)
-        vehicles = Vehicle.objects.filter(
-            operator_query | Q(source=data_source),
-            preserved=False,
-        ).select_related("latest_journey")
-
-        if vehicle.isdigit():
-            defaults["fleet_number"] = vehicle
-            vehicles = vehicles.filter(
-                Q(code=vehicle)
-                | Q(code__endswith=f"-{vehicle}")
-                | Q(code__startswith=f"{vehicle}_-_")
-            )
+        # Try to find or merge existing vehicle with the same code
+        existing_vehicle = find_or_merge_vehicle(operator, vehicle)
+        
+        if existing_vehicle:
+            vehicle = existing_vehicle
         else:
-            vehicles = vehicles.filter(code__iexact=vehicle)
+            # get or create vehicle
+            defaults = {"source": data_source, "operator": operator, "code": vehicle}
 
-        try:
-            vehicle, _ = vehicles.get_or_create(defaults)
-        except Vehicle.MultipleObjectsReturned:
-            vehicle = vehicles.filter(operator=operator).first()
+            operator_query = Q(operator=operator)
+            if operator.group_id:
+                operator_query |= Q(operator__group=operator.group_id)
+            vehicles = Vehicle.objects.filter(
+                operator_query | Q(source=data_source),
+                preserved=False,
+            ).select_related("latest_journey")
+
+            if vehicle.isdigit():
+                defaults["fleet_number"] = vehicle
+                vehicles = vehicles.filter(
+                    Q(code=vehicle)
+                    | Q(code__endswith=f"-{vehicle}")
+                    | Q(code__startswith=f"{vehicle}_-_")
+                )
+            else:
+                vehicles = vehicles.filter(code__iexact=vehicle)
+
+            try:
+                vehicle, _ = vehicles.get_or_create(defaults)
+            except Vehicle.MultipleObjectsReturned:
+                vehicle = vehicles.filter(operator=operator).first()
 
         VehicleCode.objects.create(
             scheme=source_name, code=vehicle_code_code, vehicle=vehicle
