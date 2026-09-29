@@ -104,31 +104,44 @@ def log_vehicle_journey(service, data, time, destination, source_name, url, trip
         if existing_vehicle:
             vehicle = existing_vehicle
         else:
-            # get or create vehicle
-            defaults = {"source": data_source, "operator": operator, "code": vehicle}
-
-            operator_query = Q(operator=operator)
-            if operator.group_id:
-                operator_query |= Q(operator__group=operator.group_id)
-            vehicles = Vehicle.objects.filter(
-                operator_query | Q(source=data_source),
+            # Check if a vehicle with this code already exists for this operator
+            # to avoid violating the unique constraint
+            conflicting_vehicle = Vehicle.objects.filter(
+                code__iexact=vehicle,
+                operator=operator,
                 preserved=False,
-            ).select_related("latest_journey")
-
-            if vehicle.isdigit():
-                defaults["fleet_number"] = vehicle
-                vehicles = vehicles.filter(
-                    Q(code=vehicle)
-                    | Q(code__endswith=f"-{vehicle}")
-                    | Q(code__startswith=f"{vehicle}_-_")
-                )
+                historical_fleet__isnull=True
+            ).first()
+            
+            if conflicting_vehicle:
+                # Use the existing vehicle instead of creating a new one
+                vehicle = conflicting_vehicle
             else:
-                vehicles = vehicles.filter(code__iexact=vehicle)
+                # get or create vehicle
+                defaults = {"source": data_source, "operator": operator, "code": vehicle}
 
-            try:
-                vehicle, _ = vehicles.get_or_create(defaults)
-            except Vehicle.MultipleObjectsReturned:
-                vehicle = vehicles.filter(operator=operator).first()
+                operator_query = Q(operator=operator)
+                if operator.group_id:
+                    operator_query |= Q(operator__group=operator.group_id)
+                vehicles = Vehicle.objects.filter(
+                    operator_query | Q(source=data_source),
+                    preserved=False,
+                ).select_related("latest_journey")
+
+                if vehicle.isdigit():
+                    defaults["fleet_number"] = vehicle
+                    vehicles = vehicles.filter(
+                        Q(code=vehicle)
+                        | Q(code__endswith=f"-{vehicle}")
+                        | Q(code__startswith=f"{vehicle}_-_")
+                    )
+                else:
+                    vehicles = vehicles.filter(code__iexact=vehicle)
+
+                try:
+                    vehicle, _ = vehicles.get_or_create(defaults)
+                except Vehicle.MultipleObjectsReturned:
+                    vehicle = vehicles.filter(operator=operator).first()
 
         VehicleCode.objects.create(
             scheme=source_name, code=vehicle_code_code, vehicle=vehicle
@@ -195,7 +208,14 @@ def log_vehicle_journey(service, data, time, destination, source_name, url, trip
             vehicle.garage_id = journey.trip.garage_id
         vehicle.latest_journey = journey
         vehicle.latest_journey_data = data
-        vehicle.save(update_fields=["garage", "latest_journey", "latest_journey_data"])
+        
+        # Remove VOR marker if vehicle was marked as VOR and is now tracking
+        update_fields = ["garage", "latest_journey", "latest_journey_data"]
+        if vehicle.vor:
+            vehicle.vor = False
+            update_fields.append("vor")
+        
+        vehicle.save(update_fields=update_fields)
 
 
 @db_periodic_task(crontab(minute="*/5"))

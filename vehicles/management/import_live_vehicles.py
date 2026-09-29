@@ -303,6 +303,8 @@ class ImportLiveVehiclesCommand(BaseCommand):
 
         # update vehicle records if necessary
         if self.vehicles_to_update:
+            vehicles_with_vor = [v for v in self.vehicles_to_update if v.vor]
+            
             for v in self.vehicles_to_update:
                 v.latest_journey = v.latest_journey
 
@@ -311,6 +313,13 @@ class ImportLiveVehiclesCommand(BaseCommand):
                     self.vehicles_to_update,
                     ["latest_journey", "latest_journey_data"],
                 )
+                
+                # Remove VOR marker from vehicles that were marked as VOR and are now tracking
+                if vehicles_with_vor:
+                    for v in vehicles_with_vor:
+                        v.vor = False
+                    Vehicle.objects.bulk_update(vehicles_with_vor, ["vor"])
+                    
             except IntegrityError as e:
                 logger.exception(e)
             self.vehicles_to_update = []

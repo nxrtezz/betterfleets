@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.db.models import Q
-from busstops.models import Operator
+from busstops.models import Operator, OperatorGroup
 from vehicles.models import Vehicle, VehicleCode
 from vehicles.utils import is_stagecoach_operator, get_stagecoach_operators
 
@@ -8,7 +8,7 @@ from vehicles.utils import is_stagecoach_operator, get_stagecoach_operators
 class Command(BaseCommand):
     help = (
         "Merge vehicles by matching code-only vehicles with vehicles that have the same fleet number. "
-        "For non-Stagecoach operators, searches within the same operator/group. "
+        "For non-Stagecoach operators, searches within the same operator/group/organisation. "
         "For Stagecoach operators, searches across all Stagecoach operators. "
         "Updates the target vehicle's code to match the source vehicle's code, then deletes the source."
     )
@@ -103,10 +103,24 @@ class Command(BaseCommand):
                         operator__in=stagecoach_operators
                     ).exclude(id=vehicle.id)
                 else:
-                    # Search within same operator (and group if applicable)
+                    # Search within same operator (and group/organisation if applicable)
                     operator_query = Q(operator=operator)
+                    
+                    # Check if operator is in a group
                     if operator.group_id:
                         operator_query |= Q(operator__group_id=operator.group_id)
+                        
+                        # Check if the group is in an organisation
+                        if operator.group.organisation_id:
+                            # Search across all operators in the same organisation
+                            organisation_groups = OperatorGroup.objects.filter(
+                                organisation_id=operator.group.organisation_id
+                            )
+                            organisation_operators = Operator.objects.filter(
+                                group_id__in=organisation_groups
+                            )
+                            operator_query |= Q(operator__in=organisation_operators)
+                    
                     matching_vehicles = Vehicle.objects.filter(
                         fleet_number=fleet_number
                     ).filter(operator_query).exclude(id=vehicle.id)

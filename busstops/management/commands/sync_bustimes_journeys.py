@@ -35,8 +35,24 @@ class Command(BustimesSyncCommand):
         if not code:
             return None
 
-        vehicle = Vehicle(code=code, reg=reg)
-        vehicle.save()
+        # Check if a vehicle with this code already exists
+        # Try to find by code first
+        existing_vehicle = Vehicle.objects.filter(
+            code__iexact=code,
+            preserved=False,
+            historical_fleet__isnull=True
+        ).first()
+        
+        if existing_vehicle:
+            # Use the existing vehicle instead of creating a new one
+            vehicle = existing_vehicle
+            if reg and not vehicle.reg:
+                vehicle.reg = reg
+                vehicle.save(update_fields=['reg'])
+        else:
+            vehicle = Vehicle(code=code, reg=reg)
+            vehicle.save()
+        
         if vehicle_data.get("id"):
             VehicleCode.objects.get_or_create(
                 scheme=BUSTIMES_SCHEME,
@@ -87,7 +103,14 @@ class Command(BustimesSyncCommand):
         if not options["dry_run"] and vehicle and journey.pk:
             if not vehicle.latest_journey or vehicle.latest_journey.datetime <= journey.datetime:
                 vehicle.latest_journey = journey
-                vehicle.save(update_fields=["latest_journey"])
+                
+                # Remove VOR marker if vehicle was marked as VOR and is now tracking
+                update_fields = ["latest_journey"]
+                if vehicle.vor:
+                    vehicle.vor = False
+                    update_fields.append("vor")
+                
+                vehicle.save(update_fields=update_fields)
 
         return result.created, result.updated, len(result.skipped_fields)
 

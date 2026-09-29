@@ -347,12 +347,14 @@ def find_or_merge_vehicle(operator, code, reg=None):
     1. Exact code match
     2. Fleet number match (if code is numeric or contains a number)
     
-    For non-Stagecoach operators: searches within the same operator/group
+    For non-Stagecoach operators: searches within the same operator/group/organisation
     For Stagecoach operators: searches across all Stagecoach operators
+    
+    If the operator is in an organisation, searches across all operators in that organisation.
     
     Returns the vehicle to use (existing or None if no match found).
     """
-    from busstops.models import Operator
+    from busstops.models import Operator, OperatorGroup
     
     is_stagecoach = is_stagecoach_operator(operator)
     
@@ -367,10 +369,24 @@ def find_or_merge_vehicle(operator, code, reg=None):
             operator__in=stagecoach_operators
         )
     else:
-        # For non-Stagecoach, search within the same operator (and group if applicable)
+        # For non-Stagecoach, search within the same operator (and group/organisation if applicable)
         operator_query = Q(operator=operator)
+        
+        # Check if operator is in a group
         if operator and operator.group_id:
             operator_query |= Q(operator__group_id=operator.group_id)
+            
+            # Check if the group is in an organisation
+            if operator.group.organisation_id:
+                # Search across all operators in the same organisation
+                organisation_groups = OperatorGroup.objects.filter(
+                    organisation_id=operator.group.organisation_id
+                )
+                organisation_operators = Operator.objects.filter(
+                    group_id__in=organisation_groups
+                )
+                operator_query |= Q(operator__in=organisation_operators)
+        
         vehicles = Vehicle.objects.filter(code_query, operator_query)
     
     # If we have a reg, try to find exact match first
@@ -415,10 +431,24 @@ def find_or_merge_vehicle(operator, code, reg=None):
                 operator__in=stagecoach_operators
             )
         else:
-            # For non-Stagecoach, search within the same operator (and group if applicable)
+            # For non-Stagecoach, search within the same operator (and group/organisation if applicable)
             operator_query = Q(operator=operator)
+            
+            # Check if operator is in a group
             if operator and operator.group_id:
                 operator_query |= Q(operator__group_id=operator.group_id)
+                
+                # Check if the group is in an organisation
+                if operator.group.organisation_id:
+                    # Search across all operators in the same organisation
+                    organisation_groups = OperatorGroup.objects.filter(
+                        organisation_id=operator.group.organisation_id
+                    )
+                    organisation_operators = Operator.objects.filter(
+                        group_id__in=organisation_groups
+                    )
+                    operator_query |= Q(operator__in=organisation_operators)
+            
             vehicles_by_fleet = Vehicle.objects.filter(
                 fleet_number=fleet_number
             ).filter(operator_query)
