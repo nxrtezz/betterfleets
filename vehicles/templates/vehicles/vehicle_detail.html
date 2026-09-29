@@ -536,14 +536,50 @@
                         {% endif %}
                     </div>
                 {% elif not vehicle.fleet_code and not vehicle.fleet_number %}
-                    <h1 style="margin: 0;">{% if vehicle.withdrawn %}<s>{{ vehicle }}</s>{% else %}{{ vehicle }}{% endif %}</h1>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <h1 style="margin: 0;">{% if vehicle.withdrawn %}<s>{{ vehicle }}</s>{% else %}{{ vehicle }}{% endif %}</h1>
+                        {% if request.user.is_superuser %}
+                            <div class="vehicle-menu-container">
+                                <button class="vehicle-menu-button" onclick="toggleVehicleMenu(event)">⋮</button>
+                                <div class="vehicle-menu-dropdown" id="vehicleMenu">
+                                    <button class="vehicle-menu-item" onclick="toggleVehicleLock()">
+                                        {% if vehicle.locked %}Unlock{% else %}Lock{% endif %}
+                                    </button>
+                                    <button class="vehicle-menu-item vehicle-menu-item--danger" onclick="deleteVehicle()">
+                                        Delete
+                                    </button>
+                                    <button class="vehicle-menu-item" onclick="showMergeModal()">
+                                        Merge
+                                    </button>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
                 {% endif %}
 
                 {% if vehicle.fleet_code or vehicle.fleet_number %}
-                    <div class="vehicle-fleet-num">
-                        {% if vehicle.withdrawn %}<s>{% endif %}
-                        {% firstof vehicle.fleet_code vehicle.fleet_number %}
-                        {% if vehicle.withdrawn %}</s>{% endif %}
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div class="vehicle-fleet-num">
+                            {% if vehicle.withdrawn %}<s>{% endif %}
+                            {% firstof vehicle.fleet_code vehicle.fleet_number %}
+                            {% if vehicle.withdrawn %}</s>{% endif %}
+                        </div>
+                        {% if request.user.is_superuser %}
+                            <div class="vehicle-menu-container">
+                                <button class="vehicle-menu-button" onclick="toggleVehicleMenu(event)">⋮</button>
+                                <div class="vehicle-menu-dropdown" id="vehicleMenu">
+                                    <button class="vehicle-menu-item" onclick="toggleVehicleLock()">
+                                        {% if vehicle.locked %}Unlock{% else %}Lock{% endif %}
+                                    </button>
+                                    <button class="vehicle-menu-item vehicle-menu-item--danger" onclick="deleteVehicle()">
+                                        Delete
+                                    </button>
+                                    <button class="vehicle-menu-item" onclick="showMergeModal()">
+                                        Merge
+                                    </button>
+                                </div>
+                            </div>
+                        {% endif %}
                     </div>
                 {% endif %}
             </div>
