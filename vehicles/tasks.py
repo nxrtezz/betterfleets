@@ -27,7 +27,7 @@ from .models import (
     VehicleRevision,
     VehicleCode,
 )
-from .utils import find_or_merge_vehicle, is_stagecoach_operator
+from .utils import find_or_merge_vehicle
 
 logger = logging.getLogger(__name__)
 

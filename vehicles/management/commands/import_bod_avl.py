@@ -24,7 +24,7 @@ from bustimes.models import Route, Trip
 
 from ...models import Vehicle, VehicleJourney, VehicleLocation
 from ...realtime import bods_auth, bods_parser, matcher
-from ...utils import find_or_merge_vehicle, is_stagecoach_operator
+from ...utils import find_or_merge_vehicle
 from ..import_live_vehicles import ImportLiveVehiclesCommand, Status
 
 
@@ -225,7 +225,7 @@ class Command(ImportLiveVehiclesCommand):
 
         vehicles = vehicles.filter(condition)
 
-        # Try to find or merge existing vehicle with the same code
+        # Try to find existing vehicle with the same code or fleet number
         operator = defaults.get("operator")
         reg = defaults.get("reg")
         existing_vehicle = find_or_merge_vehicle(operator, vehicle_ref, reg)

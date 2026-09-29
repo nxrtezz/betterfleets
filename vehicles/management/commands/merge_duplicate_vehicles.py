@@ -1,16 +1,16 @@
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 from busstops.models import Operator
-from vehicles.models import Vehicle
-from vehicles.utils import merge_vehicles, is_stagecoach_operator, get_stagecoach_operators
+from vehicles.models import Vehicle, VehicleCode
+from vehicles.utils import is_stagecoach_operator, get_stagecoach_operators
 
 
 class Command(BaseCommand):
     help = (
-        "Merge duplicate vehicles that have the same code but different registration status. "
+        "Merge vehicles by matching code-only vehicles with vehicles that have the same fleet number. "
         "For non-Stagecoach operators, searches within the same operator/group. "
         "For Stagecoach operators, searches across all Stagecoach operators. "
-        "Preserves codes during merging to prevent creating more duplicates."
+        "Updates the target vehicle's code to match the source vehicle's code, then deletes the source."
     )
 
     def add_arguments(self, parser):
@@ -28,11 +28,17 @@ class Command(BaseCommand):
             type=int,
             help="Process at most this many operators",
         )
+        parser.add_argument(
+            "--show-table",
+            action="store_true",
+            help="Show a table of code-only vehicles and potential matches",
+        )
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         specific_operator = options.get("operator")
         limit = options.get("limit")
+        show_table = options.get("show_table")
 
         # Get operators to process
         if specific_operator:
@@ -61,38 +67,59 @@ class Command(BaseCommand):
 
             self.stdout.write(f"  Found {vehicles_without_reg.count()} vehicles without reg")
 
+            if show_table:
+                self.stdout.write(f"\n  {'ID':<8} {'Code':<20} {'Fleet #':<10} {'Reg':<15}")
+                self.stdout.write(f"  {'-'*60}")
+                for vehicle in vehicles_without_reg:
+                    self.stdout.write(
+                        f"  {vehicle.id:<8} {vehicle.code:<20} {str(vehicle.fleet_number or ''):<10} {vehicle.reg:<15}"
+                    )
+
             merged_count = 0
             
             for vehicle in vehicles_without_reg:
                 code = vehicle.code
+                fleet_number = code if code.isdigit() else None
+                
+                if not fleet_number:
+                    # Try to extract fleet number from code if it's not just digits
+                    # e.g., "SK65PWJ_35164" -> extract "35164"
+                    if '_' in code:
+                        parts = code.split('_')
+                        for part in parts:
+                            if part.isdigit():
+                                fleet_number = part
+                                break
+                
+                if not fleet_number:
+                    continue
                 
                 # Determine search scope based on whether this is a Stagecoach operator
                 if is_stagecoach_operator(operator):
                     # Search across all Stagecoach operators
                     stagecoach_operators = get_stagecoach_operators()
                     matching_vehicles = Vehicle.objects.filter(
-                        code__iexact=code,
+                        fleet_number=fleet_number,
                         operator__in=stagecoach_operators
-                    ).exclude(reg='').exclude(id=vehicle.id)
+                    ).exclude(id=vehicle.id)
                 else:
                     # Search within same operator (and group if applicable)
                     operator_query = Q(operator=operator)
                     if operator.group_id:
                         operator_query |= Q(operator__group_id=operator.group_id)
                     matching_vehicles = Vehicle.objects.filter(
-                        code__iexact=code
-                    ).filter(operator_query).exclude(reg='').exclude(id=vehicle.id)
+                        fleet_number=fleet_number
+                    ).filter(operator_query).exclude(id=vehicle.id)
 
                 if not matching_vehicles.exists():
                     continue
 
-                # Get the best match (prefer one with most complete data)
+                # Get the best match (prefer one with reg and most complete data)
                 matching_vehicles = list(matching_vehicles)
                 matching_vehicles.sort(
                     key=lambda v: (
                         bool(v.reg),
                         bool(v.vehicle_type),
-                        bool(v.fleet_number),
                     ),
                     reverse=True
                 )
@@ -100,12 +127,32 @@ class Command(BaseCommand):
                 target_vehicle = matching_vehicles[0]
                 
                 self.stdout.write(
-                    f"  Merging {vehicle} (id: {vehicle.id}) into {target_vehicle} (id: {target_vehicle.id})"
+                    f"  Found match: {vehicle} (code: {vehicle.code}) -> {target_vehicle} (code: {target_vehicle.code}, fleet_number: {target_vehicle.fleet_number}, reg: {target_vehicle.reg})"
                 )
                 
                 if not dry_run:
                     try:
-                        merge_vehicles(vehicle, target_vehicle)
+                        # Update target vehicle's code to match source vehicle's code
+                        old_code = target_vehicle.code
+                        target_vehicle.code = code
+                        target_vehicle.save(update_fields=['code'])
+                        
+                        # Move all VehicleCode records from source to target
+                        source_codes = VehicleCode.objects.filter(vehicle=vehicle)
+                        for source_code in source_codes:
+                            source_code.vehicle = target_vehicle
+                            source_code.save()
+                        
+                        # Reassign vehicle journeys from source to target
+                        from vehicles.models import VehicleJourney
+                        VehicleJourney.objects.filter(vehicle=vehicle).update(vehicle=target_vehicle)
+                        
+                        # Delete the source vehicle
+                        vehicle.delete()
+                        
+                        self.stdout.write(
+                            f"    Updated {target_vehicle.id} code from '{old_code}' to '{code}' and deleted {vehicle.id}"
+                        )
                         merged_count += 1
                     except Exception as e:
                         self.stdout.write(
