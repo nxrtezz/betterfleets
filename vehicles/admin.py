@@ -1025,16 +1025,104 @@ class VehicleAdmin(admin.ModelAdmin):
     def mass_assign_operator(self, request, queryset):
         def apply_handler(form, selected_queryset):
             operator = form.cleaned_data["operator"]
-            updated = selected_queryset.update(
-                operator=operator,
-                is_manual=True,
-                manual_updated_at=timezone.now(),
-            )
-            self.message_user(
-                request,
-                f"Assigned {updated} vehicle{'s' if updated != 1 else ''} to {operator}.",
-                level=messages.SUCCESS,
-            )
+            merged_count = 0
+            assigned_count = 0
+            skipped_count = 0
+            
+            for vehicle in selected_queryset:
+                if vehicle.operator == operator:
+                    skipped_count += 1
+                    continue
+                
+                # Check if there's already a vehicle with the same code for this operator
+                if vehicle.code:
+                    existing_vehicle = models.Vehicle.objects.filter(
+                        code__iexact=vehicle.code,
+                        operator=operator
+                    ).first()
+                    
+                    if existing_vehicle and existing_vehicle.id != vehicle.id:
+                        # Merge this vehicle into the existing one
+                        if vehicle.preserved or existing_vehicle.preserved:
+                            self.message_user(
+                                request,
+                                f"Skipping merge for {vehicle} (preserved) or {existing_vehicle} (preserved)",
+                                level=messages.WARNING,
+                            )
+                            skipped_count += 1
+                            continue
+                        
+                        # Move all related data from vehicle to existing_vehicle
+                        vehicle.vehiclejourney_set.update(vehicle=existing_vehicle)
+                        vehicle.vehiclecode_set.update(vehicle=existing_vehicle)
+                        vehicle.vehiclerevision_set.update(vehicle=existing_vehicle)
+                        
+                        # Keep the most recent journey
+                        if (
+                            not vehicle.latest_journey_id
+                            or existing_vehicle.latest_journey_id
+                            and existing_vehicle.latest_journey_id > vehicle.latest_journey_id
+                        ):
+                            vehicle.latest_journey = existing_vehicle.latest_journey
+                        existing_vehicle.latest_journey = None
+                        existing_vehicle.save(update_fields=["latest_journey"])
+                        vehicle.save(update_fields=["latest_journey"])
+                        
+                        # Copy fleet code and number from vehicle to existing
+                        existing_vehicle.fleet_code = vehicle.fleet_code
+                        existing_vehicle.fleet_number = vehicle.fleet_number
+                        if vehicle.withdrawn and not existing_vehicle.withdrawn:
+                            existing_vehicle.withdrawn = False
+                        
+                        # Add slug code
+                        try:
+                            models.VehicleCode.objects.create(
+                                vehicle=existing_vehicle, scheme="slug", code=vehicle.slug
+                            )
+                        except IntegrityError:
+                            pass
+                        
+                        # Delete the original vehicle
+                        vehicle.delete()
+                        existing_vehicle.save(
+                            update_fields=["fleet_code", "fleet_number", "withdrawn"]
+                        )
+                        merged_count += 1
+                    else:
+                        # No conflict, just assign operator
+                        vehicle.operator = operator
+                        vehicle.is_manual = True
+                        vehicle.manual_updated_at = timezone.now()
+                        vehicle.save(update_fields=["operator", "is_manual", "manual_updated_at"])
+                        assigned_count += 1
+                else:
+                    # No code, just assign operator
+                    vehicle.operator = operator
+                    vehicle.is_manual = True
+                    vehicle.manual_updated_at = timezone.now()
+                    vehicle.save(update_fields=["operator", "is_manual", "manual_updated_at"])
+                    assigned_count += 1
+            
+            message_parts = []
+            if assigned_count:
+                message_parts.append(f"assigned {assigned_count} vehicle{'s' if assigned_count != 1 else ''}")
+            if merged_count:
+                message_parts.append(f"merged {merged_count} vehicle{'s' if merged_count != 1 else ''}")
+            if skipped_count:
+                message_parts.append(f"skipped {skipped_count} vehicle{'s' if skipped_count != 1 else ''}")
+            
+            if message_parts:
+                self.message_user(
+                    request,
+                    f"{' and '.join(message_parts)} to {operator}.",
+                    level=messages.SUCCESS,
+                )
+            else:
+                self.message_user(
+                    request,
+                    f"No vehicles were assigned to {operator}.",
+                    level=messages.WARNING,
+                )
             return None
 
         return self._bulk_vehicle_update(
