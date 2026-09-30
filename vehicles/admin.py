@@ -382,6 +382,14 @@ class VehicleBulkLogUserForm(forms.Form):
     )
 
 
+class VehicleBulkAssignOperatorForm(forms.Form):
+    operator = forms.ModelChoiceField(
+        queryset=Operator.objects.order_by("name"),
+        required=True,
+        help_text="Choose the operator to assign all selected vehicles to.",
+    )
+
+
 class VehicleBulkEditForm(forms.Form):
     fleet_number = forms.IntegerField(
         required=False, help_text="Set fleet number. Leave blank to keep current."
@@ -616,6 +624,7 @@ class VehicleAdmin(admin.ModelAdmin):
         "mass_change_branding",
         "mass_assign_features",
         "mass_log_vehicles",
+        "mass_assign_operator",
         "mass_edit",
         "deduplicate",
         "merge_all_selected",
@@ -1009,6 +1018,31 @@ class VehicleAdmin(admin.ModelAdmin):
             VehicleBulkLogUserForm,
             title="Mass log vehicles",
             submit_label="Create ride logs",
+            apply_handler=apply_handler,
+        )
+
+    @admin.action(description="Mass assign vehicles to operator")
+    def mass_assign_operator(self, request, queryset):
+        def apply_handler(form, selected_queryset):
+            operator = form.cleaned_data["operator"]
+            updated = selected_queryset.update(
+                operator=operator,
+                is_manual=True,
+                manual_updated_at=timezone.now(),
+            )
+            self.message_user(
+                request,
+                f"Assigned {updated} vehicle{'s' if updated != 1 else ''} to {operator}.",
+                level=messages.SUCCESS,
+            )
+            return None
+
+        return self._bulk_vehicle_update(
+            request,
+            queryset,
+            VehicleBulkAssignOperatorForm,
+            title="Mass assign vehicles to operator",
+            submit_label="Assign operator",
             apply_handler=apply_handler,
         )
 
