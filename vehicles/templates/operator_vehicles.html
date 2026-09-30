@@ -408,6 +408,10 @@ ticket machines, a byproduct of the live bus tracking.</p>
             height: 1.5rem;
             border-radius: 0.25rem;
             flex-shrink: 0;
+            image-rendering: auto;
+            backface-visibility: hidden;
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
         }
 
         .vehicle-info {
@@ -562,7 +566,7 @@ ticket machines, a byproduct of the live bus tracking.</p>
                     </td>{% endif %}
                     <td{% if vehicle.colours or vehicle.livery_id %} class="livery-cell"{% endif %}{% if branding_column %}{% if not vehicle.branding or not vehicle.livery_name %} colspan="2"{% endif %}{% endif %}>
                         {% if vehicle.livery and vehicle.livery.livery_type == 'svg' %}
-                            <img src="{{ vehicle.livery.svg.url }}" style="height:1.5em;width:2.25em;object-fit:contain;vertical-align:middle;position:absolute;left:0.5em;top:0.2em;" alt="{{ vehicle.livery.name }}" title="{{ vehicle.livery.name }}" onerror="console.error('Failed to load livery SVG/PNG for vehicle {{ vehicle.slug }}: {{ vehicle.livery.name }} (ID: {{ vehicle.livery_id }}). URL: {{ vehicle.livery.svg.url|default:'None' }}. Falling back to CSS.'); this.style.display='none';">
+                            <img src="{{ vehicle.livery.svg.url }}" style="height:1.5em;width:2.25em;object-fit:contain;vertical-align:middle;position:absolute;left:0.5em;top:0.2em;image-rendering:auto;backface-visibility:hidden;-webkit-transform:translateZ(0);transform:translateZ(0);" alt="{{ vehicle.livery.name }}" title="{{ vehicle.livery.name }}" onerror="console.error('Failed to load livery SVG/PNG for vehicle {{ vehicle.slug }}: {{ vehicle.livery.name }} (ID: {{ vehicle.livery_id }}). URL: {{ vehicle.livery.svg.url|default:'None' }}. Falling back to CSS.'); this.style.display='none';">
                         {% elif vehicle.colours or vehicle.livery_id %}<div class="livery{% if vehicle.livery_id %} livery-{{ vehicle.livery_id }}{% else %}" style="background:{{ vehicle.get_livery }}{% endif %}"></div>{% endif %}
                         {% if vehicle.livery_name %}{{ vehicle.livery_name }}{% else %}{{ vehicle.branding }}{% endif %}
                     </td>

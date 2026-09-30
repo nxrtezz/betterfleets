@@ -969,6 +969,10 @@ table {
     vertical-align: middle;
     width: 2.25em;
     border: 1px solid var(--active-link-color);
+    image-rendering: auto;
+    backface-visibility: hidden;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 
 table {

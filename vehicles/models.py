@@ -324,7 +324,7 @@ class Livery(models.Model):
 
     def preview(self, name=False):
         if self.livery_type == self.LiveryType.SVG and self.svg:
-            img = f'<img src="{self.svg.url}" style="height:1.5em;width:2.25em;object-fit:contain;" alt="{escape(self.name)}"'
+            img = f'<img src="{self.svg.url}" style="height:1.5em;width:2.25em;object-fit:contain;image-rendering:auto;backface-visibility:hidden;-webkit-transform:translateZ(0);transform:translateZ(0);" alt="{escape(self.name)}"'
             if name:
                 return format_html(img + '>', self.name)
             else:
@@ -338,7 +338,7 @@ class Livery(models.Model):
         else:
             return
 
-        div = f'<div style="height:1.5em;width:2.25em;background:{background}"'
+        div = f'<div style="height:1.5em;width:2.25em;background:{background};image-rendering:auto;backface-visibility:hidden;-webkit-transform:translateZ(0);transform:translateZ(0);"'
         if name:
             return format_html(div + "></div> {}", self.name)
         else:
@@ -423,6 +423,7 @@ class Livery(models.Model):
             css = f"{css};\n  color: #fff"
         if self.stroke_colour:
             css = f"{css};\n  stroke: {self.stroke_colour}"
+        css = f"{css};\n  image-rendering: auto;\n  backface-visibility: hidden;\n  -webkit-transform: translateZ(0);\n  transform: translateZ(0)"
         styles = [f"{selector}{{\n{css}\n}}\n"]
         if right_css and right_css != css:
             right_css = f"  background: {right_css}"
@@ -432,6 +433,7 @@ class Livery(models.Model):
                 right_css = f"{right_css};\n  color: #fff"
             if self.stroke_colour:
                 right_css = f"{right_css};\n  stroke: {self.stroke_colour}"
+            right_css = f"{right_css};\n  image-rendering: auto;\n  backface-visibility: hidden;\n  -webkit-transform: translateZ(0);\n  transform: translateZ(0)"
             styles.append(f"{selector}.right{{\n{right_css}\n}}\n")
         return styles
 
