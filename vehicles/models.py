@@ -256,13 +256,13 @@ class Livery(models.Model):
     )
     angle = models.PositiveSmallIntegerField(null=True, blank=True)
     left_css = CSSField(
-        max_length=1024,
+        max_length=8192,
         blank=True,
         verbose_name="Left CSS",
         help_text="Automatically generated from colours and angle",
     )
     right_css = CSSField(
-        max_length=1024,
+        max_length=8192,
         blank=True,
         verbose_name="Right CSS",
         help_text="Should be a mirror image of the left CSS",
