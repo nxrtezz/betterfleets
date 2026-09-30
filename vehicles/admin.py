@@ -1286,6 +1286,31 @@ class VehicleAdmin(admin.ModelAdmin):
             ) as e:
                 self.message_user(request, f"{vehicle} {e}")
                 continue
+
+            # Check if one is a ticket machine (no livery and no type)
+            is_vehicle_ticket_machine = not vehicle.livery_id and not vehicle.vehicle_type_id
+            is_duplicate_ticket_machine = not duplicate.livery_id and not duplicate.vehicle_type_id
+
+            # If one is a ticket machine and the other has livery/type, copy code from ticket machine to proper vehicle
+            if is_vehicle_ticket_machine and not is_duplicate_ticket_machine:
+                # vehicle is ticket machine, duplicate is proper vehicle
+                if vehicle.code and not duplicate.code:
+                    duplicate.code = vehicle.code
+                    duplicate.save(update_fields=["code"])
+                    self.message_user(
+                        request,
+                        f"Copied code '{vehicle.code}' from ticket machine {vehicle} to {duplicate}",
+                    )
+            elif not is_vehicle_ticket_machine and is_duplicate_ticket_machine:
+                # duplicate is ticket machine, vehicle is proper vehicle
+                if duplicate.code and not vehicle.code:
+                    vehicle.code = duplicate.code
+                    vehicle.save(update_fields=["code"])
+                    self.message_user(
+                        request,
+                        f"Copied code '{duplicate.code}' from ticket machine {duplicate} to {vehicle}",
+                    )
+
             self.merge_all_selected(request, (vehicle, duplicate))
 
     def spare_ticket_machine(self, request, queryset):
