@@ -1048,6 +1048,9 @@ class VehicleAdmin(admin.ModelAdmin):
 
             for form_field, model_field in field_mappings.items():
                 value = form.cleaned_data.get(form_field)
+                # Convert empty strings to None for numeric fields
+                if value == "" and form_field in {"capacity", "year_of_manufacture", "historical_fleet_year"}:
+                    value = None
                 if value is not None and value != "":
                     update_fields[model_field] = value
 
