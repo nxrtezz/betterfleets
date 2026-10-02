@@ -14,6 +14,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from busstops.models import Operator
 from vehicles.models import Vehicle, VehicleJourney, DataSource
+from bustimes.models import Trip
 from fleet.completion import (
     get_overall_operator_rankings,
     get_overall_type_rankings,
@@ -33,6 +34,12 @@ from fleet.completion import (
 )
 from fleet.transittracker_scraper import run_import
 from fleet.models import OverlandSubscription, PinnedOperator
+from fleet.rail_replacement import (
+    discover_replacements,
+    group_replacements,
+    publish_replacements,
+)
+from fleet.realtimetrains import RTTError
 
 User = get_user_model()
 
@@ -448,6 +455,22 @@ def overland_generator(request):
             vehicle = Vehicle.objects.get(slug=vehicle_slug)
         except Vehicle.DoesNotExist:
             return render(request, "overland_generator.html", {"error": "Vehicle not found."})
+        selected_trip = None
+        if trip_id:
+            selected_trip = (
+                Trip.objects.filter(
+                    pk=trip_id,
+                    route__service__is_rail_replacement=True,
+                )
+                .select_related("route__service")
+                .first()
+            )
+            if selected_trip is None:
+                return render(
+                    request,
+                    "overland_generator.html",
+                    {"error": "Select a valid rail replacement timetable trip."},
+                )
 
         import secrets
         auth_key = secrets.token_urlsafe(32)
@@ -471,9 +494,52 @@ def overland_generator(request):
         return render(request, "overland_generator.html", {
             "endpoint": endpoint,
             "vehicle": vehicle,
+            "trip": selected_trip,
         })
 
-    return render(request, "overland_generator.html", {})
+    replacement_trips = (
+        Trip.objects.filter(route__service__is_rail_replacement=True)
+        .select_related("route__service", "calendar")
+        .prefetch_related("stoptime_set__stop")
+        .order_by("calendar__start_date", "start")
+    )
+    return render(request, "overland_generator.html", {"replacement_trips": replacement_trips})
+
+
+def rail_replacement_timetable(request):
+    if not request.user.is_authenticated or not request.user.is_superuser:
+        raise PermissionDenied("Superuser access required.")
+    context = {}
+    if request.method == "POST":
+        dates = []
+        for value in request.POST.getlist("dates"):
+            parsed = parse_datetime(f"{value}T12:00:00")
+            if parsed:
+                dates.append(parsed.date())
+        origin = request.POST.get("origin", "").strip().upper()
+        destination = request.POST.get("destination", "").strip().upper()
+        operator = request.POST.get("operator", "").strip().upper()
+        if not dates or not origin or not destination:
+            context["error"] = "Choose at least one date and enter both station CRS codes."
+        elif origin == destination:
+            context["error"] = "The origin and destination must be different stations."
+        else:
+            try:
+                items = discover_replacements(
+                    dates, origin, destination, operator_code=operator
+                )
+                trips = publish_replacements(items)
+                context["published_count"] = len(trips)
+                context["groups"] = [
+                    {
+                        "pattern": " → ".join(group["pattern"]),
+                        "count": len(group["services"]),
+                    }
+                    for group in group_replacements(items)
+                ]
+            except RTTError as exc:
+                context["error"] = str(exc)
+    return render(request, "rail_replacement_timetable.html", context)
 
 
 @csrf_exempt
@@ -513,19 +579,51 @@ def overland_ingest(request, uuid):
         
         # Try to find existing journey for today
         today = parsed_timestamp.date()
-        existing_journey = VehicleJourney.objects.filter(
-            vehicle=vehicle,
-            date=today,
-            code__contains=subscription.route_number or ""
-        ).first()
-        
+        scheduled_trip = None
+        if subscription.trip_id:
+            scheduled_trip = (
+                Trip.objects.filter(
+                    pk=subscription.trip_id,
+                    route__service__is_rail_replacement=True,
+                )
+                .select_related("route__service")
+                .first()
+            )
+        journey_filter = {
+            "vehicle": vehicle,
+            "date": today,
+        }
+        if scheduled_trip:
+            journey_filter["trip"] = scheduled_trip
+        else:
+            journey_filter["code__contains"] = subscription.route_number or ""
+        existing_journey = VehicleJourney.objects.filter(**journey_filter).first()
+        journey_fields = {
+            "datetime": parsed_timestamp,
+            "destination": (
+                subscription.destination
+                or (scheduled_trip.headsign if scheduled_trip else "")
+            ),
+            "route_name": (
+                scheduled_trip.route.line_name
+                if scheduled_trip
+                else subscription.route_number or "Overland"
+            ),
+            "code": (
+                scheduled_trip.vehicle_journey_code
+                if scheduled_trip
+                else subscription.route_number or "Overland"
+            ),
+        }
         if existing_journey:
             # Update existing journey
-            existing_journey.datetime = parsed_timestamp
-            existing_journey.destination = subscription.destination
-            existing_journey.route_name = subscription.route_number or "Overland"
-            existing_journey.code = subscription.route_number or "Overland"
-            existing_journey.save(update_fields=["datetime", "destination", "route_name", "code"])
+            for field, value in journey_fields.items():
+                setattr(existing_journey, field, value)
+            if scheduled_trip:
+                existing_journey.trip = scheduled_trip
+                existing_journey.service = scheduled_trip.route.service
+                journey_fields.update({"trip": scheduled_trip, "service": scheduled_trip.route.service})
+            existing_journey.save(update_fields=list(journey_fields))
             journey_id = existing_journey.id
         else:
             # Create new journey with proper fields for journeys table
@@ -533,11 +631,13 @@ def overland_ingest(request, uuid):
                 vehicle=vehicle,
                 datetime=parsed_timestamp,
                 date=today,
-                destination=subscription.destination,
-                code=subscription.route_number or "Overland",
-                route_name=subscription.route_number or "Overland",
+                destination=journey_fields["destination"],
+                code=journey_fields["code"],
+                route_name=journey_fields["route_name"],
                 source=data_source,
-                direction=""
+                direction="inbound" if scheduled_trip and scheduled_trip.inbound else "",
+                trip=scheduled_trip,
+                service=scheduled_trip.route.service if scheduled_trip else None,
             )
             journey_id = new_journey.id
         
@@ -548,7 +648,7 @@ def overland_ingest(request, uuid):
             "coordinates": [float(longitude), float(latitude)],
             "datetime": parsed_timestamp.isoformat(),
             "heading": subscription.heading,
-            "destination": subscription.destination
+            "destination": journey_fields["destination"],
         }
         cache.set(journey_redis_key, location_data, timeout=3600)  # 1 hour
         

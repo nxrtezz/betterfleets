@@ -65,6 +65,11 @@ urlpatterns = [
     path("fleet/transittracker-import/get-operators", fleet_views.transittracker_get_operators, name="transittracker_get_operators"),
     path("fleet/transittracker-import/preview", fleet_views.transittracker_preview, name="transittracker_preview"),
     path("overland", fleet_views.overland_generator, name="overland_generator"),
+    path(
+        "fleet/rail-replacement-timetable",
+        fleet_views.rail_replacement_timetable,
+        name="rail_replacement_timetable",
+    ),
     path("overland.json", fleet_views.overland_json, name="overland_json"),
     path("staff/stats", views.staff_stats, name="staff_stats"),
     path("staff/theme-lab", views.theme_lab, name="theme_lab"),
@@ -266,5 +271,4 @@ urlpatterns = [
     path("", include(vehicles_urls)),
     path("", include(disruptions_urls)),
 ]
-
 
