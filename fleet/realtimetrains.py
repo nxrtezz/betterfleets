@@ -31,7 +31,7 @@ class RTTClient:
             request_params["version"] = settings.RTT_API_VERSION
         headers = {"Authorization": f"Bearer {token or self.token}"}
         try:
-            response = self.session.get(
+            return self.session.get(
                 f"{settings.RTT_API_BASE_URL}{path}",
                 params=request_params,
                 headers=headers,
@@ -39,9 +39,6 @@ class RTTClient:
             )
         except requests.RequestException as exc:
             raise RTTError(f"RTT request failed: {exc}") from exc
-        if response.status_code == 204:
-            return {}
-        return response
 
     def _exchange_refresh_token(self):
         response = self._request("/api/get_access_token", token=self.token)
@@ -85,9 +82,7 @@ class RTTClient:
 
     def location_services(self, code: str, service_date: date):
         start = datetime.combine(service_date, time.min).isoformat()
-        end = datetime.combine(
-            service_date, time(23, 59, 59)
-        ).isoformat()
+        end = datetime.combine(service_date, time(23, 59, 59)).isoformat()
         payload = self._get(
             "/gb-nr/location",
             {
