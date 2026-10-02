@@ -20,24 +20,50 @@ class RTTClient:
         self.session = requests.Session()
         self.session.headers.update(
             {
-                "Authorization": f"Bearer {self.token}",
                 "Accept": "application/json",
                 "User-Agent": "BetterFleets rail replacement timetable/1.0",
             }
         )
 
-    def _get(self, path, params=None):
+    def _request(self, path, params=None, token=None):
         request_params = dict(params or {})
         if settings.RTT_API_VERSION:
             request_params["version"] = settings.RTT_API_VERSION
+        headers = {"Authorization": f"Bearer {token or self.token}"}
         try:
             response = self.session.get(
                 f"{settings.RTT_API_BASE_URL}{path}",
                 params=request_params,
+                headers=headers,
                 timeout=30,
             )
         except requests.RequestException as exc:
             raise RTTError(f"RTT request failed: {exc}") from exc
+        if response.status_code == 204:
+            return {}
+        return response
+
+    def _exchange_refresh_token(self):
+        response = self._request("/api/get_access_token", token=self.token)
+        if response.status_code >= 400:
+            detail = response.text[:300].strip()
+            raise RTTError(
+                "RTT token exchange failed with HTTP "
+                f"{response.status_code}: {detail}"
+            )
+        try:
+            access_token = response.json().get("token")
+        except ValueError as exc:
+            raise RTTError("RTT token exchange returned invalid JSON.") from exc
+        if not access_token:
+            raise RTTError("RTT token exchange returned no access token.")
+        self.token = access_token
+
+    def _get(self, path, params=None):
+        response = self._request(path, params)
+        if response.status_code == 401 and "token ID" in response.text:
+            self._exchange_refresh_token()
+            response = self._request(path, params)
         if response.status_code == 204:
             return {}
         if response.status_code == 429:
