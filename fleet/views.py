@@ -1,20 +1,21 @@
 from __future__ import annotations
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.shortcuts import get_object_or_404, render
 from django.http import JsonResponse
 from django.utils import timezone
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_date, parse_datetime
 from django.views.decorators.http import require_POST, require_safe
 from django.views.decorators.csrf import csrf_exempt
 
-from busstops.models import Operator
-from vehicles.models import Vehicle, VehicleJourney, DataSource
-from bustimes.models import Trip
+from busstops.models import DataSource, Operator, Service, StopPoint
+from vehicles.models import Vehicle, VehicleJourney
+from bustimes.models import Calendar, Route, StopTime, Trip
 from fleet.completion import (
     get_overall_operator_rankings,
     get_overall_type_rankings,
@@ -437,6 +438,21 @@ def transittracker_preview(request):
         }, status=500)
 
 
+def replacement_trips_for_form():
+    return (
+        Trip.objects.filter(route__service__is_rail_replacement=True)
+        .select_related("route__service", "calendar")
+        .prefetch_related("stoptime_set__stop")
+        .order_by("calendar__start_date", "start")
+    )
+
+
+def stops_for_form():
+    return StopPoint.objects.filter(active=True).select_related("locality").order_by(
+        "common_name", "atco_code"
+    )
+
+
 def overland_generator(request):
     if (
         not request.user.is_authenticated
@@ -449,6 +465,20 @@ def overland_generator(request):
         destination = request.POST.get("destination", "").strip()
         route_number = request.POST.get("route_number", "").strip()
         trip_id = request.POST.get("trip_id", "").strip()
+        tracking_date_value = request.POST.get("tracking_date", "").strip()
+        tracking_date = parse_date(tracking_date_value)
+        if tracking_date is None:
+            if tracking_date_value:
+                return render(
+                    request,
+                    "overland_generator.html",
+                    {
+                        "error": "Enter a valid tracking date.",
+                        "replacement_trips": replacement_trips_for_form(),
+                        "stops": stops_for_form(),
+                    },
+                )
+            tracking_date = timezone.localdate()
         if not vehicle_slug:
             return render(request, "overland_generator.html", {"error": "Select a vehicle."})
         try:
@@ -472,16 +502,172 @@ def overland_generator(request):
                     {"error": "Select a valid rail replacement timetable trip."},
                 )
 
+        stop_ids = request.POST.getlist("stop_id")
+        arrival_times = request.POST.getlist("arrival_time")
+        departure_times = request.POST.getlist("departure_time")
+        stop_rows = []
+        schedule_error = None
+        if any(stop_ids):
+            if len(stop_ids) != len(arrival_times) or len(stop_ids) != len(departure_times):
+                schedule_error = "Each stop must have arrival and departure fields."
+            elif not all(stop_ids):
+                schedule_error = "Choose a stop for every schedule row."
+            else:
+                previous_time = None
+                for sequence, (stop_id, arrival, departure) in enumerate(
+                   zip(stop_ids, arrival_times, departure_times)
+                ):
+                   if not arrival and not departure:
+                       schedule_error = "Enter an arrival or departure time for every stop."
+                       break
+                   try:
+                       parsed_times = [
+                           datetime.strptime(value, "%H:%M").time()
+                           for value in (arrival, departure)
+                           if value
+                       ]
+                   except ValueError:
+                       schedule_error = "Enter valid stop times in HH:MM format."
+                       break
+                   stop_time = min(parsed_times)
+                   if previous_time is not None and stop_time < previous_time:
+                       schedule_error = "Stop times must be in chronological order."
+                       break
+                   try:
+                       stop = StopPoint.objects.get(atco_code=stop_id, active=True)
+                   except (StopPoint.DoesNotExist, StopPoint.MultipleObjectsReturned):
+                       schedule_error = "Choose valid active stops."
+                       break
+                   stop_rows.append(
+                       {
+                           "stop": stop,
+                           "arrival": datetime.combine(tracking_date, datetime.min.time()).replace(
+                               hour=parsed_times[0].hour,
+                               minute=parsed_times[0].minute,
+                           )
+                           - datetime.combine(tracking_date, datetime.min.time()),
+                           "departure": datetime.combine(tracking_date, datetime.min.time()).replace(
+                               hour=parsed_times[-1].hour,
+                               minute=parsed_times[-1].minute,
+                           )
+                           - datetime.combine(tracking_date, datetime.min.time()),
+                           "sequence": sequence,
+                       }
+                   )
+                   previous_time = stop_time
+        if schedule_error:
+            return render(
+                request,
+                "overland_generator.html",
+                {
+                   "error": schedule_error,
+                   "replacement_trips": replacement_trips_for_form(),
+                   "stops": stops_for_form(),
+                },
+            )
+
         import secrets
         auth_key = secrets.token_urlsafe(32)
-        subscription = OverlandSubscription.objects.create(
-            user=request.user,
-            vehicle=vehicle,
-            destination=destination,
-            route_number=route_number,
-            trip_id=trip_id,
-            auth_key_hash=OverlandSubscription.hash_auth_key(auth_key),
-        )
+        with transaction.atomic():
+            scheduled_trip = selected_trip
+            if stop_rows:
+                overland_source, _ = DataSource.objects.get_or_create(
+                   name="Overland",
+                   defaults={"url": "https://overland.tech"},
+                )
+                service = Service.objects.create(
+                   service_code=route_number or f"overland-{vehicle.slug}",
+                   line_name=route_number or "Overland",
+                   description=destination,
+                   source=overland_source,
+                )
+                if vehicle.operator_id:
+                   service.operator.add(vehicle.operator)
+                route = Route.objects.create(
+                   source=overland_source,
+                   service=service,
+                   line_name=service.line_name,
+                   origin=stop_rows[0]["stop"].get_long_name(),
+                   destination=destination or stop_rows[-1]["stop"].get_long_name(),
+                   start_date=tracking_date,
+                   end_date=tracking_date,
+                )
+                calendar = Calendar.objects.create(
+                   start_date=tracking_date,
+                   end_date=tracking_date,
+                   summary="Overland tracking",
+                   source=overland_source,
+                   **{
+                       day: tracking_date.weekday() == index
+                       for index, day in enumerate(
+                           ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+                       )
+                   },
+                )
+                scheduled_trip = Trip.objects.create(
+                   route=route,
+                   calendar=calendar,
+                   vehicle_journey_code=f"overland-{vehicle.slug}-{tracking_date:%Y%m%d}",
+                   headsign=destination,
+                   start=stop_rows[0]["arrival"],
+                   end=stop_rows[-1]["departure"],
+                   operator=vehicle.operator,
+                )
+                StopTime.objects.bulk_create(
+                   [
+                       StopTime(
+                           trip=scheduled_trip,
+                           stop=row["stop"],
+                           display_name=row["stop"].get_long_name(),
+                           arrival=row["arrival"],
+                           departure=row["departure"],
+                           sequence=row["sequence"],
+                       )
+                       for row in stop_rows
+                   ]
+                )
+            if scheduled_trip:
+                journey_datetime = scheduled_trip.start_datetime(tracking_date)
+                journey_destination = destination or scheduled_trip.headsign or ""
+                journey_route = scheduled_trip.route.line_name
+                journey_code = scheduled_trip.vehicle_journey_code or route_number
+                journey_service = scheduled_trip.route.service
+                journey_direction = "inbound" if scheduled_trip.inbound else ""
+            else:
+                journey_datetime = timezone.make_aware(
+                   datetime.combine(tracking_date, datetime.min.time())
+                )
+                journey_destination = destination
+                journey_route = route_number or "Overland"
+                journey_code = route_number or f"overland-{vehicle.slug}"
+                journey_service = None
+                journey_direction = ""
+            journey = VehicleJourney.objects.create(
+                vehicle=vehicle,
+                datetime=journey_datetime,
+                date=tracking_date,
+                destination=journey_destination,
+                code=journey_code,
+                route_name=journey_route,
+                source=overland_source if stop_rows else DataSource.objects.get_or_create(
+                   name="Overland",
+                   defaults={"url": "https://overland.tech"},
+                )[0],
+                direction=journey_direction,
+                trip=scheduled_trip,
+                service=journey_service,
+            )
+            subscription = OverlandSubscription.objects.create(
+                user=request.user,
+                vehicle=vehicle,
+                destination=destination,
+                route_number=route_number,
+                trip_id=str(scheduled_trip.pk) if scheduled_trip else trip_id,
+                scheduled_trip=scheduled_trip,
+                tracking_date=tracking_date,
+                journey=journey,
+                auth_key_hash=OverlandSubscription.hash_auth_key(auth_key),
+            )
         from urllib.parse import urlencode
         endpoint = f"https://eeveeit.uk/overland/{subscription.uuid}"
         endpoint += "?" + urlencode({
@@ -489,21 +675,24 @@ def overland_generator(request):
             "destination": destination,
             "route": route_number,
             "auth": auth_key,
-            "trip": trip_id,
+            "trip": scheduled_trip.pk if scheduled_trip else trip_id,
         })
         return render(request, "overland_generator.html", {
             "endpoint": endpoint,
             "vehicle": vehicle,
-            "trip": selected_trip,
+            "trip": scheduled_trip,
+            "journey": journey,
         })
 
-    replacement_trips = (
-        Trip.objects.filter(route__service__is_rail_replacement=True)
-        .select_related("route__service", "calendar")
-        .prefetch_related("stoptime_set__stop")
-        .order_by("calendar__start_date", "start")
+    return render(
+        request,
+        "overland_generator.html",
+        {
+            "replacement_trips": replacement_trips_for_form(),
+            "stops": stops_for_form(),
+            "tracking_date": timezone.localdate(),
+        },
     )
-    return render(request, "overland_generator.html", {"replacement_trips": replacement_trips})
 
 
 def rail_replacement_timetable(request):
@@ -579,8 +768,8 @@ def overland_ingest(request, uuid):
         
         # Try to find existing journey for today
         today = parsed_timestamp.date()
-        scheduled_trip = None
-        if subscription.trip_id:
+        scheduled_trip = subscription.scheduled_trip
+        if scheduled_trip is None and subscription.trip_id:
             scheduled_trip = (
                 Trip.objects.filter(
                     pk=subscription.trip_id,
@@ -597,7 +786,9 @@ def overland_ingest(request, uuid):
             journey_filter["trip"] = scheduled_trip
         else:
             journey_filter["code__contains"] = subscription.route_number or ""
-        existing_journey = VehicleJourney.objects.filter(**journey_filter).first()
+        existing_journey = subscription.journey
+        if existing_journey is None:
+            existing_journey = VehicleJourney.objects.filter(**journey_filter).first()
         journey_fields = {
             "datetime": parsed_timestamp,
             "destination": (
@@ -640,6 +831,8 @@ def overland_ingest(request, uuid):
                 service=scheduled_trip.route.service if scheduled_trip else None,
             )
             journey_id = new_journey.id
+            subscription.journey = new_journey
+            subscription.save(update_fields=["journey"])
         
         # Store location data in Redis for map history using the journey's UUID
         journey_obj = VehicleJourney.objects.get(id=journey_id)

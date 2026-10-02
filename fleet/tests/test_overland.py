@@ -1,14 +1,15 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
 
-from busstops.models import Operator
+from busstops.models import Operator, StopPoint
+from bustimes.models import StopTime, Trip
 from fleet.models import OverlandSubscription
-from vehicles.models import Vehicle
+from vehicles.models import Vehicle, VehicleJourney
 
 
 class OverlandTests(TestCase):
@@ -24,6 +25,14 @@ class OverlandTests(TestCase):
             reg="ABC123",
         )
         self.client.force_login(self.user)
+        self.stops = [
+            StopPoint.objects.create(
+                atco_code=f"STP{i}",
+                common_name=f"Stop {i}",
+                active=True,
+            )
+            for i in (1, 2)
+        ]
 
     def grant_overland_permission(self):
         permission = Permission.objects.get(
@@ -53,6 +62,41 @@ class OverlandTests(TestCase):
         self.assertIn(f"/overland/{subscription.uuid}", endpoint)
         self.assertIn("auth=", endpoint)
         self.assertEqual(subscription.destination, "Town")
+        self.assertIsNotNone(subscription.journey_id)
+
+    def test_generator_creates_scheduled_trip_and_journey(self):
+        self.grant_overland_permission()
+        response = self.client.post(
+            reverse("overland_generator"),
+            {
+                "vehicle_slug": self.vehicle.slug,
+                "destination": "Town",
+                "route_number": "1",
+                "tracking_date": "2026-10-02",
+                "stop_id": [stop.atco_code for stop in self.stops],
+                "arrival_time": ["09:00", "09:30"],
+                "departure_time": ["09:05", "09:35"],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        subscription = OverlandSubscription.objects.get()
+        self.assertIsNotNone(subscription.scheduled_trip_id)
+        self.assertEqual(subscription.journey.trip_id, subscription.scheduled_trip_id)
+        self.assertEqual(
+            list(
+                StopTime.objects.filter(trip=subscription.scheduled_trip)
+                .values_list("stop_id", "arrival", "departure")
+            ),
+            [
+                ("STP1", timedelta(hours=9), timedelta(hours=9, minutes=5)),
+                ("STP2", timedelta(hours=9, minutes=30), timedelta(hours=9, minutes=35)),
+            ],
+        )
+        self.assertEqual(
+            Trip.objects.get(pk=subscription.scheduled_trip_id).calendar.start_date.isoformat(),
+            "2026-10-02",
+        )
+        self.assertTrue(VehicleJourney.objects.filter(pk=subscription.journey_id).exists())
 
     def test_ingest_requires_auth_and_updates_feed(self):
         secret = "test-secret"

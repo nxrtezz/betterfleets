@@ -190,6 +190,21 @@ class OverlandSubscription(models.Model):
     destination = models.CharField(max_length=255, blank=True)
     route_number = models.CharField(max_length=64, blank=True)
     trip_id = models.CharField(max_length=128, blank=True)
+    scheduled_trip = models.ForeignKey(
+        "bustimes.Trip",
+        models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="overland_subscriptions",
+    )
+    tracking_date = models.DateField(null=True, blank=True)
+    journey = models.ForeignKey(
+        "vehicles.VehicleJourney",
+        models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="overland_subscriptions",
+    )
     auth_key_hash = models.CharField(max_length=64)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)

@@ -13,6 +13,7 @@
   {% if endpoint %}
     <p><strong>Copy this endpoint into Overland:</strong></p>
     <textarea readonly rows="4" style="width: 100%">{{ endpoint }}</textarea>
+    {% if journey %}<p>Journey ID: <strong>{{ journey.pk }}</strong></p>{% endif %}
     <p>The auth key is shown only here. Generate another endpoint if it is lost.</p>
   {% else %}
     <form method="post">
@@ -35,6 +36,11 @@
         <p>No generated rail replacement trips are available yet.</p>
       {% endif %}
       <p>
+        <label for="tracking_date">Tracking date</label>
+        <input id="tracking_date" name="tracking_date" type="date"
+               value="{{ tracking_date|date:'Y-m-d' }}" required>
+      </p>
+      <p>
         <label for="vehicle_slug">Vehicle slug</label>
         <input id="vehicle_slug" name="vehicle_slug" required>
       </p>
@@ -46,7 +52,51 @@
         <label for="route_number">Route number</label>
         <input id="route_number" name="route_number">
       </p>
+      <fieldset>
+        <legend>Scheduled stops (optional)</legend>
+        <p>Select stops in order and enter the expected arrival and departure times.
+          Leave the row empty for vehicle-only tracking.</p>
+        <div id="stop-rows">
+          <div class="stop-row">
+            <select name="stop_id" aria-label="Stop">
+              <option value="">Select a stop</option>
+              {% for stop in stops %}
+                <option value="{{ stop.atco_code }}">{{ stop.get_long_name }} ({{ stop.atco_code }})</option>
+              {% endfor %}
+            </select>
+            <label>Arrival <input name="arrival_time" type="time"></label>
+            <label>Departure <input name="departure_time" type="time"></label>
+            <button type="button" class="remove-stop">Remove</button>
+          </div>
+        </div>
+        <button type="button" id="add-stop">Add stop</button>
+      </fieldset>
       <button type="submit">Generate endpoint</button>
     </form>
   {% endif %}
 {% endblock content %}
+
+{% block foot %}
+  {{ block.super }}
+  <script>
+    const rows = document.getElementById("stop-rows");
+    const addStop = document.getElementById("add-stop");
+    if (rows && addStop) {
+      addStop.addEventListener("click", () => {
+        const row = rows.firstElementChild.cloneNode(true);
+        row.querySelector("select").value = "";
+        row.querySelectorAll("input").forEach((input) => input.value = "");
+        rows.appendChild(row);
+      });
+      rows.addEventListener("click", (event) => {
+        if (!event.target.classList.contains("remove-stop")) return;
+        if (rows.children.length === 1) {
+          rows.firstElementChild.querySelector("select").value = "";
+          rows.firstElementChild.querySelectorAll("input").forEach((input) => input.value = "");
+        } else {
+          event.target.closest(".stop-row").remove();
+        }
+      });
+    }
+  </script>
+{% endblock foot %}
