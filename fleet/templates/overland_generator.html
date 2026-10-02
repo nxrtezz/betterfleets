@@ -17,6 +17,23 @@
   {% else %}
     <form method="post">
       {% csrf_token %}
+      {% if replacement_trips %}
+        <p>
+          <label for="trip_id">Rail replacement timetable trip</label>
+          <select id="trip_id" name="trip_id">
+            <option value="">No scheduled trip (vehicle-only tracking)</option>
+            {% for trip in replacement_trips %}
+              <option value="{{ trip.pk }}">
+                {{ trip.calendar.start_date }} · {{ trip.route.service.line_name }}
+                · {{ trip.route.origin }} to {{ trip.route.destination }}
+                · {{ trip.headsign }} ({{ trip.vehicle_journey_code }})
+              </option>
+            {% endfor %}
+          </select>
+        </p>
+      {% else %}
+        <p>No generated rail replacement trips are available yet.</p>
+      {% endif %}
       <p>
         <label for="vehicle_slug">Vehicle slug</label>
         <input id="vehicle_slug" name="vehicle_slug" required>
@@ -28,10 +45,6 @@
       <p>
         <label for="route_number">Route number</label>
         <input id="route_number" name="route_number">
-      </p>
-      <p>
-        <label for="trip_id">Trip ID</label>
-        <input id="trip_id" name="trip_id">
       </p>
       <button type="submit">Generate endpoint</button>
     </form>

@@ -541,6 +541,9 @@ BODS_API_USER_AGENT = os.environ.get(
 # Required for many BODS keys on the national datafeed (403 without it).
 # Format: minLon,minLat,maxLon,maxLat
 BODS_AVL_BOUNDING_BOX = os.environ.get("BODS_AVL_BOUNDING_BOX", "").strip()
+RTT_API_TOKEN = os.environ.get("RTT_API_TOKEN", "").strip()
+RTT_API_BASE_URL = os.environ.get("RTT_API_BASE_URL", "https://data.rtt.io").strip().rstrip("/")
+RTT_API_VERSION = os.environ.get("RTT_API_VERSION", "").strip()
 TNDS_USERNAME = os.environ.get("TNDS_USERNAME", "")
 TNDS_PASSWORD = os.environ.get("TNDS_PASSWORD", "")
 ALLOW_VEHICLE_NOTES_OPERATORS = (
