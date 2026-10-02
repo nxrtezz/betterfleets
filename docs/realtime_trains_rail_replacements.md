@@ -6,10 +6,13 @@ railway CRS codes for the endpoints (for example `SOU` and `POO`), select one
 or more operating dates, and optionally enter the RTT operator code (`SW` for
 South Western Railway).
 
-Set `RTT_API_TOKEN` in the server environment. The token is a bearer token and
-must not be placed in browser JavaScript, templates, or a distributable
-application. `RTT_API_BASE_URL` defaults to `https://data.rtt.io`; use
-`RTT_API_VERSION` only when pinning a version supported by the token.
+Set either `RTT_API_ACCESS_TOKEN` (an issued access token) or
+`RTT_API_REFRESH_TOKEN` (an issued refresh token) in the server environment.
+The UUID shown as a token ID in the API portal is not usable for API calls and
+cannot be exchanged; it must not be used as `RTT_API_TOKEN`. The token is a
+bearer credential and must not be placed in browser JavaScript, templates, or a
+distributable application. `RTT_API_BASE_URL` defaults to `https://data.rtt.io`;
+use `RTT_API_VERSION` only when pinning a version supported by the token.
 
 The importer queries `/gb-nr/location` to discover candidates and
 `/gb-nr/service` for ordered calling points. It keeps only replacement-bus

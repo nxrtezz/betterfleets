@@ -14,9 +14,18 @@ class RTTError(RuntimeError):
 
 class RTTClient:
     def __init__(self, token: str | None = None):
-        self.token = token or settings.RTT_API_TOKEN
-        if not self.token:
-            raise RTTError("RTT_API_TOKEN is not configured on the server.")
+        self.access_token = (
+            token
+            or settings.RTT_API_ACCESS_TOKEN
+            or settings.RTT_API_TOKEN
+        )
+        self.refresh_token = settings.RTT_API_REFRESH_TOKEN
+        if not self.access_token and not self.refresh_token:
+            raise RTTError(
+                "Configure RTT_API_ACCESS_TOKEN or the issued "
+                "RTT_API_REFRESH_TOKEN on the server. The API portal token ID "
+                "cannot authenticate API requests."
+            )
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -29,7 +38,7 @@ class RTTClient:
         request_params = dict(params or {})
         if settings.RTT_API_VERSION:
             request_params["version"] = settings.RTT_API_VERSION
-        headers = {"Authorization": f"Bearer {token or self.token}"}
+        headers = {"Authorization": f"Bearer {token or self.access_token}"}
         try:
             return self.session.get(
                 f"{settings.RTT_API_BASE_URL}{path}",
@@ -41,7 +50,13 @@ class RTTClient:
             raise RTTError(f"RTT request failed: {exc}") from exc
 
     def _exchange_refresh_token(self):
-        response = self._request("/api/get_access_token", token=self.token)
+        if not self.refresh_token:
+            raise RTTError(
+                "RTT_API_TOKEN is a portal token ID, not an issued credential. "
+                "Set RTT_API_ACCESS_TOKEN to the issued access token or "
+                "RTT_API_REFRESH_TOKEN to the issued refresh token."
+            )
+        response = self._request("/api/get_access_token", token=self.refresh_token)
         if response.status_code >= 400:
             detail = response.text[:300].strip()
             raise RTTError(
@@ -54,10 +69,10 @@ class RTTClient:
             raise RTTError("RTT token exchange returned invalid JSON.") from exc
         if not access_token:
             raise RTTError("RTT token exchange returned no access token.")
-        self.token = access_token
+        self.access_token = access_token
 
     def _get(self, path, params=None):
-        response = self._request(path, params)
+        response = self._request(path, params, token=self.access_token)
         if response.status_code == 401 and "token ID" in response.text:
             self._exchange_refresh_token()
             response = self._request(path, params)

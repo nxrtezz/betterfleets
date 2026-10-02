@@ -542,6 +542,8 @@ BODS_API_USER_AGENT = os.environ.get(
 # Format: minLon,minLat,maxLon,maxLat
 BODS_AVL_BOUNDING_BOX = os.environ.get("BODS_AVL_BOUNDING_BOX", "").strip()
 RTT_API_TOKEN = os.environ.get("RTT_API_TOKEN", "").strip()
+RTT_API_ACCESS_TOKEN = os.environ.get("RTT_API_ACCESS_TOKEN", "").strip()
+RTT_API_REFRESH_TOKEN = os.environ.get("RTT_API_REFRESH_TOKEN", "").strip()
 RTT_API_BASE_URL = os.environ.get("RTT_API_BASE_URL", "https://data.rtt.io").strip().rstrip("/")
 RTT_API_VERSION = os.environ.get("RTT_API_VERSION", "").strip()
 TNDS_USERNAME = os.environ.get("TNDS_USERNAME", "")
