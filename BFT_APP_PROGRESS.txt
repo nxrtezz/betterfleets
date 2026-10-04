@@ -205,4 +205,9 @@ COMPLETED: Optimize GitHub Actions workflows
 - Added EAS project ID to app.json
 - Commit: 1a2d4a2
 
-Current Status: Workflows optimized. Tests won't run on mobile changes. Builds only on mobile changes. Ready to trigger builds.
+COMPLETED: Fix npm install issue
+- Changed from npm ci to npm install (package-lock.json wasn't in repo)
+- Generated and committed package-lock.json
+- Commit: a1efdc2
+
+Current Status: All workflow issues fixed. Builds should work now. Ready to trigger builds.
