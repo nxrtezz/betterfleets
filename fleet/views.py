@@ -754,7 +754,26 @@ def overland_ingest(request, uuid):
         heading = properties.get("course") or properties.get("heading")
         subscription.heading = round(float(heading)) if heading is not None else None
         subscription.last_timestamp = parsed_timestamp
-        subscription.save(update_fields=["latitude", "longitude", "heading", "last_timestamp", "updated_at"])
+        
+        # Handle capacity data if present
+        capacity_current = properties.get("capacity_current")
+        capacity_max = properties.get("capacity_max")
+        capacity_enabled = properties.get("capacity_enabled", False)
+        
+        if capacity_enabled and capacity_current is not None:
+            subscription.capacity_current = int(capacity_current)
+            subscription.capacity_max = int(capacity_max) if capacity_max is not None else 0
+            subscription.capacity_enabled = True
+        elif not capacity_enabled:
+            subscription.capacity_enabled = False
+        
+        update_fields = ["latitude", "longitude", "heading", "last_timestamp", "updated_at"]
+        if capacity_enabled:
+            update_fields.extend(["capacity_current", "capacity_max", "capacity_enabled"])
+        elif subscription.capacity_enabled:
+            update_fields.append("capacity_enabled")
+        
+        subscription.save(update_fields=update_fields)
         
         # Create or update VehicleJourney for tracking
         from django.core.cache import cache

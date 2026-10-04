@@ -328,3 +328,22 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_authenticators(self):
         return [authentication.OptionalAPIKeyAuthentication()]
+
+    @action(detail=False, methods=['get'])
+    def permissions(self, request):
+        """Check current user's permissions"""
+        user = request.user
+        if not user.is_authenticated:
+            return Response({'overland': False}, status=401)
+        
+        from django.contrib.auth.models import Permission
+        overland_perm = Permission.objects.filter(
+            codename='use_overland',
+            content_type__app_label='fleet'
+        ).first()
+        
+        has_overland = user.has_perm('fleet.use_overland')
+        
+        return Response({
+            'overland': has_overland,
+        })

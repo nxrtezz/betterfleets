@@ -210,6 +210,9 @@ class OverlandSubscription(models.Model):
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     heading = models.IntegerField(null=True, blank=True)
     last_timestamp = models.DateTimeField(null=True, blank=True)
+    capacity_current = models.PositiveIntegerField(default=0, null=True, blank=True)
+    capacity_max = models.PositiveIntegerField(default=0, null=True, blank=True)
+    capacity_enabled = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

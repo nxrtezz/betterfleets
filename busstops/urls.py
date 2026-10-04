@@ -64,13 +64,15 @@ urlpatterns = [
     path("fleet/transittracker-import/check-username", fleet_views.transittracker_check_username, name="transittracker_check_username"),
     path("fleet/transittracker-import/get-operators", fleet_views.transittracker_get_operators, name="transittracker_get_operators"),
     path("fleet/transittracker-import/preview", fleet_views.transittracker_preview, name="transittracker_preview"),
-    path("overland", fleet_views.overland_generator, name="overland_generator"),
+    # Web Overland generator removed - now using native mobile app
+    # path("overland", fleet_views.overland_generator, name="overland_generator"),
     path(
         "fleet/rail-replacement-timetable",
         fleet_views.rail_replacement_timetable,
         name="rail_replacement_timetable",
     ),
-    path("overland.json", fleet_views.overland_json, name="overland_json"),
+    # overland.json deprecated - now integrated into vehicles.json
+    # path("overland.json", fleet_views.overland_json, name="overland_json"),
     path("staff/stats", views.staff_stats, name="staff_stats"),
     path("staff/theme-lab", views.theme_lab, name="theme_lab"),
     path("timetable-source-stats.json", views.timetable_source_stats),
