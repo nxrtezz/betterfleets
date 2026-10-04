@@ -20,7 +20,7 @@ jobs:
       
       - name: Install dependencies
         working-directory: ./BFTApp
-        run: npm ci --legacy-peer-deps
+        run: npm install --legacy-peer-deps
       
       - name: Setup EAS
         uses: expo/expo-github-action@v8
