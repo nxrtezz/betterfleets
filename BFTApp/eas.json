@@ -15,8 +15,7 @@
         "buildType": "apk"
       },
       "ios": {
-        "buildConfiguration": "Release",
-        "bundleIdentifier": "com.betterfleets.bftapp"
+        "buildConfiguration": "Release"
       },
       "distribution": "internal"
     },
@@ -25,8 +24,7 @@
         "buildType": "apk"
       },
       "ios": {
-        "buildConfiguration": "Release",
-        "bundleIdentifier": "com.betterfleets.bftapp"
+        "buildConfiguration": "Release"
       }
     }
   },
