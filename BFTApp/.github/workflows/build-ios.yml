@@ -30,7 +30,7 @@ jobs:
       
       - name: Build iOS IPA
         working-directory: ./BFTApp
-        run: eas build --platform ios --profile production --non-interactive
+        run: eas build --platform ios --profile sideload --non-interactive
       
       - name: Upload IPA
         uses: actions/upload-artifact@v4

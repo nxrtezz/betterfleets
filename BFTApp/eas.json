@@ -10,6 +10,16 @@
     "preview": {
       "distribution": "internal"
     },
+    "sideload": {
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "buildConfiguration": "Release",
+        "bundleIdentifier": "com.betterfleets.bftapp"
+      },
+      "distribution": "internal"
+    },
     "production": {
       "android": {
         "buildType": "apk"
