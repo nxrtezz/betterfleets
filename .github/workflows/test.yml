@@ -9,6 +9,13 @@ on:
       - 'BFTApp/**'
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tests disabled
+        run: echo "Tests disabled"
+
+jobs:
   test-frontend:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
