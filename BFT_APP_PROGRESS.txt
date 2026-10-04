@@ -210,4 +210,11 @@ COMPLETED: Fix npm install issue
 - Generated and committed package-lock.json
 - Commit: a1efdc2
 
-Current Status: All workflow issues fixed. Builds should work now. Ready to trigger builds.
+COMPLETED: Fix iOS build configuration
+- Added cli.appVersionSource to eas.json
+- Added ITSAppUsesNonExemptEncryption to app.json
+- Changed iOS build to use development profile (simpler credentials)
+- Added autoIncrement for iOS builds
+- Commit: e081c90
+
+Current Status: iOS build configuration fixed. Using development profile for simpler credentials. Ready to trigger builds.

@@ -23,7 +23,8 @@
         "NSLocationAlwaysUsageDescription": "This app needs access to location to track vehicle journeys in the background.",
         "UIBackgroundModes": [
           "location"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
