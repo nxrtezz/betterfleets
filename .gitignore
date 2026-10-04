@@ -99,3 +99,14 @@ credentials.sh
 slim-bustimes.sql
 
 reference_code/
+
+# =========================
+# Mobile App (BFTApp)
+# =========================
+BFTApp/node_modules/
+BFTApp/.expo/
+BFTApp/.expo-shared/
+BFTApp/.env
+BFTApp/package-lock.json
+BFTApp/tsconfig.tsbuildinfo
+BFTApp/.DS_Store

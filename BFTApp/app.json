@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "BFT App",
+    "slug": "bftapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffff9e"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.betterfleets.bftapp",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs access to location to track vehicle journeys.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to location to track vehicle journeys in the background.",
+        "NSLocationAlwaysUsageDescription": "This app needs access to location to track vehicle journeys in the background.",
+        "UIBackgroundModes": ["location"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffff9e",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      },
+      "package": "com.betterfleets.bftapp",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-location",
+      "expo-task-manager",
+      "expo-background-fetch",
+      "expo-secure-store",
+      "expo-router"
+    ]
+  }
+}
