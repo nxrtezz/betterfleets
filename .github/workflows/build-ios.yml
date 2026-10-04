@@ -3,6 +3,8 @@ name: Build iOS IPA
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'BFTApp/**'
   workflow_dispatch:
 
 jobs:
@@ -35,3 +37,4 @@ jobs:
         with:
           name: ios-ipa
           path: BFTApp/*.ipa
+          if-no-files-found: error

@@ -2,7 +2,11 @@ name: Run tests
 
 on:
   push:
+    paths-ignore:
+      - 'BFTApp/**'
   pull_request:
+    paths-ignore:
+      - 'BFTApp/**'
 
 jobs:
   test-frontend:

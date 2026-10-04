@@ -21,7 +21,9 @@
         "NSLocationWhenInUseUsageDescription": "This app needs access to location to track vehicle journeys.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to location to track vehicle journeys in the background.",
         "NSLocationAlwaysUsageDescription": "This app needs access to location to track vehicle journeys in the background.",
-        "UIBackgroundModes": ["location"]
+        "UIBackgroundModes": [
+          "location"
+        ]
       }
     },
     "android": {
@@ -33,7 +35,11 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION"
+        "ACCESS_BACKGROUND_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.WAKE_LOCK"
       ]
     },
     "web": {
@@ -45,6 +51,14 @@
       "expo-background-fetch",
       "expo-secure-store",
       "expo-router"
-    ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "898fa507-7bf5-4466-ae97-d3fb8a849ae9"
+      }
+    }
   }
 }

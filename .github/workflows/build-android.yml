@@ -3,6 +3,8 @@ name: Build Android APK
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'BFTApp/**'
   workflow_dispatch:
 
 jobs:
@@ -35,3 +37,4 @@ jobs:
         with:
           name: android-apk
           path: BFTApp/*.apk
+          if-no-files-found: error
