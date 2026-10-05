@@ -70,23 +70,15 @@ cd betterfleets
 python manage.py migrate fleet
 ```
 
-### 2. Create GitHub Repository
-You need to create a new GitHub repository for the mobile app:
+### 2. Repository Status
+The mobile app has been added to the existing BetterFleets repository:
+- **Repository**: https://github.com/nxrtezz/betterfleets
+- **Commit**: 3243074
+- **Branch**: main
+- **Location**: `BFTApp/` subdirectory
 
-1. Go to GitHub and create a new repository (e.g., `betterfleets/bft-app`)
-2. Do NOT initialize with README, .gitignore, or license
-3. Copy the repository URL
-
-### 3. Push Mobile App to GitHub
-```bash
-cd BFTApp
-git remote add origin https://github.com/YOUR_USERNAME/bft-app.git
-git branch -M main
-git push -u origin main
-```
-
-### 4. Configure GitHub Secrets
-In your GitHub repository settings, add the following secrets:
+### 3. Configure GitHub Secrets
+In your GitHub repository settings (https://github.com/nxrtezz/betterfleets/settings/secrets/actions), add the following secrets:
 
 **Required for EAS Build:**
 - `EXPO_TOKEN` - Your Expo account token (get from https://expo.dev/accounts/tokens)
@@ -95,26 +87,26 @@ In your GitHub repository settings, add the following secrets:
 - `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` - Your Clerk publishable key
 - `EXPO_PUBLIC_API_URL` - Your BetterFleets API URL (e.g., https://betterfleets.org)
 
-### 5. Configure EAS
+### 4. Configure EAS
 ```bash
-cd BFTApp
+cd betterfleets/BFTApp
 npx eas-cli login
 npx eas-cli build:configure
 ```
 
-### 6. Install Dependencies (if not already done)
+### 5. Install Dependencies (if not already done)
 ```bash
-cd BFTApp
+cd betterfleets/BFTApp
 npm install --legacy-peer-deps
 ```
 
-### 7. Test the App
+### 6. Test the App
 ```bash
-cd BFTApp
+cd betterfleets/BFTApp
 npm start
 ```
 
-### 8. Build APK/IPA
+### 7. Build APK/IPA
 Push to the `main` branch to trigger automatic builds, or manually trigger workflows from GitHub Actions tab.
 
 ## Notes

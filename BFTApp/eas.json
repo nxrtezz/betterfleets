@@ -17,8 +17,7 @@
       },
       "ios": {
         "buildConfiguration": "Release",
-        "autoIncrement": true,
-        "bundleIdentifier": "com.betterfleets.bftapp"
+        "autoIncrement": true
       },
       "distribution": "internal"
     },

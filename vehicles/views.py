@@ -5468,6 +5468,7 @@ def search_vehicles_merge(request):
     """
     Search for vehicles to merge with.
     Only accessible to superusers.
+    Shows all results, prioritizing vehicles from the same operator, group, or organization.
     """
     if not request.user.is_superuser:
         raise PermissionDenied
@@ -5479,7 +5480,7 @@ def search_vehicles_merge(request):
         return JsonResponse({"vehicles": []})
 
     vehicles = apply_vehicle_schema_compat(
-        Vehicle.objects.select_related("operator", "vehicle_type", "livery")
+        Vehicle.objects.select_related("operator", "vehicle_type", "livery", "operator__group", "operator__group__organisation")
     )
 
     if exclude_id:
@@ -5490,10 +5491,55 @@ def search_vehicles_merge(request):
         Q(reg__icontains=query)
         | Q(fleet_code__icontains=query)
         | Q(fleet_number__icontains=query)
-    )[:10]
+    )
+
+    # Get the current vehicle to determine priority
+    current_vehicle = None
+    if exclude_id:
+        try:
+            current_vehicle = Vehicle.objects.select_related("operator__group__organisation").get(id=exclude_id)
+        except Vehicle.DoesNotExist:
+            pass
+
+    # Get the operator, group, and organization from the current vehicle
+    current_operator_id = None
+    current_group_id = None
+    current_organisation_id = None
+
+    if current_vehicle and current_vehicle.operator:
+        current_operator_id = current_vehicle.operator.id
+        if current_vehicle.operator.group:
+            current_group_id = current_vehicle.operator.group.id
+            if current_vehicle.operator.group.organisation:
+                current_organisation_id = current_vehicle.operator.group.organisation.id
+
+    # Build a list of all matching vehicles with priority scores
+    vehicles_list = list(vehicles[:50])  # Limit to 50 results for performance
+
+    # Sort by priority: same operator > same group > same organisation > others
+    def get_priority_score(vehicle):
+        if not vehicle.operator:
+            return 0
+        
+        score = 0
+        # Same operator gets highest priority
+        if vehicle.operator.id == current_operator_id:
+            score = 100
+        # Same group (but different operator)
+        elif vehicle.operator.group and vehicle.operator.group.id == current_group_id:
+            score = 50
+        # Same organisation (but different group)
+        elif (vehicle.operator.group and 
+              vehicle.operator.group.organisation and 
+              vehicle.operator.group.organisation.id == current_organisation_id):
+            score = 25
+        
+        return score
+
+    vehicles_list.sort(key=lambda v: (get_priority_score(v), v.id), reverse=True)
 
     results = []
-    for vehicle in vehicles:
+    for vehicle in vehicles_list:
         results.append({
             "id": vehicle.id,
             "reg": vehicle.reg,
