@@ -1,14 +1,627 @@
-{% extends "page.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#ffff9e">
+  <title>Tracking - Better Fleets</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-{% block title %}Tracking - Better Fleets{% endblock %}
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #fff;
+      color: #222;
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
 
-{% block bodyclass %}tracking-mobile{% endblock %}
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: #222;
+        color: #fff;
+      }
+    }
 
-{% block content %}
+    #tracking-app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      max-width: 600px;
+      margin: 0 auto;
+      background: #fff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      #tracking-app {
+        background: #222;
+      }
+    }
+
+    #tracking-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      padding-bottom: 80px;
+    }
+
+    /* Bottom navigation */
+    .tracking-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      background: #fff;
+      border-top: 1px solid #ddd;
+      z-index: 1000;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .tracking-nav {
+        background: #222;
+        border-top-color: #444;
+      }
+    }
+
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.5rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #666;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .nav-item {
+        color: #aaa;
+      }
+    }
+
+    .nav-item.active {
+      opacity: 1;
+      color: #ffff9e;
+    }
+
+    .nav-item span {
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+    }
+
+    /* Sections */
+    .tracking-section,
+    .vehicles-section,
+    .settings-section {
+      padding: 0.5rem 0;
+    }
+
+    .tracking-section h1,
+    .vehicles-section h1,
+    .settings-section h1 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .section-description {
+      color: #666;
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .section-description {
+        color: #aaa;
+      }
+    }
+
+    /* Tracking mode cards */
+    .tracking-modes {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .tracking-mode-card {
+      padding: 1.5rem;
+      border: 2px solid #ddd;
+      border-radius: 12px;
+      background: #fff;
+      cursor: pointer;
+      text-align: left;
+      transition: border-color 0.2s;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .tracking-mode-card {
+        border-color: #444;
+        background: #2a2a2a;
+      }
+    }
+
+    .tracking-mode-card:active {
+      border-color: #ffff9e;
+    }
+
+    .mode-icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .tracking-mode-card h2 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .tracking-mode-card p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .tracking-mode-card p {
+        color: #aaa;
+      }
+    }
+
+    /* Form sections */
+    .form-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-section h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+
+    .section-hint {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 0.5rem;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .section-hint {
+        color: #aaa;
+      }
+    }
+
+    /* Vehicle selection */
+    .vehicle-selection {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .vehicle-option {
+      flex: 1;
+      padding: 0.75rem;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .vehicle-option {
+        border-color: #444;
+        background: #2a2a2a;
+        color: #fff;
+      }
+    }
+
+    .vehicle-option.active {
+      border-color: #ffff9e;
+      background: #ffff9e;
+      color: #222;
+    }
+
+    /* Inputs */
+    input[type="text"],
+    input[type="search"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 0.875rem;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #fff;
+      color: #222;
+      font-size: 1rem;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      input[type="text"],
+      input[type="search"],
+      input[type="number"],
+      select {
+        border-color: #444;
+        background: #2a2a2a;
+        color: #fff;
+      }
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: #ffff9e;
+    }
+
+    /* Search results */
+    .search-results {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      margin-top: 0.5rem;
+      background: #fff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .search-results {
+        border-color: #444;
+        background: #2a2a2a;
+      }
+    }
+
+    .search-result-item {
+      padding: 0.875rem;
+      border-bottom: 1px solid #ddd;
+      cursor: pointer;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .search-result-item {
+        border-bottom-color: #444;
+      }
+    }
+
+    .search-result-item:last-child {
+      border-bottom: none;
+    }
+
+    .search-result-item:active {
+      background: #ffff9e;
+    }
+
+    /* Map */
+    .tracking-map {
+      height: 300px;
+      border-radius: 12px;
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+
+    .active-map {
+      height: 50vh;
+      margin-bottom: 0;
+    }
+
+    /* Stops list */
+    .stops-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .stop-item {
+      padding: 0.875rem;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .stop-item {
+        border-bottom-color: #444;
+      }
+    }
+
+    .stop-item.passed {
+      opacity: 0.5;
+    }
+
+    .stop-sequence {
+      font-weight: 600;
+      min-width: 2rem;
+    }
+
+    .stop-name {
+      flex: 1;
+    }
+
+    .stop-time {
+      font-size: 0.85rem;
+      color: #666;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .stop-time {
+        color: #aaa;
+      }
+    }
+
+    /* Buttons */
+    .button {
+      width: 100%;
+      padding: 0.875rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .button--primary {
+      background: #ffff9e;
+      color: #222;
+    }
+
+    .button--secondary {
+      background: #ddd;
+      color: #222;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .button--secondary {
+        background: #444;
+        color: #fff;
+      }
+    }
+
+    .button--danger {
+      background: #dc3545;
+      color: white;
+    }
+
+    .button--warning {
+      background: #ffc107;
+      color: #000;
+    }
+
+    .back-button {
+      background: none;
+      border: none;
+      padding: 0.5rem 0;
+      cursor: pointer;
+      font-size: 1rem;
+      color: #0066cc;
+      margin-bottom: 1rem;
+    }
+
+    /* Active tracking */
+    .active-tracking {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    .tracking-header {
+      padding: 1rem;
+      background: #ffff9e;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .tracking-header {
+        background: #333;
+      }
+    }
+
+    .route-info {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .route-number {
+      font-weight: 700;
+      font-size: 1.2rem;
+    }
+
+    .destination {
+      font-weight: 500;
+    }
+
+    .journey-id {
+      font-size: 0.85rem;
+      opacity: 0.7;
+      margin-top: 0.25rem;
+    }
+
+    .stops-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    .tracking-controls {
+      display: flex;
+      gap: 0.5rem;
+      padding: 1rem;
+      background: #fff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .tracking-controls {
+        background: #222;
+      }
+    }
+
+    .tracking-controls .button {
+      margin-top: 0;
+    }
+
+    .transmission-status {
+      padding: 0.75rem 1rem;
+      text-align: center;
+      font-size: 0.85rem;
+      background: #fff;
+      border-top: 1px solid #ddd;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .transmission-status {
+        background: #222;
+        border-top-color: #444;
+      }
+    }
+
+    /* Settings */
+    .setting-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .setting-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .setting-group h3 {
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .setting-hint {
+      font-size: 0.85rem;
+      color: #666;
+      margin-top: 0.25rem;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .setting-hint {
+        color: #aaa;
+      }
+    }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .modal-content {
+      background: #fff;
+      padding: 1.5rem;
+      border-radius: 12px;
+      max-width: 90%;
+      width: 300px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .modal-content {
+        background: #2a2a2a;
+      }
+    }
+
+    .modal-content h2 {
+      margin-top: 0;
+    }
+
+    .capacity-display {
+      font-size: 2rem;
+      font-weight: 700;
+      text-align: center;
+      margin: 1rem 0;
+    }
+
+    .capacity-controls {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    .capacity-btn {
+      padding: 0.75rem 1rem;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .capacity-btn {
+        border-color: #444;
+        background: #2a2a2a;
+        color: #fff;
+      }
+    }
+
+    /* Access denied */
+    .access-denied {
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .access-denied h2 {
+      margin-bottom: 1rem;
+    }
+
+    /* Vehicle details */
+    .vehicle-details {
+      padding: 1rem;
+    }
+
+    .vehicle-info p {
+      margin: 0.5rem 0;
+    }
+
+    /* Loading spinner */
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: #666;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .loading {
+        color: #aaa;
+      }
+    }
+  </style>
+</head>
+<body>
   <div id="tracking-app">
     <!-- Main content area -->
     <div id="tracking-content">
-      <!-- Content will be dynamically loaded here -->
+      <div class="loading">Loading...</div>
     </div>
 
     <!-- Bottom navigation -->
@@ -38,15 +651,7 @@
       </button>
     </nav>
   </div>
-{% endblock content %}
 
-{% block head %}
-  {{ block.super }}
-  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
-{% endblock head %}
-
-{% block foot %}
-  {{ block.super }}
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <script>
     // Tracking Application State
@@ -63,6 +668,8 @@
       selectedVehicle: null,
       selectedStops: [],
       selectedTrip: null,
+      selectedOperator: null,
+      selectedService: null,
       settings: {
         transmissionInterval: 30
       }
@@ -101,7 +708,7 @@
           <h2>Access Denied</h2>
           <p>You do not have permission to use the tracking feature.</p>
           <p>Please contact an administrator if you believe this is an error.</p>
-          <a href="/" class="button">Return to Home</a>
+          <button class="button button--secondary" onclick="window.location.href='/'">Return to Home</button>
         </div>
       `;
     }
@@ -178,7 +785,7 @@
       return `
         <div class="vehicles-section">
           <h1>Vehicles</h1>
-          <div class="search-container">
+          <div class="form-section">
             <input type="search" id="vehicle-search-input" placeholder="Search vehicles (fleet number, registration, code)...">
           </div>
           <div id="vehicle-search-results" class="search-results"></div>
@@ -245,7 +852,7 @@
     // Get Unscheduled tracking HTML
     async function getUnscheduledTrackingHTML() {
       return `
-        <div class="tracking-mode-section">
+        <div class="tracking-section">
           <button class="back-button" onclick="loadSection('tracking')">← Back</button>
           <h1>Unscheduled Tracking</h1>
 
@@ -286,7 +893,7 @@
     // Get Scheduled tracking HTML
     async function getScheduledTrackingHTML() {
       return `
-        <div class="tracking-mode-section">
+        <div class="tracking-section">
           <button class="back-button" onclick="loadSection('tracking')">← Back</button>
           <h1>Scheduled Trip</h1>
 
@@ -333,7 +940,7 @@
     // Get Tracking Only HTML
     async function getTrackingOnlyHTML() {
       return `
-        <div class="tracking-mode-section">
+        <div class="tracking-section">
           <button class="back-button" onclick="loadSection('tracking')">← Back</button>
           <h1>Tracking Only</h1>
 
@@ -362,7 +969,7 @@
       `;
     }
 
-    // Setup functions for each mode (simplified for now)
+    // Setup functions for each mode
     function setupUnscheduledTracking() {
       // Vehicle selection toggle
       const vehicleOptions = document.querySelectorAll('.vehicle-option');
@@ -786,7 +1393,7 @@
 
       const map = new maplibregl.Map({
         container: containerId,
-        style: window.MAP_STYLE_URL || 'https://demotiles.maplibre.org/style.json',
+        style: 'https://demotiles.maplibre.org/style.json',
         center: [-2, 54],
         zoom: 5
       });
@@ -945,7 +1552,7 @@
     function initializeActiveTracking() {
       const map = new maplibregl.Map({
         container: 'active-tracking-map',
-        style: window.MAP_STYLE_URL || 'https://demotiles.maplibre.org/style.json',
+        style: 'https://demotiles.maplibre.org/style.json',
         center: [-2, 54],
         zoom: 5
       });
@@ -1118,393 +1725,5 @@
       });
     }
   </script>
-
-  <style>
-    /* Mobile-first tracking styles */
-    .tracking-mobile {
-      padding-bottom: 70px; /* Space for bottom nav */
-    }
-
-    #tracking-app {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    #tracking-content {
-      flex: 1;
-      overflow-y: auto;
-    }
-
-    /* Bottom navigation */
-    .tracking-nav {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      display: flex;
-      background: var(--background-color);
-      border-top: 1px solid var(--border-color);
-      z-index: 1000;
-    }
-
-    .nav-item {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 0.5rem;
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--text-color);
-      opacity: 0.6;
-      transition: opacity 0.2s;
-    }
-
-    .nav-item.active {
-      opacity: 1;
-      color: var(--brand-color-darker);
-    }
-
-    .nav-item span {
-      font-size: 0.75rem;
-      margin-top: 0.25rem;
-    }
-
-    /* Sections */
-    .tracking-section,
-    .vehicles-section,
-    .settings-section {
-      padding: 1rem;
-    }
-
-    .tracking-section h1,
-    .vehicles-section h1,
-    .settings-section h1 {
-      margin: 0 0 0.5rem 0;
-    }
-
-    .section-description {
-      color: var(--text-color);
-      opacity: 0.7;
-      margin-bottom: 1.5rem;
-    }
-
-    /* Tracking mode cards */
-    .tracking-modes {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .tracking-mode-card {
-      padding: 1.5rem;
-      border: 2px solid var(--border-color);
-      border-radius: 8px;
-      background: var(--background-color);
-      cursor: pointer;
-      text-align: left;
-    }
-
-    .tracking-mode-card:active {
-      border-color: var(--brand-color-darker);
-    }
-
-    .mode-icon {
-      font-size: 2rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .tracking-mode-card h2 {
-      margin: 0 0 0.5rem 0;
-      font-size: 1.1rem;
-    }
-
-    .tracking-mode-card p {
-      margin: 0;
-      font-size: 0.9rem;
-      opacity: 0.8;
-    }
-
-    /* Form sections */
-    .form-section {
-      margin-bottom: 1.5rem;
-    }
-
-    .form-section h2 {
-      font-size: 1rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .section-hint {
-      font-size: 0.85rem;
-      opacity: 0.7;
-      margin-bottom: 0.5rem;
-    }
-
-    /* Vehicle selection */
-    .vehicle-selection {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-    }
-
-    .vehicle-option {
-      flex: 1;
-      padding: 0.75rem;
-      border: 2px solid var(--border-color);
-      border-radius: 6px;
-      background: var(--background-color);
-      cursor: pointer;
-    }
-
-    .vehicle-option.active {
-      border-color: var(--brand-color-darker);
-      background: var(--brand-color);
-    }
-
-    /* Inputs */
-    input[type="text"],
-    input[type="search"],
-    input[type="number"],
-    select {
-      width: 100%;
-      padding: 0.75rem;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      background: var(--background-color);
-      color: var(--text-color);
-      font-size: 1rem;
-      box-sizing: border-box;
-    }
-
-    /* Search results */
-    .search-results {
-      max-height: 200px;
-      overflow-y: auto;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      margin-top: 0.5rem;
-    }
-
-    .search-result-item {
-      padding: 0.75rem;
-      border-bottom: 1px solid var(--border-color);
-      cursor: pointer;
-    }
-
-    .search-result-item:last-child {
-      border-bottom: none;
-    }
-
-    .search-result-item:active {
-      background: var(--brand-color-darker);
-    }
-
-    /* Map */
-    .tracking-map {
-      height: 300px;
-      border-radius: 8px;
-      margin-bottom: 1rem;
-    }
-
-    .active-map {
-      height: 50vh;
-      margin-bottom: 0;
-    }
-
-    /* Stops list */
-    .stops-list {
-      max-height: 200px;
-      overflow-y: auto;
-    }
-
-    .stop-item {
-      padding: 0.75rem;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .stop-item.passed {
-      opacity: 0.5;
-    }
-
-    /* Buttons */
-    .button {
-      width: 100%;
-      padding: 0.875rem;
-      border: none;
-      border-radius: 6px;
-      font-size: 1rem;
-      font-weight: bold;
-      cursor: pointer;
-      margin-top: 0.5rem;
-    }
-
-    .button--primary {
-      background: var(--brand-color-darker);
-      color: var(--button-foreground);
-    }
-
-    .button--secondary {
-      background: var(--border-color);
-      color: var(--text-color);
-    }
-
-    .button--danger {
-      background: #dc3545;
-      color: white;
-    }
-
-    .button--warning {
-      background: #ffc107;
-      color: #000;
-    }
-
-    .back-button {
-      background: none;
-      border: none;
-      padding: 0.5rem 0;
-      cursor: pointer;
-      font-size: 1rem;
-      color: var(--link-color);
-    }
-
-    /* Active tracking */
-    .active-tracking {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
-
-    .tracking-header {
-      padding: 1rem;
-      background: var(--brand-color);
-    }
-
-    .route-info {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    .route-number {
-      font-weight: bold;
-    }
-
-    .journey-id {
-      font-size: 0.85rem;
-      opacity: 0.8;
-      margin-top: 0.25rem;
-    }
-
-    .stops-container {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem;
-    }
-
-    .tracking-controls {
-      display: flex;
-      gap: 0.5rem;
-      padding: 1rem;
-      background: var(--background-color);
-    }
-
-    .tracking-controls .button {
-      margin-top: 0;
-    }
-
-    .transmission-status {
-      padding: 0.75rem 1rem;
-      text-align: center;
-      font-size: 0.85rem;
-      background: var(--background-color);
-      border-top: 1px solid var(--border-color);
-    }
-
-    /* Settings */
-    .setting-group {
-      margin-bottom: 1.5rem;
-    }
-
-    .setting-group label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-weight: bold;
-    }
-
-    .setting-hint {
-      font-size: 0.85rem;
-      opacity: 0.7;
-      margin-top: 0.25rem;
-    }
-
-    /* Modal */
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 2000;
-    }
-
-    .modal-content {
-      background: var(--background-color);
-      padding: 1.5rem;
-      border-radius: 8px;
-      max-width: 90%;
-      width: 300px;
-    }
-
-    .modal-content h2 {
-      margin-top: 0;
-    }
-
-    .capacity-display {
-      font-size: 2rem;
-      font-weight: bold;
-      text-align: center;
-      margin: 1rem 0;
-    }
-
-    .capacity-controls {
-      display: flex;
-      gap: 0.5rem;
-      justify-content: center;
-      margin-bottom: 1rem;
-    }
-
-    .capacity-btn {
-      padding: 0.75rem 1rem;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      background: var(--background-color);
-      cursor: pointer;
-      font-size: 1.25rem;
-    }
-
-    /* Access denied */
-    .access-denied {
-      padding: 2rem;
-      text-align: center;
-    }
-
-    /* Vehicle details */
-    .vehicle-details {
-      padding: 1rem;
-    }
-
-    .vehicle-info p {
-      margin: 0.5rem 0;
-    }
-  </style>
-{% endblock foot %}
+</body>
+</html>
