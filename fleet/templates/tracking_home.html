@@ -677,31 +677,12 @@
 
     // Initialize the tracking app
     document.addEventListener('DOMContentLoaded', async () => {
-      await checkPermissions();
       loadSection('tracking');
       setupNavigation();
       loadSettings();
     });
 
-    // Check if user has Overland permission
-    async function checkPermissions() {
-      try {
-        const response = await fetch('/api/users/permissions/');
-        if (response.ok) {
-          const data = await response.json();
-          if (!data.overland) {
-            showAccessDenied();
-          }
-        } else if (response.status === 401) {
-          // Not authenticated - redirect to login
-          window.location.href = '/accounts/login/';
-        }
-      } catch (error) {
-        console.error('Error checking permissions:', error);
-      }
-    }
-
-    // Show access denied message
+    // Show access denied message (fallback if server-side check fails)
     function showAccessDenied() {
       document.getElementById('tracking-content').innerHTML = `
         <div class="access-denied">

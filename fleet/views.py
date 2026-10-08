@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render, redirect
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
@@ -929,7 +929,7 @@ def toggle_pin_operator(request):
 def tracking_home(request):
     """Main tracking page - mobile-first SPA with three tracking modes"""
     if not request.user.is_authenticated:
-        raise PermissionDenied("Authentication required")
+        return redirect('/accounts/login/?next=/tracking/')
     if not request.user.has_perm('fleet.use_overland'):
         raise PermissionDenied("You do not have permission to use tracking")
 

@@ -1,6 +1,6 @@
 import struct
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import pagination, viewsets
+from rest_framework import pagination, viewsets, authentication
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -338,6 +338,7 @@ class VehicleJourneyViewSet(viewsets.ReadOnlyModelViewSet):
         """Create a new vehicle from ticket machine code"""
         from vehicles.models import Vehicle
 
+        # Allow both API key and session authentication
         if not request.user.is_authenticated:
             return Response({'error': 'Authentication required'}, status=401)
 
@@ -412,6 +413,27 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = []
 
     def get_authenticators(self):
+        # Allow both API key and session authentication
+        return [authentication.OptionalAPIKeyAuthentication(), authentication.SessionAuthentication()]
+    queryset = User.objects.annotate(
+        approved_edit_count=Count(
+            "edited_revisions", filter=Q(edited_revisions__pending=False, edited_revisions__disapproved=False)
+        ),
+        disapproved_edit_count=Count(
+            "edited_revisions", filter=Q(edited_revisions__disapproved=True)
+        ),
+        pending_edit_count=Count(
+            "edited_revisions", filter=Q(edited_revisions__pending=True)
+        ),
+        photo_count=Count("photo", distinct=True),
+        ride_count=Count("fleet_ride_logs", distinct=True),
+    )
+    serializer_class = serializers.UserSerializer
+    pagination_class = CursorPagination
+    authentication_classes = [authentication.OptionalAPIKeyAuthentication]
+    permission_classes = []
+
+    def get_authenticators(self):
         return [authentication.OptionalAPIKeyAuthentication()]
 
     @action(detail=False, methods=['get'])
@@ -444,6 +466,7 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
         from secrets import token_urlsafe
         import json
 
+        # Allow both API key and session authentication
         if not request.user.is_authenticated:
             return Response({'error': 'Authentication required'}, status=401)
 
