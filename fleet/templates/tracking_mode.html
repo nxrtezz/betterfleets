@@ -1,0 +1,172 @@
+{% extends "page.html" %}
+
+{% block title %}{{ mode_name }} Tracking - Better Fleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+  <h1>{{ mode_name }} Tracking</h1>
+  <p><a href="/tracking">← Back to tracking modes</a></p>
+
+  {% if mode == 'unscheduled' %}
+    <form method="post" id="unscheduled-form">
+      {% csrf_token %}
+      <p>
+        <label for="vehicle_slug">Vehicle slug</label>
+        <input id="vehicle_slug" name="vehicle_slug" required placeholder="e.g. 1234 or ABC123">
+      </p>
+      <p>
+        <label for="destination">Destination</label>
+        <input id="destination" name="destination" required placeholder="e.g. Town Centre">
+      </p>
+      <p>
+        <label for="route_number">Route number</label>
+        <input id="route_number" name="route_number" required placeholder="e.g. 1 or X99">
+      </p>
+      <p>
+        <label for="tracking_date">Tracking date</label>
+        <input id="tracking_date" name="tracking_date" type="date"
+               value="{{ tracking_date|date:'Y-m-d' }}" required>
+      </p>
+      <fieldset>
+        <legend>Stops (select in order)</legend>
+        <p>Tap stops on the map to add them to your route. You can reorder them by dragging.</p>
+        <div id="stop-rows">
+          <div class="stop-row">
+            <select name="stop_id" aria-label="Stop">
+              <option value="">Select a stop</option>
+              {% for stop in stops %}
+                <option value="{{ stop.atco_code }}">{{ stop.get_long_name }} ({{ stop.atco_code }})</option>
+              {% endfor %}
+            </select>
+            <label>Arrival <input name="arrival_time" type="time"></label>
+            <label>Departure <input name="departure_time" type="time"></label>
+            <button type="button" class="remove-stop">Remove</button>
+          </div>
+        </div>
+        <button type="button" id="add-stop">Add stop</button>
+      </fieldset>
+      <button type="submit">Start Tracking</button>
+    </form>
+
+  {% elif mode == 'scheduled' %}
+    <form method="post" id="scheduled-form">
+      {% csrf_token %}
+      <p>
+        <label for="vehicle_slug">Vehicle slug</label>
+        <input id="vehicle_slug" name="vehicle_slug" required placeholder="e.g. 1234 or ABC123">
+      </p>
+      <p>
+        <label for="trip_id">Scheduled trip</label>
+        <select id="trip_id" name="trip_id" required>
+          <option value="">Select a trip</option>
+          {% for trip in trips %}
+            <option value="{{ trip.pk }}">
+              {{ trip.calendar.start_date }} · {{ trip.route.service.line_name }}
+              · {{ trip.route.origin }} to {{ trip.route.destination }}
+              · {{ trip.headsign }} ({{ trip.vehicle_journey_code }})
+            </option>
+          {% endfor %}
+        </select>
+      </p>
+      <button type="submit">Start Tracking</button>
+    </form>
+
+  {% elif mode == 'tracking-only' %}
+    <form method="post" id="tracking-only-form">
+      {% csrf_token %}
+      <p>
+        <label for="vehicle_slug">Vehicle slug</label>
+        <input id="vehicle_slug" name="vehicle_slug" required placeholder="e.g. 1234 or ABC123">
+      </p>
+      <p>
+        <label for="destination">Destination</label>
+        <input id="destination" name="destination" required placeholder="e.g. Town Centre">
+      </p>
+      <p>
+        <label for="route_number">Route number</label>
+        <input id="route_number" name="route_number" required placeholder="e.g. 1 or X99">
+      </p>
+      <p>
+        <label for="tracking_date">Tracking date</label>
+        <input id="tracking_date" name="tracking_date" type="date"
+               value="{{ tracking_date|date:'Y-m-d' }}" required>
+      </p>
+      <button type="submit">Start Tracking</button>
+    </form>
+  {% endif %}
+{% endblock content %}
+
+{% block foot %}
+  {{ block.super }}
+  <script>
+    const rows = document.getElementById("stop-rows");
+    const addStop = document.getElementById("add-stop");
+    if (rows && addStop) {
+      addStop.addEventListener("click", () => {
+        const row = rows.firstElementChild.cloneNode(true);
+        row.querySelector("select").value = "";
+        row.querySelectorAll("input").forEach((input) => input.value = "");
+        rows.appendChild(row);
+      });
+      rows.addEventListener("click", (event) => {
+        if (!event.target.classList.contains("remove-stop")) return;
+        if (rows.children.length === 1) {
+          rows.firstElementChild.querySelector("select").value = "";
+          rows.firstElementChild.querySelectorAll("input").forEach((input) => input.value = "");
+        } else {
+          event.target.closest(".stop-row").remove();
+        }
+      });
+    }
+
+    // Form submission handler
+    const form = document.querySelector('form');
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+
+        // Handle multiple stops
+        if (document.getElementById('stop-rows')) {
+          const stopRows = document.querySelectorAll('.stop-row');
+          const stops = [];
+          stopRows.forEach((row, index) => {
+            const stopId = row.querySelector('select[name="stop_id"]').value;
+            if (stopId) {
+              stops.push({
+                stop_id: stopId,
+                arrival: row.querySelector('input[name="arrival_time"]').value,
+                departure: row.querySelector('input[name="departure_time"]').value,
+                sequence: index
+              });
+            }
+          });
+          data.stops = JSON.stringify(stops);
+        }
+
+        try {
+          const response = await fetch('/api/tracking/start/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            },
+            body: JSON.stringify(data)
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            window.location.href = `/tracking/active/${result.subscription_id}`;
+          } else {
+            const error = await response.json();
+            alert('Error: ' + (error.error || 'Failed to start tracking'));
+          }
+        } catch (err) {
+          alert('Error: Failed to start tracking');
+        }
+      });
+    }
+  </script>
+{% endblock foot %}

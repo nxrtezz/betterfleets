@@ -1,0 +1,94 @@
+{% extends "page.html" %}
+
+{% block title %}Tracking - Better Fleets{% endblock %}
+
+{% block bodyclass %}narrow{% endblock %}
+
+{% block content %}
+  <h1>Vehicle Tracking</h1>
+  <p>Choose a tracking mode to begin tracking your vehicle journey.</p>
+
+  <div class="tracking-modes">
+    <a href="/tracking/unscheduled" class="tracking-mode-card">
+      <h2>Unscheduled Tracking</h2>
+      <p>Select a vehicle, choose stops on a map, and create a custom journey. Best for ad-hoc or special services.</p>
+    </a>
+
+    <a href="/tracking/scheduled" class="tracking-mode-card">
+      <h2>Scheduled Trip</h2>
+      <p>Select an operator, service, and trip from the timetable. Ideal for regular scheduled services.</p>
+    </a>
+
+    <a href="/tracking/tracking-only" class="tracking-mode-card">
+      <h2>Tracking Only</h2>
+      <p>Simple vehicle tracking with route number and destination. Minimal setup, just track your position.</p>
+    </a>
+  </div>
+
+  <div class="tracking-info">
+    <h3>How it works</h3>
+    <ol>
+      <li>Choose a tracking mode above</li>
+      <li>Set up your journey details (vehicle, route, stops)</li>
+      <li>Start tracking - your location will be sent to the server</li>
+      <li>View your progress on the map with live updates</li>
+      <li>Stop tracking when you complete your journey</li>
+    </ol>
+  </div>
+{% endblock content %}
+
+{% block foot %}
+  {{ block.super }}
+  <style>
+    .tracking-modes {
+      display: grid;
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .tracking-mode-card {
+      display: block;
+      padding: 1.5rem;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--text-color);
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .tracking-mode-card:hover {
+      border-color: var(--brand-color-darker);
+      transform: translateY(-2px);
+    }
+
+    .tracking-mode-card h2 {
+      margin: 0 0 0.5rem 0;
+      color: var(--brand-color-darker);
+    }
+
+    .tracking-mode-card p {
+      margin: 0;
+      color: var(--text-color);
+      opacity: 0.8;
+    }
+
+    .tracking-info {
+      margin-top: 2rem;
+      padding: 1.5rem;
+      background: var(--background-color);
+      border-radius: 8px;
+    }
+
+    .tracking-info h3 {
+      margin-top: 0;
+    }
+
+    .tracking-info ol {
+      padding-left: 1.5rem;
+    }
+
+    .tracking-info li {
+      margin: 0.5rem 0;
+    }
+  </style>
+{% endblock foot %}

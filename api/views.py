@@ -335,15 +335,182 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
         user = request.user
         if not user.is_authenticated:
             return Response({'overland': False}, status=401)
-        
+
         from django.contrib.auth.models import Permission
         overland_perm = Permission.objects.filter(
             codename='use_overland',
             content_type__app_label='fleet'
         ).first()
-        
+
         has_overland = user.has_perm('fleet.use_overland')
-        
+
         return Response({
             'overland': has_overland,
+        })
+
+    @action(detail=False, methods=['post'])
+    def start_tracking(self, request):
+        """Start a new tracking session"""
+        from fleet.models import OverlandSubscription
+        from busstops.models import DataSource, StopPoint
+        from bustimes.models import Route, Calendar, Trip, StopTime
+        from vehicles.models import Vehicle, VehicleJourney
+        from django.utils import timezone
+        from secrets import token_urlsafe
+        import json
+
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=401)
+
+        if not request.user.has_perm('fleet.use_overland'):
+            return Response({'error': 'Permission denied'}, status=403)
+
+        data = request.data
+        vehicle_slug = data.get('vehicle_slug')
+        destination = data.get('destination')
+        route_number = data.get('route_number')
+        tracking_date_str = data.get('tracking_date')
+        trip_id = data.get('trip_id')
+        stops_str = data.get('stops')
+
+        if not vehicle_slug:
+            return Response({'error': 'Vehicle slug required'}, status=400)
+
+        try:
+            vehicle = Vehicle.objects.get(slug=vehicle_slug)
+        except Vehicle.DoesNotExist:
+            return Response({'error': 'Vehicle not found'}, status=404)
+
+        # Parse tracking date
+        if tracking_date_str:
+            try:
+                tracking_date = timezone.datetime.strptime(tracking_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({'error': 'Invalid tracking date'}, status=400)
+        else:
+            tracking_date = timezone.localdate()
+
+        # Get or create Overland data source
+        overland_source, _ = DataSource.objects.get_or_create(
+            name="Overland",
+            defaults={"url": "https://overland.tech"}
+        )
+
+        # Handle scheduled trip mode
+        scheduled_trip = None
+        if trip_id:
+            try:
+                scheduled_trip = Trip.objects.get(pk=trip_id)
+            except Trip.DoesNotExist:
+                return Response({'error': 'Trip not found'}, status=404)
+
+        # Handle stops for unscheduled mode
+        stop_rows = []
+        if stops_str:
+            try:
+                stops_data = json.loads(stops_str)
+                for stop_data in stops_data:
+                    stop = StopPoint.objects.get(atco_code=stop_data['stop_id'])
+                    stop_rows.append({
+                        'stop': stop,
+                        'arrival': stop_data.get('arrival'),
+                        'departure': stop_data.get('departure'),
+                        'sequence': stop_data.get('sequence', 0)
+                    })
+            except (json.JSONDecodeError, StopPoint.DoesNotExist):
+                return Response({'error': 'Invalid stops data'}, status=400)
+
+        # Create scheduled trip data if stops provided
+        if stop_rows and not scheduled_trip:
+            if destination:
+                service = Route.objects.create(
+                    source=overland_source,
+                    line_name=route_number or "Overland",
+                    origin=stop_rows[0]["stop"].get_long_name(),
+                    destination=destination or stop_rows[-1]["stop"].get_long_name(),
+                    start_date=tracking_date,
+                    end_date=tracking_date,
+                )
+                calendar = Calendar.objects.create(
+                    start_date=tracking_date,
+                    end_date=tracking_date,
+                    summary="Overland tracking",
+                    source=overland_source,
+                    **{
+                        day: tracking_date.weekday() == index
+                        for index, day in enumerate(
+                            ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+                        )
+                    },
+                )
+                scheduled_trip = Trip.objects.create(
+                    route=service,
+                    calendar=calendar,
+                    vehicle_journey_code=f"overland-{vehicle.slug}-{tracking_date:%Y%m%d}",
+                    headsign=destination,
+                    start=stop_rows[0]["arrival"],
+                    end=stop_rows[-1]["departure"],
+                    operator=vehicle.operator,
+                )
+                StopTime.objects.bulk_create([
+                    StopTime(
+                        trip=scheduled_trip,
+                        stop=row["stop"],
+                        display_name=row["stop"].get_long_name(),
+                        arrival=row["arrival"],
+                        departure=row["departure"],
+                        sequence=row["sequence"],
+                    )
+                    for row in stop_rows
+                ])
+
+        # Create journey
+        if scheduled_trip:
+            journey_datetime = scheduled_trip.start_datetime(tracking_date)
+            journey_destination = destination or scheduled_trip.headsign or ""
+            journey_route = scheduled_trip.route.line_name
+            journey_code = scheduled_trip.vehicle_journey_code or route_number
+            journey_service = scheduled_trip.route.service
+            journey_direction = "inbound" if scheduled_trip.inbound else ""
+        else:
+            journey_datetime = timezone.make_aware(
+                timezone.datetime.combine(tracking_date, timezone.datetime.min.time())
+            )
+            journey_destination = destination
+            journey_route = route_number or "Overland"
+            journey_code = route_number or f"overland-{vehicle.slug}"
+            journey_service = None
+            journey_direction = ""
+
+        journey = VehicleJourney.objects.create(
+            vehicle=vehicle,
+            datetime=journey_datetime,
+            date=tracking_date,
+            destination=journey_destination,
+            code=journey_code,
+            route_name=journey_route,
+            source=overland_source,
+            direction=journey_direction,
+            trip=scheduled_trip,
+            service=journey_service,
+        )
+
+        # Create subscription
+        auth_key = token_urlsafe(32)
+        subscription = OverlandSubscription.objects.create(
+            user=request.user,
+            vehicle=vehicle,
+            destination=destination,
+            route_number=route_number,
+            trip_id=str(scheduled_trip.pk) if scheduled_trip else trip_id,
+            scheduled_trip=scheduled_trip,
+            tracking_date=tracking_date,
+            journey=journey,
+            auth_key_hash=OverlandSubscription.hash_auth_key(auth_key),
+        )
+
+        return Response({
+            'subscription_id': str(subscription.uuid),
+            'journey_id': journey.pk,
+            'auth_key': auth_key,
         })

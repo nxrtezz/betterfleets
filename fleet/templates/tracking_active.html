@@ -1,0 +1,358 @@
+{% extends "page.html" %}
+
+{% block title %}Active Tracking - {{ vehicle.slug }} - Better Fleets{% endblock %}
+
+{% block bodyclass %}tracking-active{% endblock %}
+
+{% block content %}
+  <div class="tracking-header">
+    <h1>Active Tracking</h1>
+    <div class="tracking-info-bar">
+      <span class="tracking-vehicle">{{ vehicle.slug }}</span>
+      <span class="tracking-route">{{ journey.route_name }}</span>
+      <span class="tracking-destination">{{ journey.destination }}</span>
+      <span class="tracking-journey-id">Journey ID: {{ journey.pk }}</span>
+    </div>
+  </div>
+
+  <div class="tracking-layout">
+    <div class="tracking-map-container">
+      <div id="tracking-map" class="tracking-map"></div>
+      <div class="tracking-controls">
+        <button id="stop-tracking" class="tracking-button tracking-button--danger">Stop Tracking</button>
+        <button id="pause-tracking" class="tracking-button tracking-button--warning">Pause</button>
+        <div class="tracking-status">
+          <span id="tracking-status-text">Tracking active</span>
+          <span id="last-update">Last update: Never</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tracking-stops-container">
+      <h2>Stops</h2>
+      <div id="stops-list" class="stops-list">
+        <!-- Stops will be populated dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <div class="tracking-capacity">
+    <h3>Capacity Tracking</h3>
+    <div class="capacity-controls">
+      <button class="capacity-btn" data-change="-5">-5</button>
+      <button class="capacity-btn" data-change="-1">-1</button>
+      <span id="capacity-display">0</span>
+      <button class="capacity-btn" data-change="1">+1</button>
+      <button class="capacity-btn" data-change="5">+5</button>
+    </div>
+    <p class="capacity-info">Current passengers</p>
+  </div>
+{% endblock content %}
+
+{% block head %}
+  {{ block.super }}
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
+{% endblock head %}
+
+{% block foot %}
+  {{ block.super }}
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+  <script>
+    const subscriptionId = '{{ subscription.uuid }}';
+    const journeyId = {{ journey.pk }};
+    let trackingInterval = null;
+    let isPaused = false;
+    let currentCapacity = 0;
+
+    // Initialize map
+    const map = new maplibregl.Map({
+      container: 'tracking-map',
+      style: window.MAP_STYLE_URL || 'https://demotiles.maplibre.org/style.json',
+      center: [-2, 54], // Default center (UK)
+      zoom: 5
+    });
+
+    map.addControl(new maplibregl.NavigationControl());
+
+    // Get user's location
+    if ('geolocation' in navigator) {
+      navigator.geolocation.watchPosition(
+        (position) => {
+          if (isPaused) return;
+
+          const coords = [position.coords.longitude, position.coords.latitude];
+          const timestamp = new Date().toISOString();
+
+          // Update map
+          map.flyTo({ center: coords, zoom: 14 });
+
+          // Add/update current position marker
+          if (!window.currentMarker) {
+            window.currentMarker = new maplibregl.Marker({ color: '#ffff9e' })
+              .setLngLat(coords)
+              .addTo(map);
+          } else {
+            window.currentMarker.setLngLat(coords);
+          }
+
+          // Send location to server
+          sendLocation(coords, position.coords.heading, timestamp);
+
+          // Update last update time
+          document.getElementById('last-update').textContent =
+            'Last update: ' + new Date().toLocaleTimeString();
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    }
+
+    // Send location to server
+    async function sendLocation(coords, heading, timestamp) {
+      try {
+        const response = await fetch(`/overland/${subscriptionId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            locations: [{
+              geometry: {
+                coordinates: coords
+              },
+              properties: {
+                timestamp: timestamp,
+                course: heading || 0,
+                capacity_current: currentCapacity,
+                capacity_enabled: true
+              }
+            }]
+          })
+        });
+
+        if (!response.ok) {
+          console.error('Failed to send location');
+        }
+      } catch (error) {
+        console.error('Error sending location:', error);
+      }
+    }
+
+    // Stop tracking
+    document.getElementById('stop-tracking').addEventListener('click', async () => {
+      if (confirm('Are you sure you want to stop tracking?')) {
+        clearInterval(trackingInterval);
+        window.location.href = '/tracking';
+      }
+    });
+
+    // Pause/resume tracking
+    document.getElementById('pause-tracking').addEventListener('click', function() {
+      isPaused = !isPaused;
+      this.textContent = isPaused ? 'Resume' : 'Pause';
+      document.getElementById('tracking-status-text').textContent =
+        isPaused ? 'Tracking paused' : 'Tracking active';
+    });
+
+    // Capacity controls
+    document.querySelectorAll('.capacity-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const change = parseInt(this.dataset.change);
+        currentCapacity = Math.max(0, currentCapacity + change);
+        document.getElementById('capacity-display').textContent = currentCapacity;
+      });
+    });
+
+    // Load stops from journey if available
+    async function loadStops() {
+      try {
+        const response = await fetch(`/api/vehiclejourneys/${journeyId}/`);
+        if (response.ok) {
+          const journey = await response.json();
+          const stopsList = document.getElementById('stops-list');
+
+          if (journey.trip && journey.trip.stoptime_set) {
+            journey.trip.stoptime_set.forEach((stop, index) => {
+              const stopEl = document.createElement('div');
+              stopEl.className = 'stop-item';
+              stopEl.innerHTML = `
+                <span class="stop-sequence">${index + 1}</span>
+                <span class="stop-name">${stop.display_name}</span>
+                <span class="stop-time">${stop.arrival}</span>
+              `;
+              stopsList.appendChild(stopEl);
+            });
+          } else {
+            stopsList.innerHTML = '<p>No scheduled stops for this journey</p>';
+          }
+        }
+      } catch (error) {
+        console.error('Error loading stops:', error);
+      }
+    }
+
+    loadStops();
+  </script>
+
+  <style>
+    .tracking-active {
+      padding: 0;
+    }
+
+    .tracking-header {
+      padding: 1rem;
+      background: var(--brand-color);
+      color: var(--text-color);
+    }
+
+    .tracking-header h1 {
+      margin: 0 0 0.5rem 0;
+    }
+
+    .tracking-info-bar {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: 0.9rem;
+    }
+
+    .tracking-info-bar span {
+      padding: 0.25rem 0.5rem;
+      background: rgba(0,0,0,0.1);
+      border-radius: 4px;
+    }
+
+    .tracking-layout {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 1rem;
+      height: calc(100vh - 150px);
+    }
+
+    @media (max-width: 768px) {
+      .tracking-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+    }
+
+    .tracking-map-container {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tracking-map {
+      flex: 1;
+      min-height: 400px;
+    }
+
+    .tracking-controls {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      background: var(--background-color);
+      border-top: 1px solid var(--border-color);
+    }
+
+    .tracking-button {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .tracking-button--danger {
+      background: #dc3545;
+      color: white;
+    }
+
+    .tracking-button--warning {
+      background: #ffc107;
+      color: #000;
+    }
+
+    .tracking-status {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      font-size: 0.85rem;
+    }
+
+    .tracking-stops-container {
+      padding: 1rem;
+      background: var(--background-color);
+      overflow-y: auto;
+    }
+
+    .stops-list {
+      margin-top: 1rem;
+    }
+
+    .stop-item {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .stop-sequence {
+      font-weight: bold;
+      min-width: 2rem;
+    }
+
+    .stop-name {
+      flex: 1;
+    }
+
+    .stop-time {
+      font-size: 0.85rem;
+      opacity: 0.7;
+    }
+
+    .tracking-capacity {
+      padding: 1rem;
+      background: var(--background-color);
+      border-top: 1px solid var(--border-color);
+    }
+
+    .tracking-capacity h3 {
+      margin: 0 0 0.5rem 0;
+    }
+
+    .capacity-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .capacity-btn {
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--border-color);
+      background: var(--button-background);
+      color: var(--button-foreground);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    #capacity-display {
+      font-size: 1.5rem;
+      font-weight: bold;
+      min-width: 3rem;
+      text-align: center;
+    }
+
+    .capacity-info {
+      margin: 0.5rem 0 0 0;
+      font-size: 0.85rem;
+      opacity: 0.7;
+    }
+  </style>
+{% endblock foot %}
