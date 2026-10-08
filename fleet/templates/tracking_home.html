@@ -270,6 +270,18 @@
       border-color: #ffff9e;
     }
 
+    input.vehicle-selected {
+      border-color: #ffff9e;
+      background: #ffff9e;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      input.vehicle-selected {
+        border-color: #ffff9e;
+        background: #333;
+      }
+    }
+
     /* Search results */
     .search-results {
       max-height: 200px;
@@ -969,7 +981,7 @@
       // Vehicle search
       const vehicleSearch = document.getElementById('unscheduled-vehicle-search');
       if (vehicleSearch) {
-        setupVehicleSearch(vehicleSearch, 'unscheduled-vehicle-results');
+        setupVehicleSearch(vehicleSearch, 'unscheduled-vehicle-results', true);
       }
 
       // New vehicle creation
@@ -979,6 +991,15 @@
           const code = newVehicleCode.value.trim();
           if (code) {
             await createNewVehicle(code);
+          }
+        });
+        newVehicleCode.addEventListener('keypress', async (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const code = newVehicleCode.value.trim();
+            if (code) {
+              await createNewVehicle(code);
+            }
           }
         });
       }
@@ -1012,7 +1033,7 @@
       // Vehicle search
       const vehicleSearch = document.getElementById('scheduled-vehicle-search');
       if (vehicleSearch) {
-        setupVehicleSearch(vehicleSearch, 'scheduled-vehicle-results');
+        setupVehicleSearch(vehicleSearch, 'scheduled-vehicle-results', true);
       }
 
       // Vehicle selection toggle
@@ -1049,7 +1070,7 @@
       // Vehicle search
       const vehicleSearch = document.getElementById('tracking-only-vehicle-search');
       if (vehicleSearch) {
-        setupVehicleSearch(vehicleSearch, 'tracking-only-vehicle-results');
+        setupVehicleSearch(vehicleSearch, 'tracking-only-vehicle-results', true);
       }
 
       // Start button
@@ -1062,7 +1083,7 @@
     }
 
     // Setup vehicle search
-    function setupVehicleSearch(inputId, resultsId) {
+    function setupVehicleSearch(inputId, resultsId, selectVehicle = false) {
       const input = document.getElementById(inputId);
       const results = document.getElementById(resultsId);
       if (!input || !results) return;
@@ -1071,7 +1092,7 @@
       input.addEventListener('input', (e) => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          searchVehicles(e.target.value, results);
+          searchVehicles(e.target.value, results, selectVehicle);
         }, 300);
       });
     }
@@ -1182,14 +1203,24 @@
         if (response.ok) {
           const data = await response.json();
           trackingState.selectedVehicle = data;
+          // Find the vehicle search input and update it
+          const vehicleInputs = document.querySelectorAll('input[id*="vehicle-search"]');
+          vehicleInputs.forEach(input => {
+            if (input && input.offsetParent && input.offsetParent.style.display !== 'none') {
+              input.value = data.slug;
+              input.classList.add('vehicle-selected');
+            }
+          });
           return data;
         } else {
           const error = await response.json();
           console.error('Error creating vehicle:', error);
+          alert('Error: ' + (error.error || 'Failed to create vehicle'));
           return null;
         }
       } catch (error) {
         console.error('Error creating vehicle:', error);
+        alert('Error: Failed to create vehicle');
         return null;
       }
     }
@@ -1394,13 +1425,13 @@
       searchInput.addEventListener('input', (e) => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          searchVehicles(e.target.value, resultsContainer);
+          searchVehicles(e.target.value, resultsContainer, false);
         }, 300);
       });
     }
 
     // Search vehicles
-    async function searchVehicles(query, container) {
+    async function searchVehicles(query, container, selectVehicle = false) {
       if (query.length < 2) {
         container.innerHTML = '';
         return;
@@ -1419,7 +1450,20 @@
                 <strong>${vehicle.slug}</strong><br>
                 <small>${vehicle.registration || 'No reg'} - ${vehicle.vehicle_type?.name || 'Unknown'}</small>
               `;
-              div.addEventListener('click', () => showVehicleDetails(vehicle.id));
+              if (selectVehicle) {
+                div.addEventListener('click', () => {
+                  trackingState.selectedVehicle = vehicle;
+                  // Update the input to show selected vehicle
+                  const searchInput = container.previousElementSibling;
+                  if (searchInput && searchInput.tagName === 'INPUT') {
+                    searchInput.value = vehicle.slug;
+                    searchInput.classList.add('vehicle-selected');
+                  }
+                  container.innerHTML = '';
+                });
+              } else {
+                div.addEventListener('click', () => showVehicleDetails(vehicle.id));
+              }
               container.appendChild(div);
             });
           } else {
