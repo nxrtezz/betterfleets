@@ -957,13 +957,6 @@ def tracking_mode(request, mode):
     # Add context for each mode
     if mode == 'unscheduled':
         context['stops'] = StopPoint.objects.all()[:500]  # Limit to first 500 stops
-    elif mode == 'scheduled':
-        # Get upcoming trips from today
-        today = timezone.localdate()
-        context['trips'] = Trip.objects.filter(
-            calendar__start_date__lte=today,
-            calendar__end_date__gte=today
-        ).select_related('route', 'route__service')[:100]
 
     return render(request, "tracking_mode.html", context)
 

@@ -371,6 +371,7 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
         route_number = data.get('route_number')
         tracking_date_str = data.get('tracking_date')
         trip_id = data.get('trip_id')
+        service_id = data.get('service_id')
         stops_str = data.get('stops')
 
         if not vehicle_slug:
@@ -403,6 +404,20 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
                 scheduled_trip = Trip.objects.get(pk=trip_id)
             except Trip.DoesNotExist:
                 return Response({'error': 'Trip not found'}, status=404)
+        elif service_id:
+            # If service_id is provided but no trip_id, get the first trip for that service
+            try:
+                from busstops.models import Service
+                service = Service.objects.get(pk=service_id)
+                scheduled_trip = Trip.objects.filter(
+                    route__service=service,
+                    calendar__start_date__lte=tracking_date,
+                    calendar__end_date__gte=tracking_date
+                ).first()
+                if not scheduled_trip:
+                    return Response({'error': 'No trips found for this service on the selected date'}, status=404)
+            except Service.DoesNotExist:
+                return Response({'error': 'Service not found'}, status=404)
 
         # Handle stops for unscheduled mode
         stop_rows = []

@@ -12,8 +12,10 @@
     <form method="post" id="unscheduled-form">
       {% csrf_token %}
       <p>
-        <label for="vehicle_slug">Vehicle slug</label>
-        <input id="vehicle_slug" name="vehicle_slug" required placeholder="e.g. 1234 or ABC123">
+        <label for="vehicle_search">Vehicle</label>
+        <input id="vehicle_search" name="vehicle_search" required placeholder="Search for vehicle (fleet number, registration, or code)" autocomplete="off">
+        <input type="hidden" id="vehicle_slug" name="vehicle_slug" required>
+        <div id="vehicle-results" class="search-results"></div>
       </p>
       <p>
         <label for="destination">Destination</label>
@@ -53,20 +55,21 @@
     <form method="post" id="scheduled-form">
       {% csrf_token %}
       <p>
-        <label for="vehicle_slug">Vehicle slug</label>
-        <input id="vehicle_slug" name="vehicle_slug" required placeholder="e.g. 1234 or ABC123">
+        <label for="vehicle_search">Vehicle</label>
+        <input id="vehicle_search" name="vehicle_search" required placeholder="Search for vehicle (fleet number, registration, or code)" autocomplete="off">
+        <input type="hidden" id="vehicle_slug" name="vehicle_slug" required>
+        <div id="vehicle-results" class="search-results"></div>
       </p>
       <p>
+        <label for="service_search">Service</label>
+        <input id="service_search" name="service_search" required placeholder="Search for service (route number)" autocomplete="off">
+        <input type="hidden" id="service_id" name="service_id" required>
+        <div id="service-results" class="search-results"></div>
+      </p>
+      <p id="trip-selection" style="display: none;">
         <label for="trip_id">Scheduled trip</label>
         <select id="trip_id" name="trip_id" required>
           <option value="">Select a trip</option>
-          {% for trip in trips %}
-            <option value="{{ trip.pk }}">
-              {{ trip.calendar.start_date }} · {{ trip.route.service.line_name }}
-              · {{ trip.route.origin }} to {{ trip.route.destination }}
-              · {{ trip.headsign }} ({{ trip.vehicle_journey_code }})
-            </option>
-          {% endfor %}
         </select>
       </p>
       <button type="submit">Start Tracking</button>
@@ -76,8 +79,10 @@
     <form method="post" id="tracking-only-form">
       {% csrf_token %}
       <p>
-        <label for="vehicle_slug">Vehicle slug</label>
-        <input id="vehicle_slug" name="vehicle_slug" required placeholder="e.g. 1234 or ABC123">
+        <label for="vehicle_search">Vehicle</label>
+        <input id="vehicle_search" name="vehicle_search" required placeholder="Search for vehicle (fleet number, registration, or code)" autocomplete="off">
+        <input type="hidden" id="vehicle_slug" name="vehicle_slug" required>
+        <div id="vehicle-results" class="search-results"></div>
       </p>
       <p>
         <label for="destination">Destination</label>
@@ -118,6 +123,131 @@
           event.target.closest(".stop-row").remove();
         }
       });
+    }
+
+    // Debounce function
+    function debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    }
+
+    // Vehicle search
+    const vehicleSearch = document.getElementById('vehicle_search');
+    const vehicleResults = document.getElementById('vehicle-results');
+    const vehicleSlug = document.getElementById('vehicle_slug');
+
+    if (vehicleSearch) {
+      vehicleSearch.addEventListener('input', debounce(async (e) => {
+        const query = e.target.value.trim();
+        if (query.length < 2) {
+          vehicleResults.innerHTML = '';
+          return;
+        }
+
+        try {
+          const response = await fetch(`/api/vehicles/?search=${encodeURIComponent(query)}`);
+          if (response.ok) {
+            const data = await response.json();
+            vehicleResults.innerHTML = '';
+            if (data.results && data.results.length > 0) {
+              data.results.slice(0, 10).forEach(vehicle => {
+                const div = document.createElement('div');
+                div.className = 'search-result-item';
+                div.textContent = `${vehicle.slug} - ${vehicle.registration || 'No reg'} - ${vehicle.vehicle_type?.name || 'Unknown type'}`;
+                div.addEventListener('click', () => {
+                  vehicleSearch.value = vehicle.slug;
+                  vehicleSlug.value = vehicle.slug;
+                  vehicleResults.innerHTML = '';
+                });
+                vehicleResults.appendChild(div);
+              });
+            } else {
+              vehicleResults.innerHTML = '<div class="search-result-item">No vehicles found</div>';
+            }
+          }
+        } catch (err) {
+          console.error('Vehicle search error:', err);
+        }
+      }, 300));
+    }
+
+    // Service search
+    const serviceSearch = document.getElementById('service_search');
+    const serviceResults = document.getElementById('service-results');
+    const serviceId = document.getElementById('service_id');
+    const tripSelection = document.getElementById('trip-selection');
+    const tripSelect = document.getElementById('trip_id');
+
+    if (serviceSearch) {
+      serviceSearch.addEventListener('input', debounce(async (e) => {
+        const query = e.target.value.trim();
+        if (query.length < 1) {
+          serviceResults.innerHTML = '';
+          tripSelection.style.display = 'none';
+          return;
+        }
+
+        try {
+          const response = await fetch(`/api/services/?search=${encodeURIComponent(query)}`);
+          if (response.ok) {
+            const data = await response.json();
+            serviceResults.innerHTML = '';
+            if (data.results && data.results.length > 0) {
+              data.results.slice(0, 10).forEach(service => {
+                const div = document.createElement('div');
+                div.className = 'search-result-item';
+                div.textContent = `${service.line_name} - ${service.description}`;
+                div.addEventListener('click', () => {
+                  serviceSearch.value = `${service.line_name} - ${service.description}`;
+                  serviceId.value = service.id;
+                  serviceResults.innerHTML = '';
+                  loadTrips(service.id);
+                });
+                serviceResults.appendChild(div);
+              });
+            } else {
+              serviceResults.innerHTML = '<div class="search-result-item">No services found</div>';
+            }
+          }
+        } catch (err) {
+          console.error('Service search error:', err);
+        }
+      }, 300));
+    }
+
+    // Load trips for selected service
+    async function loadTrips(serviceId) {
+      if (!tripSelection || !tripSelect) return;
+
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const response = await fetch(`/api/trips/?service=${serviceId}&date=${today}`);
+        if (response.ok) {
+          const data = await response.json();
+          tripSelect.innerHTML = '<option value="">Select a trip</option>';
+          if (data.results && data.results.length > 0) {
+            data.results.slice(0, 50).forEach(trip => {
+              const option = document.createElement('option');
+              option.value = trip.id;
+              option.textContent = `${trip.headsign || trip.route?.destination || 'Unknown'} (${trip.vehicle_journey_code || trip.id})`;
+              tripSelect.appendChild(option);
+            });
+            tripSelection.style.display = 'block';
+          } else {
+            tripSelect.innerHTML = '<option value="">No trips available for this service</option>';
+            tripSelection.style.display = 'block';
+          }
+        }
+      } catch (err) {
+        console.error('Error loading trips:', err);
+      }
     }
 
     // Form submission handler
@@ -170,3 +300,37 @@
     }
   </script>
 {% endblock foot %}
+
+{% block extra_style %}
+<style>
+  .search-results {
+    position: absolute;
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    width: 100%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  .search-result-item {
+    padding: 0.5rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .search-result-item:hover {
+    background: var(--brand-color-darker);
+  }
+
+  .search-result-item:last-child {
+    border-bottom: none;
+  }
+
+  form p {
+    position: relative;
+  }
+</style>
+{% endblock extra_style %}
