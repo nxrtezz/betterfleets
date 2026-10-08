@@ -2,92 +2,1508 @@
 
 {% block title %}Tracking - Better Fleets{% endblock %}
 
-{% block bodyclass %}narrow{% endblock %}
+{% block bodyclass %}tracking-mobile{% endblock %}
 
 {% block content %}
-  <h1>Vehicle Tracking</h1>
-  <p>Choose a tracking mode to begin tracking your vehicle journey.</p>
+  <div id="tracking-app">
+    <!-- Main content area -->
+    <div id="tracking-content">
+      <!-- Content will be dynamically loaded here -->
+    </div>
 
-  <div class="tracking-modes">
-    <a href="/tracking/unscheduled" class="tracking-mode-card">
-      <h2>Unscheduled Tracking</h2>
-      <p>Select a vehicle, choose stops on a map, and create a custom journey. Best for ad-hoc or special services.</p>
-    </a>
-
-    <a href="/tracking/scheduled" class="tracking-mode-card">
-      <h2>Scheduled Trip</h2>
-      <p>Select an operator, service, and trip from the timetable. Ideal for regular scheduled services.</p>
-    </a>
-
-    <a href="/tracking/tracking-only" class="tracking-mode-card">
-      <h2>Tracking Only</h2>
-      <p>Simple vehicle tracking with route number and destination. Minimal setup, just track your position.</p>
-    </a>
-  </div>
-
-  <div class="tracking-info">
-    <h3>How it works</h3>
-    <ol>
-      <li>Choose a tracking mode above</li>
-      <li>Set up your journey details (vehicle, route, stops)</li>
-      <li>Start tracking - your location will be sent to the server</li>
-      <li>View your progress on the map with live updates</li>
-      <li>Stop tracking when you complete your journey</li>
-    </ol>
+    <!-- Bottom navigation -->
+    <nav class="tracking-nav">
+      <button class="nav-item active" data-section="tracking">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+          <circle cx="12" cy="10" r="3"></circle>
+        </svg>
+        <span>Tracking</span>
+      </button>
+      <button class="nav-item" data-section="vehicles">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="1" y="3" width="15" height="13"></rect>
+          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+          <circle cx="5.5" cy="18.5" r="2.5"></circle>
+          <circle cx="18.5" cy="18.5" r="2.5"></circle>
+        </svg>
+        <span>Vehicles</span>
+      </button>
+      <button class="nav-item" data-section="settings">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.4 1.4-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-2v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-1.4-1.4.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H7v-2h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 1.4-1.4.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V7h2v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.4 1.4-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v2h-.2a1.7 1.7 0 0 0-1.6 1z"></path>
+        </svg>
+        <span>Settings</span>
+      </button>
+    </nav>
   </div>
 {% endblock content %}
 
+{% block head %}
+  {{ block.super }}
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
+{% endblock head %}
+
 {% block foot %}
   {{ block.super }}
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+  <script>
+    // Tracking Application State
+    const trackingState = {
+      currentSection: 'tracking',
+      activeTrackingSession: null,
+      trackingInterval: null,
+      isPaused: false,
+      currentCapacity: 0,
+      capacityMax: 0,
+      capacityEnabled: false,
+      transmissionInterval: 30, // seconds
+      lastTransmission: null,
+      selectedVehicle: null,
+      selectedStops: [],
+      selectedTrip: null,
+      settings: {
+        transmissionInterval: 30
+      }
+    };
+
+    // Initialize the tracking app
+    document.addEventListener('DOMContentLoaded', async () => {
+      await checkPermissions();
+      loadSection('tracking');
+      setupNavigation();
+      loadSettings();
+    });
+
+    // Check if user has Overland permission
+    async function checkPermissions() {
+      try {
+        const response = await fetch('/api/users/permissions/');
+        if (response.ok) {
+          const data = await response.json();
+          if (!data.overland) {
+            showAccessDenied();
+          }
+        } else if (response.status === 401) {
+          // Not authenticated - redirect to login
+          window.location.href = '/accounts/login/';
+        }
+      } catch (error) {
+        console.error('Error checking permissions:', error);
+      }
+    }
+
+    // Show access denied message
+    function showAccessDenied() {
+      document.getElementById('tracking-content').innerHTML = `
+        <div class="access-denied">
+          <h2>Access Denied</h2>
+          <p>You do not have permission to use the tracking feature.</p>
+          <p>Please contact an administrator if you believe this is an error.</p>
+          <a href="/" class="button">Return to Home</a>
+        </div>
+      `;
+    }
+
+    // Setup bottom navigation
+    function setupNavigation() {
+      const navItems = document.querySelectorAll('.nav-item');
+      navItems.forEach(item => {
+        item.addEventListener('click', () => {
+          const section = item.dataset.section;
+          navItems.forEach(n => n.classList.remove('active'));
+          item.classList.add('active');
+          loadSection(section);
+        });
+      });
+    }
+
+    // Load a section
+    async function loadSection(section) {
+      trackingState.currentSection = section;
+      const content = document.getElementById('tracking-content');
+
+      switch(section) {
+        case 'tracking':
+          content.innerHTML = await getTrackingSectionHTML();
+          setupTrackingSection();
+          break;
+        case 'vehicles':
+          content.innerHTML = await getVehiclesSectionHTML();
+          setupVehiclesSection();
+          break;
+        case 'settings':
+          content.innerHTML = await getSettingsSectionHTML();
+          setupSettingsSection();
+          break;
+      }
+    }
+
+    // Get Tracking section HTML
+    async function getTrackingSectionHTML() {
+      if (trackingState.activeTrackingSession) {
+        return getActiveTrackingHTML();
+      }
+      return `
+        <div class="tracking-section">
+          <h1>Start Tracking</h1>
+          <p class="section-description">Choose a tracking mode to begin</p>
+
+          <div class="tracking-modes">
+            <button class="tracking-mode-card" data-mode="unscheduled">
+              <div class="mode-icon">📍</div>
+              <h2>Unscheduled</h2>
+              <p>Select vehicle, choose stops on map, create custom journey</p>
+            </button>
+
+            <button class="tracking-mode-card" data-mode="scheduled">
+              <div class="mode-icon">📅</div>
+              <h2>Scheduled Trip</h2>
+              <p>Select operator, service, and trip from timetable</p>
+            </button>
+
+            <button class="tracking-mode-card" data-mode="tracking-only">
+              <div class="mode-icon">🚗</div>
+              <h2>Tracking Only</h2>
+              <p>Simple vehicle tracking with route and destination</p>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Get Vehicles section HTML
+    async function getVehiclesSectionHTML() {
+      return `
+        <div class="vehicles-section">
+          <h1>Vehicles</h1>
+          <div class="search-container">
+            <input type="search" id="vehicle-search-input" placeholder="Search vehicles (fleet number, registration, code)...">
+          </div>
+          <div id="vehicle-search-results" class="search-results"></div>
+        </div>
+      `;
+    }
+
+    // Get Settings section HTML
+    async function getSettingsSectionHTML() {
+      return `
+        <div class="settings-section">
+          <h1>Settings</h1>
+
+          <div class="setting-group">
+            <label for="transmission-interval">Location transmission interval (seconds)</label>
+            <input type="number" id="transmission-interval" value="${trackingState.settings.transmissionInterval}" min="10" max="300" step="10">
+            <p class="setting-hint">Minimum 10s, maximum 300s. Default: 30s</p>
+          </div>
+
+          <div class="setting-group">
+            <h3>Account</h3>
+            <button id="logout-button" class="button button--secondary">Sign Out</button>
+          </div>
+
+          <div class="setting-group">
+            <h3>Location Permission</h3>
+            <p id="location-permission-status">Checking...</p>
+          </div>
+        </div>
+      `;
+    }
+
+    // Setup Tracking section
+    function setupTrackingSection() {
+      const modeCards = document.querySelectorAll('.tracking-mode-card');
+      modeCards.forEach(card => {
+        card.addEventListener('click', () => {
+          const mode = card.dataset.mode;
+          loadTrackingMode(mode);
+        });
+      });
+    }
+
+    // Load a specific tracking mode
+    async function loadTrackingMode(mode) {
+      const content = document.getElementById('tracking-content');
+
+      switch(mode) {
+        case 'unscheduled':
+          content.innerHTML = await getUnscheduledTrackingHTML();
+          setupUnscheduledTracking();
+          break;
+        case 'scheduled':
+          content.innerHTML = await getScheduledTrackingHTML();
+          setupScheduledTracking();
+          break;
+        case 'tracking-only':
+          content.innerHTML = await getTrackingOnlyHTML();
+          setupTrackingOnly();
+          break;
+      }
+    }
+
+    // Get Unscheduled tracking HTML
+    async function getUnscheduledTrackingHTML() {
+      return `
+        <div class="tracking-mode-section">
+          <button class="back-button" onclick="loadSection('tracking')">← Back</button>
+          <h1>Unscheduled Tracking</h1>
+
+          <div class="form-section">
+            <h2>Vehicle</h2>
+            <div class="vehicle-selection">
+              <button class="vehicle-option active" data-option="current">Current Vehicle</button>
+              <button class="vehicle-option" data-option="new">New Vehicle</button>
+            </div>
+
+            <div id="current-vehicle-search" class="vehicle-search">
+              <input type="search" id="unscheduled-vehicle-search" placeholder="Search for vehicle...">
+              <div id="unscheduled-vehicle-results" class="search-results"></div>
+            </div>
+
+            <div id="new-vehicle-form" class="new-vehicle-form" style="display: none;">
+              <input type="text" id="new-vehicle-code" placeholder="Vehicle code / Ticket machine code">
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h2>Service/Route</h2>
+            <input type="text" id="unscheduled-route-number" placeholder="Route number (e.g. 1, X99)">
+          </div>
+
+          <div class="form-section">
+            <h2>Stops</h2>
+            <p class="section-hint">Tap stops on the map to add them to your route</p>
+            <div id="unscheduled-map" class="tracking-map"></div>
+            <div id="unscheduled-stops-list" class="stops-list"></div>
+          </div>
+
+          <button id="unscheduled-finished" class="button button--primary">Finished</button>
+        </div>
+      `;
+    }
+
+    // Get Scheduled tracking HTML
+    async function getScheduledTrackingHTML() {
+      return `
+        <div class="tracking-mode-section">
+          <button class="back-button" onclick="loadSection('tracking')">← Back</button>
+          <h1>Scheduled Trip</h1>
+
+          <div class="form-section">
+            <h2>Operator</h2>
+            <input type="search" id="scheduled-operator-search" placeholder="Search for operator...">
+            <div id="scheduled-operator-results" class="search-results"></div>
+          </div>
+
+          <div class="form-section">
+            <h2>Service</h2>
+            <input type="search" id="scheduled-service-search" placeholder="Search for service...">
+            <div id="scheduled-service-results" class="search-results"></div>
+          </div>
+
+          <div class="form-section">
+            <h2>Starting Stop</h2>
+            <p class="section-hint">Select your starting stop on the map</p>
+            <div id="scheduled-map" class="tracking-map"></div>
+          </div>
+
+          <div class="form-section">
+            <h2>Vehicle</h2>
+            <div class="vehicle-selection">
+              <button class="vehicle-option active" data-option="current">Current Vehicle</button>
+              <button class="vehicle-option" data-option="new">New Vehicle</button>
+            </div>
+            <input type="search" id="scheduled-vehicle-search" placeholder="Search for vehicle...">
+            <div id="scheduled-vehicle-results" class="search-results"></div>
+          </div>
+
+          <div class="form-section">
+            <h2>Departures</h2>
+            <select id="scheduled-trip-select">
+              <option value="">Select a trip</option>
+            </select>
+          </div>
+
+          <button id="scheduled-start" class="button button--primary">Start Tracking</button>
+        </div>
+      `;
+    }
+
+    // Get Tracking Only HTML
+    async function getTrackingOnlyHTML() {
+      return `
+        <div class="tracking-mode-section">
+          <button class="back-button" onclick="loadSection('tracking')">← Back</button>
+          <h1>Tracking Only</h1>
+
+          <div class="form-section">
+            <h2>Vehicle</h2>
+            <div class="vehicle-selection">
+              <button class="vehicle-option active" data-option="current">Current Vehicle</button>
+              <button class="vehicle-option" data-option="new">New Vehicle</button>
+            </div>
+            <input type="search" id="tracking-only-vehicle-search" placeholder="Search for vehicle...">
+            <div id="tracking-only-vehicle-results" class="search-results"></div>
+          </div>
+
+          <div class="form-section">
+            <h2>Route/Service Number</h2>
+            <input type="text" id="tracking-only-route" placeholder="e.g. 1 or X99">
+          </div>
+
+          <div class="form-section">
+            <h2>Destination</h2>
+            <input type="text" id="tracking-only-destination" placeholder="e.g. Town Centre">
+          </div>
+
+          <button id="tracking-only-start" class="button button--primary">Start Tracking</button>
+        </div>
+      `;
+    }
+
+    // Setup functions for each mode (simplified for now)
+    function setupUnscheduledTracking() {
+      // Vehicle selection toggle
+      const vehicleOptions = document.querySelectorAll('.vehicle-option');
+      vehicleOptions.forEach(opt => {
+        opt.addEventListener('click', () => {
+          vehicleOptions.forEach(o => o.classList.remove('active'));
+          opt.classList.add('active');
+          const option = opt.dataset.option;
+          const currentSearch = document.getElementById('current-vehicle-search');
+          const newForm = document.getElementById('new-vehicle-form');
+          if (currentSearch) currentSearch.style.display = option === 'current' ? 'block' : 'none';
+          if (newForm) newForm.style.display = option === 'new' ? 'block' : 'none';
+        });
+      });
+
+      // Vehicle search
+      const vehicleSearch = document.getElementById('unscheduled-vehicle-search');
+      if (vehicleSearch) {
+        setupVehicleSearch(vehicleSearch, 'unscheduled-vehicle-results');
+      }
+
+      // New vehicle creation
+      const newVehicleCode = document.getElementById('new-vehicle-code');
+      if (newVehicleCode) {
+        newVehicleCode.addEventListener('blur', async () => {
+          const code = newVehicleCode.value.trim();
+          if (code) {
+            await createNewVehicle(code);
+          }
+        });
+      }
+
+      // Initialize map
+      initializeMap('unscheduled-map');
+      loadStopsOnMap('unscheduled-map');
+
+      // Finished button
+      const finishedBtn = document.getElementById('unscheduled-finished');
+      if (finishedBtn) {
+        finishedBtn.addEventListener('click', async () => {
+          await startUnscheduledTracking();
+        });
+      }
+    }
+
+    function setupScheduledTracking() {
+      // Operator search
+      const operatorSearch = document.getElementById('scheduled-operator-search');
+      if (operatorSearch) {
+        setupOperatorSearch(operatorSearch, 'scheduled-operator-results');
+      }
+
+      // Service search
+      const serviceSearch = document.getElementById('scheduled-service-search');
+      if (serviceSearch) {
+        setupServiceSearch(serviceSearch, 'scheduled-service-results');
+      }
+
+      // Vehicle search
+      const vehicleSearch = document.getElementById('scheduled-vehicle-search');
+      if (vehicleSearch) {
+        setupVehicleSearch(vehicleSearch, 'scheduled-vehicle-results');
+      }
+
+      // Vehicle selection toggle
+      const vehicleOptions = document.querySelectorAll('.vehicle-option');
+      vehicleOptions.forEach(opt => {
+        opt.addEventListener('click', () => {
+          vehicleOptions.forEach(o => o.classList.remove('active'));
+          opt.classList.add('active');
+        });
+      });
+
+      initializeMap('scheduled-map');
+      loadStopsOnMap('scheduled-map');
+
+      // Start button
+      const startBtn = document.getElementById('scheduled-start');
+      if (startBtn) {
+        startBtn.addEventListener('click', async () => {
+          await startScheduledTracking();
+        });
+      }
+    }
+
+    function setupTrackingOnly() {
+      // Vehicle selection toggle
+      const vehicleOptions = document.querySelectorAll('.vehicle-option');
+      vehicleOptions.forEach(opt => {
+        opt.addEventListener('click', () => {
+          vehicleOptions.forEach(o => o.classList.remove('active'));
+          opt.classList.add('active');
+        });
+      });
+
+      // Vehicle search
+      const vehicleSearch = document.getElementById('tracking-only-vehicle-search');
+      if (vehicleSearch) {
+        setupVehicleSearch(vehicleSearch, 'tracking-only-vehicle-results');
+      }
+
+      // Start button
+      const startBtn = document.getElementById('tracking-only-start');
+      if (startBtn) {
+        startBtn.addEventListener('click', async () => {
+          await startTrackingOnly();
+        });
+      }
+    }
+
+    // Setup vehicle search
+    function setupVehicleSearch(inputId, resultsId) {
+      const input = document.getElementById(inputId);
+      const results = document.getElementById(resultsId);
+      if (!input || !results) return;
+
+      let debounceTimer;
+      input.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          searchVehicles(e.target.value, results);
+        }, 300);
+      });
+    }
+
+    // Setup operator search
+    function setupOperatorSearch(inputId, resultsId) {
+      const input = document.getElementById(inputId);
+      const results = document.getElementById(resultsId);
+      if (!input || !results) return;
+
+      let debounceTimer;
+      input.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          searchOperators(e.target.value, results);
+        }, 300);
+      });
+    }
+
+    // Setup service search
+    function setupServiceSearch(inputId, resultsId) {
+      const input = document.getElementById(inputId);
+      const results = document.getElementById(resultsId);
+      if (!input || !results) return;
+
+      let debounceTimer;
+      input.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          searchServices(e.target.value, results);
+        }, 300);
+      });
+    }
+
+    // Search operators
+    async function searchOperators(query, container) {
+      if (query.length < 2) {
+        container.innerHTML = '';
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/operators/?search=${encodeURIComponent(query)}`);
+        if (response.ok) {
+          const data = await response.json();
+          container.innerHTML = '';
+          if (data.results && data.results.length > 0) {
+            data.results.slice(0, 10).forEach(op => {
+              const div = document.createElement('div');
+              div.className = 'search-result-item';
+              div.innerHTML = `<strong>${op.name}</strong> (${op.noc})`;
+              div.addEventListener('click', () => {
+                trackingState.selectedOperator = op;
+                container.innerHTML = '';
+              });
+              container.appendChild(div);
+            });
+          } else {
+            container.innerHTML = '<div class="search-result-item">No operators found</div>';
+          }
+        }
+      } catch (error) {
+        console.error('Error searching operators:', error);
+      }
+    }
+
+    // Search services
+    async function searchServices(query, container) {
+      if (query.length < 1) {
+        container.innerHTML = '';
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/services/?search=${encodeURIComponent(query)}`);
+        if (response.ok) {
+          const data = await response.json();
+          container.innerHTML = '';
+          if (data.results && data.results.length > 0) {
+            data.results.slice(0, 10).forEach(service => {
+              const div = document.createElement('div');
+              div.className = 'search-result-item';
+              div.innerHTML = `<strong>${service.line_name}</strong> - ${service.description}`;
+              div.addEventListener('click', () => {
+                trackingState.selectedService = service;
+                container.innerHTML = '';
+              });
+              container.appendChild(div);
+            });
+          } else {
+            container.innerHTML = '<div class="search-result-item">No services found</div>';
+          }
+        }
+      } catch (error) {
+        console.error('Error searching services:', error);
+      }
+    }
+
+    // Create new vehicle
+    async function createNewVehicle(code) {
+      try {
+        const response = await fetch('/api/vehicles/create_vehicle/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          trackingState.selectedVehicle = data;
+          return data;
+        } else {
+          const error = await response.json();
+          console.error('Error creating vehicle:', error);
+          return null;
+        }
+      } catch (error) {
+        console.error('Error creating vehicle:', error);
+        return null;
+      }
+    }
+
+    // Load stops on map
+    function loadStopsOnMap(containerId) {
+      const map = window[containerId + '_map'];
+      if (!map) return;
+
+      // Fetch stops and add to map
+      fetch('/api/stops/?limit=500')
+        .then(response => response.json())
+        .then(data => {
+          if (data.results) {
+            data.results.forEach(stop => {
+              if (stop.location) {
+                new maplibregl.Marker()
+                  .setLngLat([stop.location[0], stop.location[1]])
+                  .setPopup(new maplibregl.Popup().setText(stop.name))
+                  .addTo(map);
+              }
+            });
+          }
+        })
+        .catch(error => console.error('Error loading stops:', error));
+    }
+
+    // Start unscheduled tracking
+    async function startUnscheduledTracking() {
+      const vehicleSlug = trackingState.selectedVehicle?.slug;
+      const routeNumber = document.getElementById('unscheduled-route-number')?.value;
+      const stops = trackingState.selectedStops;
+
+      if (!vehicleSlug) {
+        alert('Please select a vehicle');
+        return;
+      }
+
+      if (!routeNumber) {
+        alert('Please enter a route number');
+        return;
+      }
+
+      if (stops.length === 0) {
+        alert('Please select at least one stop');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/tracking/start/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            vehicle_slug: vehicleSlug,
+            route_number: routeNumber,
+            destination: stops[stops.length - 1].name,
+            mode: 'unscheduled',
+            stops: JSON.stringify(stops)
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          trackingState.activeTrackingSession = {
+            subscription_id: result.subscription_id,
+            journey_id: result.journey_id,
+            route_number: routeNumber,
+            destination: stops[stops.length - 1].name
+          };
+          loadSection('tracking');
+        } else {
+          const error = await response.json();
+          alert('Error: ' + (error.error || 'Failed to start tracking'));
+        }
+      } catch (error) {
+        console.error('Error starting tracking:', error);
+        alert('Error: Failed to start tracking');
+      }
+    }
+
+    // Start scheduled tracking
+    async function startScheduledTracking() {
+      const vehicleSlug = trackingState.selectedVehicle?.slug;
+      const tripId = document.getElementById('scheduled-trip-select')?.value;
+
+      if (!vehicleSlug) {
+        alert('Please select a vehicle');
+        return;
+      }
+
+      if (!tripId) {
+        alert('Please select a trip');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/tracking/start/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            vehicle_slug: vehicleSlug,
+            trip_id: tripId,
+            mode: 'scheduled'
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          trackingState.activeTrackingSession = {
+            subscription_id: result.subscription_id,
+            journey_id: result.journey_id,
+            route_number: 'Scheduled',
+            destination: 'See timetable'
+          };
+          loadSection('tracking');
+        } else {
+          const error = await response.json();
+          alert('Error: ' + (error.error || 'Failed to start tracking'));
+        }
+      } catch (error) {
+        console.error('Error starting tracking:', error);
+        alert('Error: Failed to start tracking');
+      }
+    }
+
+    // Start tracking only
+    async function startTrackingOnly() {
+      const vehicleSlug = trackingState.selectedVehicle?.slug;
+      const routeNumber = document.getElementById('tracking-only-route')?.value;
+      const destination = document.getElementById('tracking-only-destination')?.value;
+
+      if (!vehicleSlug) {
+        alert('Please select a vehicle');
+        return;
+      }
+
+      if (!routeNumber) {
+        alert('Please enter a route number');
+        return;
+      }
+
+      if (!destination) {
+        alert('Please enter a destination');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/tracking/start/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            vehicle_slug: vehicleSlug,
+            route_number: routeNumber,
+            destination: destination,
+            mode: 'tracking-only'
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          trackingState.activeTrackingSession = {
+            subscription_id: result.subscription_id,
+            journey_id: result.journey_id,
+            route_number: routeNumber,
+            destination: destination
+          };
+          loadSection('tracking');
+        } else {
+          const error = await response.json();
+          alert('Error: ' + (error.error || 'Failed to start tracking'));
+        }
+      } catch (error) {
+        console.error('Error starting tracking:', error);
+        alert('Error: Failed to start tracking');
+      }
+    }
+
+    // Initialize map
+    function initializeMap(containerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      const map = new maplibregl.Map({
+        container: containerId,
+        style: window.MAP_STYLE_URL || 'https://demotiles.maplibre.org/style.json',
+        center: [-2, 54],
+        zoom: 5
+      });
+
+      map.addControl(new maplibregl.NavigationControl());
+
+      // Store map instance globally
+      window[containerId + '_map'] = map;
+    }
+
+    // Setup Vehicles section
+    function setupVehiclesSection() {
+      const searchInput = document.getElementById('vehicle-search-input');
+      const resultsContainer = document.getElementById('vehicle-search-results');
+
+      let debounceTimer;
+      searchInput.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          searchVehicles(e.target.value, resultsContainer);
+        }, 300);
+      });
+    }
+
+    // Search vehicles
+    async function searchVehicles(query, container) {
+      if (query.length < 2) {
+        container.innerHTML = '';
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/vehicles/?search=${encodeURIComponent(query)}`);
+        if (response.ok) {
+          const data = await response.json();
+          container.innerHTML = '';
+          if (data.results && data.results.length > 0) {
+            data.results.slice(0, 10).forEach(vehicle => {
+              const div = document.createElement('div');
+              div.className = 'search-result-item';
+              div.innerHTML = `
+                <strong>${vehicle.slug}</strong><br>
+                <small>${vehicle.registration || 'No reg'} - ${vehicle.vehicle_type?.name || 'Unknown'}</small>
+              `;
+              div.addEventListener('click', () => showVehicleDetails(vehicle.id));
+              container.appendChild(div);
+            });
+          } else {
+            container.innerHTML = '<div class="search-result-item">No vehicles found</div>';
+          }
+        }
+      } catch (error) {
+        console.error('Error searching vehicles:', error);
+      }
+    }
+
+    // Show vehicle details
+    async function showVehicleDetails(vehicleId) {
+      try {
+        const response = await fetch(`/api/vehicles/${vehicleId}/`);
+        if (response.ok) {
+          const vehicle = await response.json();
+          const content = document.getElementById('tracking-content');
+          content.innerHTML = `
+            <div class="vehicle-details">
+              <button class="back-button" onclick="loadSection('vehicles')">← Back</button>
+              <h1>${vehicle.slug}</h1>
+              <div class="vehicle-info">
+                <p><strong>Registration:</strong> ${vehicle.registration || 'N/A'}</p>
+                <p><strong>Fleet Number:</strong> ${vehicle.fleet_number || 'N/A'}</p>
+                <p><strong>Type:</strong> ${vehicle.vehicle_type?.name || 'N/A'}</p>
+                <p><strong>Operator:</strong> ${vehicle.operator?.name || 'N/A'}</p>
+              </div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading vehicle details:', error);
+      }
+    }
+
+    // Setup Settings section
+    function setupSettingsSection() {
+      const intervalInput = document.getElementById('transmission-interval');
+      intervalInput.addEventListener('change', (e) => {
+        let value = parseInt(e.target.value);
+        if (value < 10) value = 10;
+        if (value > 300) value = 300;
+        intervalInput.value = value;
+        trackingState.settings.transmissionInterval = value;
+        saveSettings();
+      });
+
+      document.getElementById('logout-button').addEventListener('click', () => {
+        window.location.href = '/accounts/logout/';
+      });
+
+      // Check location permission
+      if ('permissions' in navigator) {
+        navigator.permissions.query({ name: 'geolocation' }).then(result => {
+          const statusEl = document.getElementById('location-permission-status');
+          statusEl.textContent = `Location permission: ${result.state}`;
+        });
+      }
+    }
+
+    // Load settings from localStorage
+    function loadSettings() {
+      const saved = localStorage.getItem('tracking_settings');
+      if (saved) {
+        try {
+          trackingState.settings = JSON.parse(saved);
+        } catch (e) {
+          console.error('Error loading settings:', e);
+        }
+      }
+    }
+
+    // Save settings to localStorage
+    function saveSettings() {
+      localStorage.setItem('tracking_settings', JSON.stringify(trackingState.settings));
+    }
+
+    // Get active tracking HTML
+    function getActiveTrackingHTML() {
+      return `
+        <div class="active-tracking">
+          <div class="tracking-header">
+            <div class="route-info">
+              <span class="route-number">${trackingState.activeTrackingSession.route_number || 'Unknown'}</span>
+              <span class="destination">${trackingState.activeTrackingSession.destination || 'Unknown'}</span>
+            </div>
+            <div class="journey-id">Journey ID: ${trackingState.activeTrackingSession.journey_id}</div>
+          </div>
+
+          <div id="active-tracking-map" class="tracking-map active-map"></div>
+
+          <div class="stops-container">
+            <div id="active-stops-list" class="stops-list"></div>
+          </div>
+
+          <div class="tracking-controls">
+            <button id="stop-tracking" class="button button--danger">Stop Tracking</button>
+            <button id="pause-tracking" class="button button--warning">${trackingState.isPaused ? 'Resume' : 'Pause'}</button>
+            <button id="capacity-button" class="button button--secondary">Capacity</button>
+          </div>
+
+          <div class="transmission-status">
+            Last update: <span id="last-transmission">Never</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // Initialize active tracking
+    function initializeActiveTracking() {
+      const map = new maplibregl.Map({
+        container: 'active-tracking-map',
+        style: window.MAP_STYLE_URL || 'https://demotiles.maplibre.org/style.json',
+        center: [-2, 54],
+        zoom: 5
+      });
+
+      map.addControl(new maplibregl.NavigationControl());
+
+      // Load journey details
+      loadJourneyDetails();
+
+      // Start geolocation
+      if ('geolocation' in navigator) {
+        navigator.geolocation.watchPosition(
+          (position) => {
+            if (trackingState.isPaused) return;
+
+            const coords = [position.coords.longitude, position.coords.latitude];
+            map.flyTo({ center: coords, zoom: 14 });
+
+            if (!window.currentMarker) {
+              window.currentMarker = new maplibregl.Marker({ color: '#ffff9e' })
+                .setLngLat(coords)
+                .addTo(map);
+            } else {
+              window.currentMarker.setLngLat(coords);
+            }
+
+            sendLocation(coords, position.coords.heading);
+            updateLastTransmission();
+          },
+          (error) => {
+            console.error('Geolocation error:', error);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+          }
+        );
+      }
+
+      // Setup controls
+      document.getElementById('stop-tracking').addEventListener('click', stopTracking);
+      document.getElementById('pause-tracking').addEventListener('click', togglePause);
+      document.getElementById('capacity-button').addEventListener('click', showCapacityModal);
+    }
+
+    // Load journey details
+    async function loadJourneyDetails() {
+      if (!trackingState.activeTrackingSession) return;
+
+      try {
+        const response = await fetch(`/api/vehiclejourneys/${trackingState.activeTrackingSession.journey_id}/details/`);
+        if (response.ok) {
+          const journey = await response.json();
+          const stopsList = document.getElementById('active-stops-list');
+
+          if (journey.times) {
+            stopsList.innerHTML = '';
+            journey.times.forEach((stop, index) => {
+              const stopEl = document.createElement('div');
+              stopEl.className = 'stop-item';
+              stopEl.innerHTML = `
+                <span class="stop-sequence">${index + 1}</span>
+                <span class="stop-name">${stop.stop?.name || 'Unknown'}</span>
+                <span class="stop-time">${stop.aimed_arrival_time || stop.aimed_departure_time || ''}</span>
+              `;
+              stopsList.appendChild(stopEl);
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error loading journey details:', error);
+      }
+    }
+
+    // Send location to server
+    async function sendLocation(coords, heading) {
+      if (!trackingState.activeTrackingSession) return;
+
+      try {
+        const response = await fetch(`/overland/${trackingState.activeTrackingSession.subscription_id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            locations: [{
+              geometry: { coordinates: coords },
+              properties: {
+                timestamp: new Date().toISOString(),
+                course: heading || 0,
+                capacity_current: trackingState.currentCapacity,
+                capacity_max: trackingState.capacityMax,
+                capacity_enabled: trackingState.capacityEnabled
+              }
+            }]
+          })
+        });
+
+        if (!response.ok) {
+          console.error('Failed to send location');
+        }
+      } catch (error) {
+        console.error('Error sending location:', error);
+      }
+    }
+
+    // Update last transmission time
+    function updateLastTransmission() {
+      const now = new Date();
+      trackingState.lastTransmission = now;
+      const el = document.getElementById('last-transmission');
+      if (el) {
+        el.textContent = now.toLocaleTimeString();
+      }
+    }
+
+    // Stop tracking
+    function stopTracking() {
+      if (confirm('Are you sure you want to stop tracking?')) {
+        if (trackingState.trackingInterval) {
+          clearInterval(trackingState.trackingInterval);
+        }
+        trackingState.activeTrackingSession = null;
+        loadSection('tracking');
+      }
+    }
+
+    // Toggle pause
+    function togglePause() {
+      trackingState.isPaused = !trackingState.isPaused;
+      const btn = document.getElementById('pause-tracking');
+      if (btn) {
+        btn.textContent = trackingState.isPaused ? 'Resume' : 'Pause';
+      }
+    }
+
+    // Show capacity modal
+    function showCapacityModal() {
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <h2>Capacity</h2>
+          <p class="capacity-status">${trackingState.capacityEnabled ? 'Enabled' : 'Disabled'}</p>
+          <div class="capacity-display">
+            ${trackingState.currentCapacity} / ${trackingState.capacityMax || '?'}
+          </div>
+          <div class="capacity-controls">
+            <button class="capacity-btn" data-change="-5">-5</button>
+            <button class="capacity-btn" data-change="-1">-1</button>
+            <button class="capacity-btn" data-change="0">0</button>
+            <button class="capacity-btn" data-change="1">+1</button>
+            <button class="capacity-btn" data-change="5">+5</button>
+          </div>
+          <button class="button button--secondary" id="close-capacity">Close</button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      modal.querySelectorAll('.capacity-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const change = parseInt(btn.dataset.change);
+          trackingState.currentCapacity = Math.max(0, trackingState.currentCapacity + change);
+          modal.querySelector('.capacity-display').textContent =
+            `${trackingState.currentCapacity} / ${trackingState.capacityMax || '?'}`;
+        });
+      });
+
+      document.getElementById('close-capacity').addEventListener('click', () => {
+        modal.remove();
+      });
+    }
+  </script>
+
   <style>
+    /* Mobile-first tracking styles */
+    .tracking-mobile {
+      padding-bottom: 70px; /* Space for bottom nav */
+    }
+
+    #tracking-app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #tracking-content {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    /* Bottom navigation */
+    .tracking-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      background: var(--background-color);
+      border-top: 1px solid var(--border-color);
+      z-index: 1000;
+    }
+
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.5rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-color);
+      opacity: 0.6;
+      transition: opacity 0.2s;
+    }
+
+    .nav-item.active {
+      opacity: 1;
+      color: var(--brand-color-darker);
+    }
+
+    .nav-item span {
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+    }
+
+    /* Sections */
+    .tracking-section,
+    .vehicles-section,
+    .settings-section {
+      padding: 1rem;
+    }
+
+    .tracking-section h1,
+    .vehicles-section h1,
+    .settings-section h1 {
+      margin: 0 0 0.5rem 0;
+    }
+
+    .section-description {
+      color: var(--text-color);
+      opacity: 0.7;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Tracking mode cards */
     .tracking-modes {
-      display: grid;
-      gap: 1.5rem;
-      margin: 2rem 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
     }
 
     .tracking-mode-card {
-      display: block;
       padding: 1.5rem;
       border: 2px solid var(--border-color);
       border-radius: 8px;
-      text-decoration: none;
-      color: var(--text-color);
-      transition: border-color 0.2s, transform 0.2s;
+      background: var(--background-color);
+      cursor: pointer;
+      text-align: left;
     }
 
-    .tracking-mode-card:hover {
+    .tracking-mode-card:active {
       border-color: var(--brand-color-darker);
-      transform: translateY(-2px);
+    }
+
+    .mode-icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
     }
 
     .tracking-mode-card h2 {
       margin: 0 0 0.5rem 0;
-      color: var(--brand-color-darker);
+      font-size: 1.1rem;
     }
 
     .tracking-mode-card p {
       margin: 0;
-      color: var(--text-color);
+      font-size: 0.9rem;
       opacity: 0.8;
     }
 
-    .tracking-info {
-      margin-top: 2rem;
-      padding: 1.5rem;
-      background: var(--background-color);
-      border-radius: 8px;
+    /* Form sections */
+    .form-section {
+      margin-bottom: 1.5rem;
     }
 
-    .tracking-info h3 {
+    .form-section h2 {
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .section-hint {
+      font-size: 0.85rem;
+      opacity: 0.7;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Vehicle selection */
+    .vehicle-selection {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .vehicle-option {
+      flex: 1;
+      padding: 0.75rem;
+      border: 2px solid var(--border-color);
+      border-radius: 6px;
+      background: var(--background-color);
+      cursor: pointer;
+    }
+
+    .vehicle-option.active {
+      border-color: var(--brand-color-darker);
+      background: var(--brand-color);
+    }
+
+    /* Inputs */
+    input[type="text"],
+    input[type="search"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: var(--background-color);
+      color: var(--text-color);
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+
+    /* Search results */
+    .search-results {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      margin-top: 0.5rem;
+    }
+
+    .search-result-item {
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+      cursor: pointer;
+    }
+
+    .search-result-item:last-child {
+      border-bottom: none;
+    }
+
+    .search-result-item:active {
+      background: var(--brand-color-darker);
+    }
+
+    /* Map */
+    .tracking-map {
+      height: 300px;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+
+    .active-map {
+      height: 50vh;
+      margin-bottom: 0;
+    }
+
+    /* Stops list */
+    .stops-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .stop-item {
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .stop-item.passed {
+      opacity: 0.5;
+    }
+
+    /* Buttons */
+    .button {
+      width: 100%;
+      padding: 0.875rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+
+    .button--primary {
+      background: var(--brand-color-darker);
+      color: var(--button-foreground);
+    }
+
+    .button--secondary {
+      background: var(--border-color);
+      color: var(--text-color);
+    }
+
+    .button--danger {
+      background: #dc3545;
+      color: white;
+    }
+
+    .button--warning {
+      background: #ffc107;
+      color: #000;
+    }
+
+    .back-button {
+      background: none;
+      border: none;
+      padding: 0.5rem 0;
+      cursor: pointer;
+      font-size: 1rem;
+      color: var(--link-color);
+    }
+
+    /* Active tracking */
+    .active-tracking {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    .tracking-header {
+      padding: 1rem;
+      background: var(--brand-color);
+    }
+
+    .route-info {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .route-number {
+      font-weight: bold;
+    }
+
+    .journey-id {
+      font-size: 0.85rem;
+      opacity: 0.8;
+      margin-top: 0.25rem;
+    }
+
+    .stops-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    .tracking-controls {
+      display: flex;
+      gap: 0.5rem;
+      padding: 1rem;
+      background: var(--background-color);
+    }
+
+    .tracking-controls .button {
       margin-top: 0;
     }
 
-    .tracking-info ol {
-      padding-left: 1.5rem;
+    .transmission-status {
+      padding: 0.75rem 1rem;
+      text-align: center;
+      font-size: 0.85rem;
+      background: var(--background-color);
+      border-top: 1px solid var(--border-color);
     }
 
-    .tracking-info li {
+    /* Settings */
+    .setting-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .setting-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: bold;
+    }
+
+    .setting-hint {
+      font-size: 0.85rem;
+      opacity: 0.7;
+      margin-top: 0.25rem;
+    }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .modal-content {
+      background: var(--background-color);
+      padding: 1.5rem;
+      border-radius: 8px;
+      max-width: 90%;
+      width: 300px;
+    }
+
+    .modal-content h2 {
+      margin-top: 0;
+    }
+
+    .capacity-display {
+      font-size: 2rem;
+      font-weight: bold;
+      text-align: center;
+      margin: 1rem 0;
+    }
+
+    .capacity-controls {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    .capacity-btn {
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: var(--background-color);
+      cursor: pointer;
+      font-size: 1.25rem;
+    }
+
+    /* Access denied */
+    .access-denied {
+      padding: 2rem;
+      text-align: center;
+    }
+
+    /* Vehicle details */
+    .vehicle-details {
+      padding: 1rem;
+    }
+
+    .vehicle-info p {
       margin: 0.5rem 0;
     }
   </style>

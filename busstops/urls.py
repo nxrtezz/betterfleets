@@ -65,8 +65,6 @@ urlpatterns = [
     path("fleet/transittracker-import/get-operators", fleet_views.transittracker_get_operators, name="transittracker_get_operators"),
     path("fleet/transittracker-import/preview", fleet_views.transittracker_preview, name="transittracker_preview"),
     path("tracking", fleet_views.tracking_home, name="tracking_home"),
-    path("tracking/<str:mode>", fleet_views.tracking_mode, name="tracking_mode"),
-    path("tracking/active/<uuid:subscription_id>", fleet_views.tracking_active, name="tracking_active"),
     # Web Overland generator - available for legacy compatibility
     path("overland", fleet_views.overland_generator, name="overland_generator"),
     path(

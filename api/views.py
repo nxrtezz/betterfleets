@@ -206,6 +206,12 @@ class StopViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_class = filters.StopFilter
 
+    def retrieve(self, request, *args, pk=None):
+        """Get stop by ATCO code"""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
 
 class TripViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = (
@@ -290,6 +296,85 @@ class VehicleJourneyViewSet(viewsets.ReadOnlyModelViewSet):
 
         return Response(serializer.data | extra_data)
 
+    @action(detail=True, methods=['get'])
+    def details(self, request, pk=None):
+        """Return complete vehicle journey details including path/live data"""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+
+        extra_data = {}
+
+        if instance.trip:
+            instance.trip.stops = TripViewSet.get_stops(instance.trip)
+            extra_data["times"] = serializers.TripSerializer().get_times(instance.trip)
+
+        if redis_client:
+            locations = redis_client.lrange(instance.get_redis_key(), 0, -1)
+            locations = [
+                struct.unpack("I 2f ?h ?h", location) for location in locations
+            ]
+            polyline = encode_time_aware_polyline(
+                [[lat, lng, time] for time, lat, lng, _, _, _, _ in locations]
+            )
+            extra_data["time_aware_polyline"] = polyline
+            extra_data["locations"] = locations
+
+        extra_data["service"] = {
+            "id": instance.service_id,
+            "slug": instance.service.slug,
+            "line_name": instance.service.line_name if instance.service else None,
+        }
+
+        extra_data["trip"] = {
+            "id": instance.trip_id,
+            "vehicle_journey_code": instance.trip.vehicle_journey_code if instance.trip else None,
+            "headsign": instance.trip.destination_name if instance.trip else None,
+        } if instance.trip else None
+
+        return Response(serializer.data | extra_data)
+
+    @action(detail=False, methods=['post'])
+    def create_vehicle(self, request):
+        """Create a new vehicle from ticket machine code"""
+        from vehicles.models import Vehicle
+
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=401)
+
+        if not request.user.has_perm('fleet.use_overland'):
+            return Response({'error': 'Permission denied'}, status=403)
+
+        code = request.data.get('code')
+        if not code:
+            return Response({'error': 'Vehicle code required'}, status=400)
+
+        # Check if vehicle already exists
+        existing = Vehicle.objects.filter(fleet_code__iexact=code).first()
+        if existing:
+            return Response({
+                'id': existing.id,
+                'slug': existing.slug,
+                'registration': existing.reg,
+                'fleet_number': existing.fleet_number,
+                'message': 'Vehicle already exists'
+            })
+
+        # Create new vehicle
+        vehicle = Vehicle.objects.create(
+            fleet_code=code,
+            slug=code.lower().replace(' ', '-'),
+            reg='',
+            fleet_number=None,
+        )
+
+        return Response({
+            'id': vehicle.id,
+            'slug': vehicle.slug,
+            'registration': vehicle.reg,
+            'fleet_number': vehicle.fleet_number,
+            'message': 'Vehicle created'
+        })
+
 
 class SiteInfoViewSet(viewsets.ViewSet):
     def list(self, request):
@@ -373,6 +458,7 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
         trip_id = data.get('trip_id')
         service_id = data.get('service_id')
         stops_str = data.get('stops')
+        mode = data.get('mode', 'tracking-only')
 
         if not vehicle_slug:
             return Response({'error': 'Vehicle slug required'}, status=400)
@@ -404,7 +490,7 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
                 scheduled_trip = Trip.objects.get(pk=trip_id)
             except Trip.DoesNotExist:
                 return Response({'error': 'Trip not found'}, status=404)
-        elif service_id:
+        elif service_id and mode == 'scheduled':
             # If service_id is provided but no trip_id, get the first trip for that service
             try:
                 from busstops.models import Service

@@ -927,54 +927,10 @@ def toggle_pin_operator(request):
 
 @require_safe
 def tracking_home(request):
-    """Main tracking page - requires authentication and permission"""
+    """Main tracking page - mobile-first SPA with three tracking modes"""
     if not request.user.is_authenticated:
         raise PermissionDenied("Authentication required")
     if not request.user.has_perm('fleet.use_overland'):
         raise PermissionDenied("You do not have permission to use tracking")
 
     return render(request, "tracking_home.html")
-
-
-@require_safe
-def tracking_mode(request, mode):
-    """Tracking mode selection page"""
-    if not request.user.is_authenticated:
-        raise PermissionDenied("Authentication required")
-    if not request.user.has_perm('fleet.use_overland'):
-        raise PermissionDenied("You do not have permission to use tracking")
-
-    valid_modes = ['unscheduled', 'scheduled', 'tracking-only']
-    if mode not in valid_modes:
-        raise PermissionDenied("Invalid tracking mode")
-
-    context = {
-        'mode': mode,
-        'mode_name': mode.replace('-', ' ').title(),
-        'tracking_date': timezone.localdate(),
-    }
-
-    # Add context for each mode
-    if mode == 'unscheduled':
-        context['stops'] = StopPoint.objects.all()[:500]  # Limit to first 500 stops
-
-    return render(request, "tracking_mode.html", context)
-
-
-@require_safe
-def tracking_active(request, subscription_id):
-    """Active tracking view with map and journey info"""
-    if not request.user.is_authenticated:
-        raise PermissionDenied("Authentication required")
-    if not request.user.has_perm('fleet.use_overland'):
-        raise PermissionDenied("You do not have permission to use tracking")
-
-    subscription = get_object_or_404(OverlandSubscription, uuid=subscription_id)
-    if subscription.user != request.user:
-        raise PermissionDenied("You can only view your own tracking sessions")
-
-    return render(request, "tracking_active.html", {
-        'subscription': subscription,
-        'journey': subscription.journey,
-        'vehicle': subscription.vehicle,
-    })
