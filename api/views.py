@@ -337,6 +337,7 @@ class VehicleJourneyViewSet(viewsets.ReadOnlyModelViewSet):
     def create_vehicle(self, request):
         """Create a new vehicle from ticket machine code"""
         from vehicles.models import Vehicle
+        import re
 
         # Allow both API key and session authentication
         if not request.user.is_authenticated:
@@ -360,13 +361,24 @@ class VehicleJourneyViewSet(viewsets.ReadOnlyModelViewSet):
                 'message': 'Vehicle already exists'
             })
 
+        # Generate unique slug
+        base_slug = re.sub(r'[^a-zA-Z0-9-]', '-', code).lower().strip('-')
+        slug = base_slug
+        counter = 1
+        while Vehicle.objects.filter(slug=slug).exists():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+
         # Create new vehicle
-        vehicle = Vehicle.objects.create(
-            fleet_code=code,
-            slug=code.lower().replace(' ', '-'),
-            reg='',
-            fleet_number=None,
-        )
+        try:
+            vehicle = Vehicle.objects.create(
+                fleet_code=code,
+                slug=slug,
+                reg='',
+                fleet_number=None,
+            )
+        except Exception as e:
+            return Response({'error': f'Failed to create vehicle: {str(e)}'}, status=400)
 
         return Response({
             'id': vehicle.id,

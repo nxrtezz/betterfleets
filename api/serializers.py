@@ -48,6 +48,7 @@ class VehicleSerializer(serializers.ModelSerializer):
     vehicle_type = VehicleTypeSerializer()
     special_features = serializers.ListField()
     status = serializers.SerializerMethodField()
+    latest_journey_id = serializers.IntegerField(read_only=True)
 
     def get_operator(self, obj):
         if obj.operator_id:
@@ -109,6 +110,7 @@ class VehicleSerializer(serializers.ModelSerializer):
             "withdrawn",
             "special_features",
             "status",
+            "latest_journey_id",
         ]
 
 
@@ -176,6 +178,7 @@ class ServiceSerializer(serializers.ModelSerializer):
             "line_name",
             "line_brand",
             "description",
+            "depot",
             "region_id",
             "mode",
             "operator",

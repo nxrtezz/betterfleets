@@ -27,7 +27,12 @@ class VehicleFilter(FilterSet):
     ordering = OrderingFilter(fields=(("id", "id"),))
 
     def search_filter(self, queryset, name, value):
-        return queryset.filter(Q(reg__iexact=value) | Q(fleet_code__iexact=value))
+        return queryset.filter(
+            Q(reg__icontains=value) |
+            Q(fleet_code__icontains=value) |
+            Q(fleet_number__icontains=value) |
+            Q(slug__icontains=value)
+        )
 
     class Meta:
         model = Vehicle
@@ -64,11 +69,23 @@ class ServiceFilter(FilterSet):
     stops = ModelChoiceFilter(queryset=StopPoint.objects, widget=TextInput)
 
     def search_filter(self, queryset, name, value):
-        query = SearchQuery(value, search_type="websearch", config="english")
-        rank = SearchRank(F("search_vector"), query)
-        query = Q(search_vector=query)
-        queryset = queryset.annotate(rank=rank).filter(query).order_by("-rank")
-        return queryset
+        # Try full-text search first
+        try:
+            query = SearchQuery(value, search_type="websearch", config="english")
+            rank = SearchRank(F("search_vector"), query)
+            query = Q(search_vector=query)
+            search_results = queryset.annotate(rank=rank).filter(query).order_by("-rank")
+            if search_results.exists():
+                return search_results
+        except:
+            pass
+
+        # Fallback to simple text search
+        return queryset.filter(
+            Q(line_name__icontains=value) |
+            Q(description__icontains=value) |
+            Q(service_code__icontains=value)
+        )
 
     class Meta:
         model = Service
@@ -81,9 +98,16 @@ class ServiceFilter(FilterSet):
 
 
 class OperatorFilter(FilterSet):
+    search = CharFilter(method="search_filter", label="Search")
     vehicle_count = NumberFilter(field_name='vehicle_count', lookup_expr='gte')
     vehicle_count__lte = NumberFilter(field_name='vehicle_count', lookup_expr='lte')
     vehicle_count__exact = NumberFilter(field_name='vehicle_count', lookup_expr='exact')
+
+    def search_filter(self, queryset, name, value):
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(noc__icontains=value)
+        )
 
     class Meta:
         model = Operator

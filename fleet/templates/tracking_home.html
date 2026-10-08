@@ -167,6 +167,7 @@
       margin: 0 0 0.5rem 0;
       font-size: 1.1rem;
       font-weight: 600;
+      color: #fff;
     }
 
     .tracking-mode-card p {
@@ -303,6 +304,9 @@
       padding: 0.875rem;
       border-bottom: 1px solid #ddd;
       cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     @media (prefers-color-scheme: dark) {
@@ -317,6 +321,48 @@
 
     .search-result-item:active {
       background: #ffff9e;
+    }
+
+    .search-result-content {
+      flex: 1;
+    }
+
+    .search-result-main {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+    }
+
+    .search-result-sub {
+      font-size: 0.85rem;
+      color: #666;
+      margin-top: 0.25rem;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .search-result-sub {
+        color: #aaa;
+      }
+    }
+
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-left: 0.5rem;
+    }
+
+    .status-indicator.tracking {
+      background: #28a745;
+    }
+
+    .status-indicator.not-tracking {
+      background: #fd7e14;
+    }
+
+    .status-indicator.vor {
+      background: #dc3545;
     }
 
     /* Map */
@@ -611,8 +657,100 @@
       padding: 1rem;
     }
 
-    .vehicle-info p {
-      margin: 0.5rem 0;
+    .vehicle-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .vehicle-icon {
+      font-size: 3rem;
+    }
+
+    .vehicle-title h1 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+
+    .vehicle-status {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-top: 0.25rem;
+    }
+
+    .vehicle-info-card {
+      background: #f5f5f5;
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .vehicle-info-card {
+        background: #333;
+      }
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid #ddd;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .info-row {
+        border-bottom-color: #444;
+      }
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      color: #666;
+      font-weight: 500;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .info-label {
+        color: #aaa;
+      }
+    }
+
+    .info-value {
+      font-weight: 600;
+    }
+
+    .vehicle-features {
+      margin-top: 1rem;
+    }
+
+    .vehicle-features h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .features-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .feature-tag {
+      background: #ffff9e;
+      padding: 0.25rem 0.75rem;
+      border-radius: 16px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .feature-tag {
+        background: #444;
+      }
     }
 
     /* Loading spinner */
@@ -891,6 +1029,23 @@
           <h1>Scheduled Trip</h1>
 
           <div class="form-section">
+            <h2>Vehicle</h2>
+            <div class="vehicle-selection">
+              <button class="vehicle-option active" data-option="current">Current Vehicle</button>
+              <button class="vehicle-option" data-option="new">New Vehicle</button>
+            </div>
+
+            <div id="current-vehicle-search" class="vehicle-search">
+              <input type="search" id="scheduled-vehicle-search" placeholder="Search for vehicle...">
+              <div id="scheduled-vehicle-results" class="search-results"></div>
+            </div>
+
+            <div id="new-vehicle-form" class="new-vehicle-form" style="display: none;">
+              <input type="text" id="new-vehicle-code" placeholder="Vehicle code / Ticket machine code">
+            </div>
+          </div>
+
+          <div class="form-section">
             <h2>Operator</h2>
             <input type="search" id="scheduled-operator-search" placeholder="Search for operator...">
             <div id="scheduled-operator-results" class="search-results"></div>
@@ -906,16 +1061,6 @@
             <h2>Starting Stop</h2>
             <p class="section-hint">Select your starting stop on the map</p>
             <div id="scheduled-map" class="tracking-map"></div>
-          </div>
-
-          <div class="form-section">
-            <h2>Vehicle</h2>
-            <div class="vehicle-selection">
-              <button class="vehicle-option active" data-option="current">Current Vehicle</button>
-              <button class="vehicle-option" data-option="new">New Vehicle</button>
-            </div>
-            <input type="search" id="scheduled-vehicle-search" placeholder="Search for vehicle...">
-            <div id="scheduled-vehicle-results" class="search-results"></div>
           </div>
 
           <div class="form-section">
@@ -943,8 +1088,15 @@
               <button class="vehicle-option active" data-option="current">Current Vehicle</button>
               <button class="vehicle-option" data-option="new">New Vehicle</button>
             </div>
-            <input type="search" id="tracking-only-vehicle-search" placeholder="Search for vehicle...">
-            <div id="tracking-only-vehicle-results" class="search-results"></div>
+
+            <div id="current-vehicle-search" class="vehicle-search">
+              <input type="search" id="tracking-only-vehicle-search" placeholder="Search for vehicle...">
+              <div id="tracking-only-vehicle-results" class="search-results"></div>
+            </div>
+
+            <div id="new-vehicle-form" class="new-vehicle-form" style="display: none;">
+              <input type="text" id="new-vehicle-code" placeholder="Vehicle code / Ticket machine code">
+            </div>
           </div>
 
           <div class="form-section">
@@ -1018,6 +1170,20 @@
     }
 
     function setupScheduledTracking() {
+      // Vehicle selection toggle
+      const vehicleOptions = document.querySelectorAll('.vehicle-option');
+      vehicleOptions.forEach(opt => {
+        opt.addEventListener('click', () => {
+          vehicleOptions.forEach(o => o.classList.remove('active'));
+          opt.classList.add('active');
+          const option = opt.dataset.option;
+          const currentSearch = document.getElementById('scheduled-vehicle-search');
+          const newForm = document.getElementById('new-vehicle-form');
+          if (currentSearch) currentSearch.parentElement.style.display = option === 'current' ? 'block' : 'none';
+          if (newForm) newForm.style.display = option === 'new' ? 'block' : 'none';
+        });
+      });
+
       // Operator search
       const operatorSearch = document.getElementById('scheduled-operator-search');
       if (operatorSearch) {
@@ -1036,14 +1202,25 @@
         setupVehicleSearch(vehicleSearch, 'scheduled-vehicle-results', true);
       }
 
-      // Vehicle selection toggle
-      const vehicleOptions = document.querySelectorAll('.vehicle-option');
-      vehicleOptions.forEach(opt => {
-        opt.addEventListener('click', () => {
-          vehicleOptions.forEach(o => o.classList.remove('active'));
-          opt.classList.add('active');
+      // New vehicle creation
+      const newVehicleCode = document.getElementById('new-vehicle-code');
+      if (newVehicleCode) {
+        newVehicleCode.addEventListener('blur', async () => {
+          const code = newVehicleCode.value.trim();
+          if (code) {
+            await createNewVehicle(code);
+          }
         });
-      });
+        newVehicleCode.addEventListener('keypress', async (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const code = newVehicleCode.value.trim();
+            if (code) {
+              await createNewVehicle(code);
+            }
+          }
+        });
+      }
 
       initializeMap('scheduled-map');
       loadStopsOnMap('scheduled-map');
@@ -1064,6 +1241,11 @@
         opt.addEventListener('click', () => {
           vehicleOptions.forEach(o => o.classList.remove('active'));
           opt.classList.add('active');
+          const option = opt.dataset.option;
+          const currentSearch = document.getElementById('tracking-only-vehicle-search');
+          const newForm = document.getElementById('new-vehicle-form');
+          if (currentSearch) currentSearch.parentElement.style.display = option === 'current' ? 'block' : 'none';
+          if (newForm) newForm.style.display = option === 'new' ? 'block' : 'none';
         });
       });
 
@@ -1071,6 +1253,26 @@
       const vehicleSearch = document.getElementById('tracking-only-vehicle-search');
       if (vehicleSearch) {
         setupVehicleSearch(vehicleSearch, 'tracking-only-vehicle-results', true);
+      }
+
+      // New vehicle creation
+      const newVehicleCode = document.getElementById('new-vehicle-code');
+      if (newVehicleCode) {
+        newVehicleCode.addEventListener('blur', async () => {
+          const code = newVehicleCode.value.trim();
+          if (code) {
+            await createNewVehicle(code);
+          }
+        });
+        newVehicleCode.addEventListener('keypress', async (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const code = newVehicleCode.value.trim();
+            if (code) {
+              await createNewVehicle(code);
+            }
+          }
+        });
       }
 
       // Start button
@@ -1083,8 +1285,8 @@
     }
 
     // Setup vehicle search
-    function setupVehicleSearch(inputId, resultsId, selectVehicle = false) {
-      const input = document.getElementById(inputId);
+    function setupVehicleSearch(inputElement, resultsId, selectVehicle = false) {
+      const input = typeof inputElement === 'string' ? document.getElementById(inputElement) : inputElement;
       const results = document.getElementById(resultsId);
       if (!input || !results) return;
 
@@ -1230,22 +1432,36 @@
       const map = window[containerId + '_map'];
       if (!map) return;
 
-      // Fetch stops and add to map
-      fetch('/api/stops/?limit=500')
-        .then(response => response.json())
-        .then(data => {
-          if (data.results) {
-            data.results.forEach(stop => {
-              if (stop.location) {
-                new maplibregl.Marker()
+      // Wait for map to load
+      map.on('load', () => {
+        // Fetch stops and add to map
+        fetch('/api/stops/?limit=1000')
+          .then(response => response.json())
+          .then(data => {
+            if (data.results) {
+              data.results.forEach(stop => {
+                if (stop.location) {
+                  new maplibregl.Marker({
+                    color: '#ffff9e'
+                  })
                   .setLngLat([stop.location[0], stop.location[1]])
                   .setPopup(new maplibregl.Popup().setText(stop.name))
                   .addTo(map);
-              }
-            });
-          }
-        })
-        .catch(error => console.error('Error loading stops:', error));
+                }
+              });
+
+              // Fit map to show all stops
+              const bounds = new maplibregl.LngLatBounds();
+              data.results.forEach(stop => {
+                if (stop.location) {
+                  bounds.extend([stop.location[0], stop.location[1]]);
+                }
+              });
+              map.fitBounds(bounds, { padding: 50 });
+            }
+          })
+          .catch(error => console.error('Error loading stops:', error));
+      });
     }
 
     // Start unscheduled tracking
@@ -1446,9 +1662,28 @@
             data.results.slice(0, 10).forEach(vehicle => {
               const div = document.createElement('div');
               div.className = 'search-result-item';
+
+              // Determine status
+              let statusClass = 'not-tracking';
+              if (vehicle.status && vehicle.status.VOR) {
+                statusClass = 'vor';
+              } else if (vehicle.latest_journey_id) {
+                statusClass = 'tracking';
+              }
+
+              // Get livery icon
+              const liveryIcon = vehicle.livery ? getLiveryIcon(vehicle.livery) : '🚌';
+
               div.innerHTML = `
-                <strong>${vehicle.slug}</strong><br>
-                <small>${vehicle.registration || 'No reg'} - ${vehicle.vehicle_type?.name || 'Unknown'}</small>
+                <div class="search-result-content">
+                  <div class="search-result-main">
+                    ${liveryIcon} | ${vehicle.fleet_number || vehicle.slug} - ${vehicle.registration || 'No reg'}
+                  </div>
+                  <div class="search-result-sub">
+                    ${vehicle.slug} - ${vehicle.operator?.name || 'Unknown operator'}
+                  </div>
+                </div>
+                <div class="status-indicator ${statusClass}"></div>
               `;
               if (selectVehicle) {
                 div.addEventListener('click', () => {
@@ -1475,6 +1710,12 @@
       }
     }
 
+    // Get livery icon based on CSS
+    function getLiveryIcon(livery) {
+      // Simple mapping - could be enhanced
+      return '🚌';
+    }
+
     // Show vehicle details
     async function showVehicleDetails(vehicleId) {
       try {
@@ -1482,16 +1723,66 @@
         if (response.ok) {
           const vehicle = await response.json();
           const content = document.getElementById('tracking-content');
+
+          // Determine status
+          let statusText = 'Not Tracking';
+          let statusColor = '#fd7e14';
+          if (vehicle.status && vehicle.status.VOR) {
+            statusText = 'VOR';
+            statusColor = '#dc3545';
+          } else if (vehicle.latest_journey_id) {
+            statusText = 'Tracking';
+            statusColor = '#28a745';
+          }
+
+          // Get livery icon
+          const liveryIcon = vehicle.livery ? getLiveryIcon(vehicle.livery) : '🚌';
+
           content.innerHTML = `
             <div class="vehicle-details">
               <button class="back-button" onclick="loadSection('vehicles')">← Back</button>
-              <h1>${vehicle.slug}</h1>
-              <div class="vehicle-info">
-                <p><strong>Registration:</strong> ${vehicle.registration || 'N/A'}</p>
-                <p><strong>Fleet Number:</strong> ${vehicle.fleet_number || 'N/A'}</p>
-                <p><strong>Type:</strong> ${vehicle.vehicle_type?.name || 'N/A'}</p>
-                <p><strong>Operator:</strong> ${vehicle.operator?.name || 'N/A'}</p>
+
+              <div class="vehicle-header">
+                <div class="vehicle-icon">${liveryIcon}</div>
+                <div class="vehicle-title">
+                  <h1>${vehicle.slug}</h1>
+                  <div class="vehicle-status" style="color: ${statusColor}">${statusText}</div>
+                </div>
               </div>
+
+              <div class="vehicle-info-card">
+                <div class="info-row">
+                  <span class="info-label">Registration</span>
+                  <span class="info-value">${vehicle.registration || 'N/A'}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Fleet Number</span>
+                  <span class="info-value">${vehicle.fleet_number || 'N/A'}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Type</span>
+                  <span class="info-value">${vehicle.vehicle_type?.name || 'N/A'}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Operator</span>
+                  <span class="info-value">${vehicle.operator?.name || 'N/A'}</span>
+                </div>
+                ${vehicle.garage ? `
+                <div class="info-row">
+                  <span class="info-label">Garage</span>
+                  <span class="info-value">${vehicle.garage.name || 'N/A'}</span>
+                </div>
+                ` : ''}
+              </div>
+
+              ${vehicle.special_features && vehicle.special_features.length > 0 ? `
+              <div class="vehicle-features">
+                <h3>Features</h3>
+                <div class="features-list">
+                  ${vehicle.special_features.map(f => `<span class="feature-tag">${f}</span>`).join('')}
+                </div>
+              </div>
+              ` : ''}
             </div>
           `;
         }
