@@ -1396,7 +1396,7 @@
     // Create new vehicle
     async function createNewVehicle(code) {
       try {
-        const response = await fetch('/api/vehicles/create_vehicle/', {
+        const response = await fetch('/api/vehiclejourneys/create_vehicle/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code })
@@ -1486,7 +1486,7 @@
       }
 
       try {
-        const response = await fetch('/api/tracking/start/', {
+        const response = await fetch('/api/vehiclejourneys/start_tracking/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1533,7 +1533,7 @@
       }
 
       try {
-        const response = await fetch('/api/tracking/start/', {
+        const response = await fetch('/api/vehiclejourneys/start_tracking/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1584,7 +1584,7 @@
       }
 
       try {
-        const response = await fetch('/api/tracking/start/', {
+        const response = await fetch('/api/vehiclejourneys/start_tracking/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
