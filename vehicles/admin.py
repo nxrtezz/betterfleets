@@ -85,6 +85,12 @@ class ChassisAdmin(admin.ModelAdmin):
     search_fields = ("name", "manufacturer")
     list_filter = ("manufacturer",)
 
+    def get_queryset(self, request):
+        try:
+            return super().get_queryset(request)
+        except Exception:
+            return models.Chassis.objects.none()
+
 
 @admin.register(models.Engine)
 class EngineAdmin(admin.ModelAdmin):
@@ -92,17 +98,35 @@ class EngineAdmin(admin.ModelAdmin):
     search_fields = ("name", "manufacturer")
     list_filter = ("manufacturer",)
 
+    def get_queryset(self, request):
+        try:
+            return super().get_queryset(request)
+        except Exception:
+            return models.Engine.objects.none()
+
 
 @admin.register(models.Gearbox)
 class GearboxAdmin(admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name",)
 
+    def get_queryset(self, request):
+        try:
+            return super().get_queryset(request)
+        except Exception:
+            return models.Gearbox.objects.none()
+
 
 @admin.register(models.EmissionsRating)
 class EmissionsRatingAdmin(admin.ModelAdmin):
     list_display = ("name", "code")
     search_fields = ("name", "code")
+
+    def get_queryset(self, request):
+        try:
+            return super().get_queryset(request)
+        except Exception:
+            return models.EmissionsRating.objects.none()
 
 
 @admin.register(models.VehicleTypeGroup)
