@@ -18,7 +18,8 @@ from .models import (
     AdvancedField,
     Chassis,
     Engine,
-    EmissionsStandard,
+    EmissionsRating,
+    Gearbox,
     Livery,
     Vehicle,
     VehicleFeature,
@@ -148,23 +149,15 @@ class AdvancedFieldsMixin:
             self.advanced_field_fields[field_name] = field
 
     def get_dropdown_choices(self, slug):
-        """Get dropdown choices from database models or JSON files."""
+        """Get dropdown choices from database models."""
         if slug == "chassis":
             return list(Chassis.objects.values_list("name", flat=True).order_by("name"))
         elif slug == "engine":
             return list(Engine.objects.values_list("name", flat=True).order_by("name"))
-        elif slug == "emissions":
-            return list(EmissionsStandard.objects.values_list("name", flat=True).order_by("name"))
         elif slug == "gearbox":
-            # Load from JSON file for gearbox
-            import json
-            from pathlib import Path
-
-            json_file = Path(__file__).parent / "static" / "vehicles" / f"{slug}.json"
-            if json_file.exists():
-                with open(json_file) as f:
-                    data = json.load(f)
-                    return data if isinstance(data, list) else []
+            return list(Gearbox.objects.values_list("name", flat=True).order_by("name"))
+        elif slug == "emissions":
+            return list(EmissionsRating.objects.values_list("name", flat=True).order_by("name"))
         return []
 
     def get_advanced_field_updates(self):

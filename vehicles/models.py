@@ -511,7 +511,19 @@ class Chassis(models.Model):
         ordering = ("name",)
 
 
-class EmissionsStandard(models.Model):
+class Gearbox(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        app_label = "vehicles"
+        ordering = ("name",)
+
+
+class EmissionsRating(models.Model):
     name = models.CharField(max_length=255, unique=True)
     code = models.CharField(max_length=50, blank=True)
     description = models.TextField(blank=True)
@@ -522,8 +534,8 @@ class EmissionsStandard(models.Model):
     class Meta:
         app_label = "vehicles"
         ordering = ("name",)
-        verbose_name = "emissions standard"
-        verbose_name_plural = "emissions standards"
+        verbose_name = "emissions rating"
+        verbose_name_plural = "emissions ratings"
 
 
 class VehicleNamePage(models.Model):
@@ -822,18 +834,21 @@ class Vehicle(models.Model):
         related_name="vehicles",
         help_text="Vehicle chassis"
     )
-    gearbox = models.CharField(
-        max_length=50,
-        blank=True,
-        help_text="Vehicle gearbox/transmission type"
-    )
-    emissions_standard = models.ForeignKey(
-        EmissionsStandard,
+    gearbox = models.ForeignKey(
+        Gearbox,
         models.SET_NULL,
         null=True,
         blank=True,
         related_name="vehicles",
-        help_text="Vehicle emissions standard"
+        help_text="Vehicle gearbox/transmission type"
+    )
+    emissions_rating = models.ForeignKey(
+        EmissionsRating,
+        models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="vehicles",
+        help_text="Vehicle emissions rating"
     )
     locked = models.BooleanField(default=False)
     advanced = models.JSONField(

@@ -84,8 +84,14 @@ class EngineAdmin(admin.ModelAdmin):
     list_filter = ("manufacturer",)
 
 
-@admin.register(models.EmissionsStandard)
-class EmissionsStandardAdmin(admin.ModelAdmin):
+@admin.register(models.Gearbox)
+class GearboxAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    search_fields = ("name",)
+
+
+@admin.register(models.EmissionsRating)
+class EmissionsRatingAdmin(admin.ModelAdmin):
     list_display = ("name", "code")
     search_fields = ("name", "code")
 
@@ -471,15 +477,15 @@ class VehicleBulkEditForm(forms.Form):
         required=False,
         help_text="Set chassis. Leave blank to keep current.",
     )
-    gearbox = forms.CharField(
+    gearbox = forms.ModelChoiceField(
+        queryset=models.Gearbox.objects.order_by("name"),
         required=False,
-        max_length=255,
         help_text="Set gearbox. Leave blank to keep current.",
     )
-    emissions_standard = forms.ModelChoiceField(
-        queryset=models.EmissionsStandard.objects.order_by("name"),
+    emissions_rating = forms.ModelChoiceField(
+        queryset=models.EmissionsRating.objects.order_by("name"),
         required=False,
-        help_text="Set emissions standard. Leave blank to keep current.",
+        help_text="Set emissions rating. Leave blank to keep current.",
     )
     historical_fleet = forms.ModelChoiceField(
         queryset=Operator.objects.order_by("name"),
@@ -1162,8 +1168,8 @@ class VehicleAdmin(admin.ModelAdmin):
                 "length": "length",
                 "engine": "engine_id",
                 "chassis": "chassis_id",
-                "gearbox": "gearbox",
-                "emissions_standard": "emissions_standard_id",
+                "gearbox": "gearbox_id",
+                "emissions_rating": "emissions_rating_id",
                 "historical_fleet": "historical_fleet",
                 "historical_fleet_year": "historical_fleet_year",
                 "historical_fleet_creator": "historical_fleet_creator",
