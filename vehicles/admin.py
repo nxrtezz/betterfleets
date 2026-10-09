@@ -1352,14 +1352,14 @@ class VehicleAdmin(admin.ModelAdmin):
             # Build update dict with only fields that were provided
             update_fields = {}
             
-            # Handle advanced fields
+            # Handle advanced fields - need to update individually since they're in JSON
             advanced_updates = form.get_advanced_field_updates()
             if advanced_updates:
                 for vehicle in selected_queryset:
                     current_advanced = vehicle.advanced or {}
                     current_advanced.update(advanced_updates)
                     vehicle.advanced = current_advanced
-                    vehicle.save(update_fields=["advanced"])
+                    vehicle.save(update_fields=["advanced", "is_manual", "manual_updated_at"])
             
             # Handle regular fields
             field_mappings = {
@@ -1399,9 +1399,10 @@ class VehicleAdmin(admin.ModelAdmin):
                 if value is not None and value != "":
                     update_fields[model_field] = value
 
-            # Always set manual flags
-            update_fields["is_manual"] = True
-            update_fields["manual_updated_at"] = timezone.now()
+            # Always set manual flags if we have regular field updates
+            if update_fields:
+                update_fields["is_manual"] = True
+                update_fields["manual_updated_at"] = timezone.now()
 
             if update_fields:
                 updated = selected_queryset.update(**update_fields)
@@ -1410,7 +1411,7 @@ class VehicleAdmin(admin.ModelAdmin):
                     f"Updated {updated} vehicle{'s' if updated != 1 else ''}.",
                     level=messages.SUCCESS,
                 )
-            else:
+            elif not advanced_updates:
                 self.message_user(
                     request,
                     "No fields were changed.",
