@@ -5344,24 +5344,32 @@ def journey_json(request, pk, vehicle_id=None, service_id=None):
         next_previous_filter["vehicle_id"] = journey.vehicle_id
 
     try:
-        next_journey = journey.get_next_by_datetime(**next_previous_filter)
+        next_journey = VehicleJourney.objects.filter(
+            datetime__gt=journey.datetime,
+            **next_previous_filter
+        ).order_by("datetime").first()
     except VehicleJourney.DoesNotExist:
         pass
     else:
-        data["next"] = {
-            "id": next_journey.id,
-            "datetime": timezone.localtime(next_journey.datetime),
-        }
+        if next_journey:
+            data["next"] = {
+                "id": next_journey.id,
+                "datetime": timezone.localtime(next_journey.datetime),
+            }
 
     try:
-        previous_journey = journey.get_previous_by_datetime(**next_previous_filter)
+        previous_journey = VehicleJourney.objects.filter(
+            datetime__lt=journey.datetime,
+            **next_previous_filter
+        ).order_by("-datetime").first()
     except VehicleJourney.DoesNotExist:
         pass
     else:
-        data["previous"] = {
-            "id": previous_journey.id,
-            "datetime": timezone.localtime(previous_journey.datetime),
-        }
+        if previous_journey:
+            data["previous"] = {
+                "id": previous_journey.id,
+                "datetime": timezone.localtime(previous_journey.datetime),
+            }
 
     return JsonResponse(data)
 

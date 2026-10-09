@@ -1069,7 +1069,7 @@
     <style>{% for css in vehicle.livery.get_styles %}{{ css|safe }}{% endfor %}</style>
     {% endif %}
 
-    {% if journeys or date %}
+    {% if journeys or date or vehicle %}
         <script>
             {% if vehicle %}VEHICLE_ID{% else %}SERVICE_ID{% endif %} = {{ object.id }};
             LIVERIES_CSS_URL = "/liveries.{{ liveries_css_version }}.css";
