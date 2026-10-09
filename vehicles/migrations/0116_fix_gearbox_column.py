@@ -8,8 +8,16 @@ def fix_gearbox_column(apps, schema_editor):
     """Fix the gearbox column by dropping the old one and adding the proper ForeignKey."""
     Vehicle = apps.get_model('vehicles', 'Vehicle')
     with schema_editor.connection.cursor() as cursor:
+        # Map field names to their actual table names
+        field_table_map = {
+            'chassis': 'vehicles_chassis',
+            'engine': 'vehicles_engine',
+            'emissions_rating': 'vehicles_emissionsrating',
+            'gearbox': 'vehicles_gearbox',
+        }
+        
         # Also check and fix chassis, engine, emissions_rating, and gearbox columns if needed
-        for field in ['chassis', 'engine', 'emissions_rating', 'gearbox']:
+        for field, table_name in field_table_map.items():
             fk_column = f'{field}_id'
             
             # Check if the old CharField column exists
@@ -39,7 +47,7 @@ def fix_gearbox_column(apps, schema_editor):
                 cursor.execute(f'''
                     ALTER TABLE vehicles_vehicle
                     ADD COLUMN {fk_column} integer NULL
-                    REFERENCES vehicles_{field}(id) ON DELETE SET NULL
+                    REFERENCES {table_name}(id) ON DELETE SET NULL
                 ''')
 
 
