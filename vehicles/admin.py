@@ -18,6 +18,7 @@ from django.utils.html import format_html
 from sql_util.utils import SubqueryCount
 
 from busstops.forms import FleetImportForm
+from .forms import AdvancedFieldsMixin
 from busstops.fleet_imports import (
     build_livery_mapping_rows,
     collect_livery_mappings,
@@ -539,12 +540,110 @@ class VehicleBulkEditForm(forms.Form):
     locked = forms.BooleanField(required=False, help_text="Lock vehicles")
 
 
-class VehicleBulkAdvancedEditForm(forms.Form):
-    advanced = forms.JSONField(
-        required=False,
-        help_text="Set advanced metadata as JSON. Leave blank to keep current.",
-    )
-    locked = forms.BooleanField(required=False, help_text="Lock vehicles")
+class VehicleBulkAdvancedEditForm(forms.Form, AdvancedFieldsMixin):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.add_advanced_fields()
+        # Add all the same fields as VehicleBulkEditForm
+        self.fields["prev_registration"] = forms.CharField(
+            required=False,
+            max_length=24,
+            help_text="Set previous registration. Leave blank to keep current.",
+        )
+        self.fields["vehicle_type"] = forms.ModelChoiceField(
+            queryset=safe_queryset_getter(models.VehicleType),
+            required=False,
+            help_text="Set vehicle type. Leave blank to keep current.",
+        )
+        self.fields["colours"] = forms.CharField(
+            required=False, help_text="Set colours. Leave blank to keep current."
+        )
+        self.fields["livery"] = forms.ModelChoiceField(
+            queryset=models.Livery.objects.order_by("name"),
+            required=False,
+            help_text="Set livery. Leave blank to keep current.",
+        )
+        self.fields["name"] = forms.CharField(
+            required=False,
+            max_length=255,
+            help_text="Set name. Leave blank to keep current.",
+        )
+        self.fields["branding"] = forms.CharField(
+            required=False,
+            max_length=255,
+            help_text="Set branding. Leave blank to keep current.",
+        )
+        self.fields["rear_advert"] = forms.CharField(
+            required=False,
+            max_length=255,
+            help_text="Set rear advert. Leave blank to keep current.",
+        )
+        self.fields["notes"] = forms.CharField(
+            required=False,
+            max_length=255,
+            help_text="Set notes. Leave blank to keep current.",
+        )
+        self.fields["withdrawn"] = forms.BooleanField(required=False, help_text="Mark as withdrawn")
+        self.fields["preserved"] = forms.BooleanField(required=False, help_text="Mark as preserved")
+        self.fields["fleet_support_vehicle"] = forms.BooleanField(
+            required=False, help_text="Mark as fleet support vehicle"
+        )
+        self.fields["vor"] = forms.BooleanField(required=False, help_text="Mark as VOR (Vehicle Off Road)")
+        self.fields["awaiting_delivery"] = forms.BooleanField(
+            required=False, help_text="Mark as awaiting delivery"
+        )
+        self.fields["trainer_vehicle"] = forms.BooleanField(
+            required=False, help_text="Mark as trainer vehicle"
+        )
+        self.fields["demonstrator"] = forms.BooleanField(required=False, help_text="Mark as demonstrator")
+        self.fields["year_of_manufacture"] = forms.IntegerField(
+            required=False,
+            help_text="Set year of manufacture. Leave blank to keep current.",
+        )
+        self.fields["capacity"] = forms.IntegerField(
+            required=False,
+            help_text="Set capacity. Leave blank to keep current.",
+        )
+        self.fields["length"] = forms.CharField(
+            required=False,
+            max_length=50,
+            help_text="Set length. Leave blank to keep current.",
+        )
+        self.fields["engine"] = forms.ModelChoiceField(
+            queryset=safe_queryset_getter(models.Engine),
+            required=False,
+            help_text="Set engine. Leave blank to keep current.",
+        )
+        self.fields["chassis"] = forms.ModelChoiceField(
+            queryset=safe_queryset_getter(models.Chassis),
+            required=False,
+            help_text="Set chassis. Leave blank to keep current.",
+        )
+        self.fields["gearbox"] = forms.ModelChoiceField(
+            queryset=safe_queryset_getter(models.Gearbox),
+            required=False,
+            help_text="Set gearbox. Leave blank to keep current.",
+        )
+        self.fields["emissions_rating"] = forms.ModelChoiceField(
+            queryset=safe_queryset_getter(models.EmissionsRating),
+            required=False,
+            help_text="Set emissions rating. Leave blank to keep current.",
+        )
+        self.fields["historical_fleet"] = forms.ModelChoiceField(
+            queryset=Operator.objects.order_by("name"),
+            required=False,
+            help_text="Set historical fleet. Leave blank to keep current.",
+        )
+        self.fields["historical_fleet_year"] = forms.IntegerField(
+            required=False,
+            help_text="Set historical fleet year. Leave blank to keep current.",
+        )
+        self.fields["historical_fleet_creator"] = forms.CharField(
+            required=False,
+            max_length=255,
+            help_text="Set historical fleet creator. Leave blank to keep current.",
+        )
+        self.fields["locked"] = forms.BooleanField(required=False, help_text="Lock vehicles")
 
 
 def user(obj):
@@ -1252,10 +1351,53 @@ class VehicleAdmin(admin.ModelAdmin):
         def apply_handler(form, selected_queryset):
             # Build update dict with only fields that were provided
             update_fields = {}
-            advanced_data = form.cleaned_data.get("advanced")
+            
+            # Handle advanced fields
+            advanced_updates = form.get_advanced_field_updates()
+            if advanced_updates:
+                for vehicle in selected_queryset:
+                    current_advanced = vehicle.advanced or {}
+                    current_advanced.update(advanced_updates)
+                    vehicle.advanced = current_advanced
+                    vehicle.save(update_fields=["advanced"])
+            
+            # Handle regular fields
+            field_mappings = {
+                "prev_registration": "prev_registration",
+                "vehicle_type": "vehicle_type_id",
+                "colours": "colours",
+                "livery": "livery_id",
+                "name": "name",
+                "branding": "branding",
+                "rear_advert": "rear_advert",
+                "notes": "notes",
+                "withdrawn": "withdrawn",
+                "preserved": "preserved",
+                "fleet_support_vehicle": "fleet_support_vehicle",
+                "vor": "vor",
+                "awaiting_delivery": "awaiting_delivery",
+                "trainer_vehicle": "trainer_vehicle",
+                "demonstrator": "demonstrator",
+                "year_of_manufacture": "year_of_manufacture",
+                "capacity": "capacity",
+                "length": "length",
+                "engine": "engine_id",
+                "chassis": "chassis_id",
+                "gearbox": "gearbox_id",
+                "emissions_rating": "emissions_rating_id",
+                "historical_fleet": "historical_fleet",
+                "historical_fleet_year": "historical_fleet_year",
+                "historical_fleet_creator": "historical_fleet_creator",
+                "locked": "locked",
+            }
 
-            if advanced_data is not None and advanced_data != "":
-                update_fields["advanced"] = advanced_data
+            for form_field, model_field in field_mappings.items():
+                value = form.cleaned_data.get(form_field)
+                # Convert empty strings to None for numeric fields
+                if value == "" and form_field in {"capacity", "year_of_manufacture", "historical_fleet_year"}:
+                    value = None
+                if value is not None and value != "":
+                    update_fields[model_field] = value
 
             # Always set manual flags
             update_fields["is_manual"] = True
