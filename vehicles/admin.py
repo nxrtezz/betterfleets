@@ -70,6 +70,26 @@ def apply_vehicle_schema_compat(queryset, prefix=""):
     return queryset
 
 
+@admin.register(models.Chassis)
+class ChassisAdmin(admin.ModelAdmin):
+    list_display = ("name", "manufacturer")
+    search_fields = ("name", "manufacturer")
+    list_filter = ("manufacturer",)
+
+
+@admin.register(models.Engine)
+class EngineAdmin(admin.ModelAdmin):
+    list_display = ("name", "manufacturer")
+    search_fields = ("name", "manufacturer")
+    list_filter = ("manufacturer",)
+
+
+@admin.register(models.EmissionsStandard)
+class EmissionsStandardAdmin(admin.ModelAdmin):
+    list_display = ("name", "code")
+    search_fields = ("name", "code")
+
+
 @admin.register(models.VehicleTypeGroup)
 class VehicleTypeGroupAdmin(admin.ModelAdmin):
     list_display = ("name", "manufacturer")
@@ -314,20 +334,6 @@ class VehicleAdminForm(ModelForm):
                 )
             else:
                 self.fields["garage"].queryset = self.fields["garage"].queryset.none()
-        
-        # Load choices from JSON files for technical spec fields
-        if "chassis" in self.fields:
-            self.fields["chassis"].widget = forms.Select(
-                choices=[("", "--------")] + models.get_chassis_choices()
-            )
-        if "gearbox" in self.fields:
-            self.fields["gearbox"].widget = forms.Select(
-                choices=[("", "--------")] + models.get_gearbox_choices()
-            )
-        if "emissions_rating" in self.fields:
-            self.fields["emissions_rating"].widget = forms.Select(
-                choices=[("", "--------")] + models.get_emissions_choices()
-            )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -465,9 +471,9 @@ class VehicleBulkEditForm(forms.Form):
         required=False,
         help_text="Set chassis. Leave blank to keep current.",
     )
-    gearbox = forms.ChoiceField(
-        choices=[("", "--------")] + models.get_gearbox_choices(),
+    gearbox = forms.CharField(
         required=False,
+        max_length=255,
         help_text="Set gearbox. Leave blank to keep current.",
     )
     emissions_standard = forms.ModelChoiceField(
