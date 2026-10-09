@@ -63,6 +63,15 @@ def missing_vehicle_field_names():
     return tuple(missing)
 
 
+def safe_queryset_getter(model, order_by="name"):
+    """Safely get a queryset, returning empty if the table doesn't exist."""
+    try:
+        return model.objects.order_by(order_by)
+    except Exception:
+        # Table doesn't exist yet (migrations not applied)
+        return model.objects.none()
+
+
 def apply_vehicle_schema_compat(queryset, prefix=""):
     missing = missing_vehicle_field_names()
     if missing:
@@ -468,22 +477,22 @@ class VehicleBulkEditForm(forms.Form):
         help_text="Set length. Leave blank to keep current.",
     )
     engine = forms.ModelChoiceField(
-        queryset=models.Engine.objects.order_by("name"),
+        queryset=safe_queryset_getter(models.Engine),
         required=False,
         help_text="Set engine. Leave blank to keep current.",
     )
     chassis = forms.ModelChoiceField(
-        queryset=models.Chassis.objects.order_by("name"),
+        queryset=safe_queryset_getter(models.Chassis),
         required=False,
         help_text="Set chassis. Leave blank to keep current.",
     )
     gearbox = forms.ModelChoiceField(
-        queryset=models.Gearbox.objects.order_by("name"),
+        queryset=safe_queryset_getter(models.Gearbox),
         required=False,
         help_text="Set gearbox. Leave blank to keep current.",
     )
     emissions_rating = forms.ModelChoiceField(
-        queryset=models.EmissionsRating.objects.order_by("name"),
+        queryset=safe_queryset_getter(models.EmissionsRating),
         required=False,
         help_text="Set emissions rating. Leave blank to keep current.",
     )

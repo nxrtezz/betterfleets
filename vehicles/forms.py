@@ -150,14 +150,18 @@ class AdvancedFieldsMixin:
 
     def get_dropdown_choices(self, slug):
         """Get dropdown choices from database models."""
-        if slug == "chassis":
-            return list(Chassis.objects.values_list("name", flat=True).order_by("name"))
-        elif slug == "engine":
-            return list(Engine.objects.values_list("name", flat=True).order_by("name"))
-        elif slug == "gearbox":
-            return list(Gearbox.objects.values_list("name", flat=True).order_by("name"))
-        elif slug == "emissions":
-            return list(EmissionsRating.objects.values_list("name", flat=True).order_by("name"))
+        try:
+            if slug == "chassis":
+                return list(Chassis.objects.values_list("name", flat=True).order_by("name"))
+            elif slug == "engine":
+                return list(Engine.objects.values_list("name", flat=True).order_by("name"))
+            elif slug == "gearbox":
+                return list(Gearbox.objects.values_list("name", flat=True).order_by("name"))
+            elif slug == "emissions":
+                return list(EmissionsRating.objects.values_list("name", flat=True).order_by("name"))
+        except Exception:
+            # Table doesn't exist yet (migrations not applied)
+            pass
         return []
 
     def get_advanced_field_updates(self):
