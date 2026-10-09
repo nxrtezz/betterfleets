@@ -22,6 +22,18 @@
         {% endif %}
     {% endwith %}
 
+    {% if vehicle.vehicle_type %}
+        <div>
+            <dt>Type</dt>
+            <dd>
+                {{ vehicle.vehicle_type }}
+                {% if vehicle.vehicle_type.manufacturer_id %}
+                    by <a href="{{ vehicle.vehicle_type.manufacturer.get_absolute_url }}">{{ vehicle.vehicle_type.manufacturer }}</a>
+                {% endif %}
+            </dd>
+        </div>
+    {% endif %}
+
     {% if vehicle.livery or vehicle.colours %}
         <div>
             <dt>Livery</dt>
@@ -50,32 +62,6 @@
         </div>
     {% endif %}
 
-    {% if vehicle.vehicle_type %}
-        <div>
-            <dt>Type</dt>
-            <dd>
-                {{ vehicle.vehicle_type }}
-                {% if vehicle.vehicle_type.manufacturer_id %}
-                    by <a href="{{ vehicle.vehicle_type.manufacturer.get_absolute_url }}">{{ vehicle.vehicle_type.manufacturer }}</a>
-                {% endif %}
-            </dd>
-        </div>
-    {% endif %}
-
-    {% if vehicle.year_of_manufacture %}
-        <div>
-            <dt>Year of manufacture</dt>
-            <dd>{{ vehicle.year_of_manufacture }}</dd>
-        </div>
-    {% endif %}
-
-    {% if vehicle.operated_by %}
-        <div>
-            <dt>Loan operator</dt>
-            <dd><a href="{{ vehicle.operated_by.get_absolute_url }}">{{ vehicle.operated_by }}</a></dd>
-        </div>
-    {% endif %}
-
     {% if vehicle.joined_fleet %}
         <div>
             <dt>Delivered</dt>
@@ -96,80 +82,99 @@
         </div>
     {% endif %}
 
-    {% for key, value in vehicle.data_get %}
-        {% if value %}
-            <div>
-                <dt>{{ key }}</dt>
-                <dd>{{ value }}</dd>
-            </div>
-        {% endif %}
-    {% endfor %}
-
     {% if vehicle.get_standard_features %}
         <div>
             <dt>Features</dt>
             <dd>{{ vehicle.get_standard_features|join:", " }}</dd>
         </div>
     {% endif %}
+</dl>
 
-    {% if vehicle.get_accessibility_features %}
-        <div>
-            <dt>Accessibility</dt>
-            <dd>{{ vehicle.get_accessibility_features|join:", " }}</dd>
-        </div>
-    {% endif %}
+<details class="technical-info-section">
+    <summary>Technical Info</summary>
+    <dl class="contact-details vehicle-details">
+        {% if vehicle.year_of_manufacture %}
+            <div>
+                <dt>Year of manufacture</dt>
+                <dd>{{ vehicle.year_of_manufacture }}</dd>
+            </div>
+        {% endif %}
 
-    {% if vehicle.dvla_euro_status %}
-        <div>
-            <dt>Euro status</dt>
-            <dd>{{ vehicle.dvla_euro_status }}</dd>
-        </div>
-    {% endif %}
+        {% if vehicle.operated_by %}
+            <div>
+                <dt>Loan operator</dt>
+                <dd><a href="{{ vehicle.operated_by.get_absolute_url }}">{{ vehicle.operated_by }}</a></dd>
+            </div>
+        {% endif %}
 
-    {% if vehicle.dvla_mot_status and vehicle.dvla_mot_status != 'No details held by DVLA' %}
-        <div>
-            <dt>MOT status</dt>
-            <dd>{{ vehicle.dvla_mot_status }}</dd>
-        </div>
-    {% endif %}
+        {% if vehicle.get_accessibility_features %}
+            <div>
+                <dt>Accessibility</dt>
+                <dd>{{ vehicle.get_accessibility_features|join:", " }}</dd>
+            </div>
+        {% endif %}
 
-    {% if request.user.is_authenticated %}
-        <div>
-            <dt>Your photo count</dt>
-            <dd>{{ photo_log_quantity }}</dd>
-        </div>
-    {% endif %}
+        {% if vehicle.dvla_euro_status %}
+            <div>
+                <dt>Euro status</dt>
+                <dd>{{ vehicle.dvla_euro_status }}</dd>
+            </div>
+        {% endif %}
 
-    {% if total_photo_count %}
-        <div>
-            <dt>Total photo count</dt>
-            <dd>{{ total_photo_count }}</dd>
-        </div>
-    {% endif %}
+        {% if vehicle.dvla_mot_status and vehicle.dvla_mot_status != 'No details held by DVLA' %}
+            <div>
+                <dt>MOT status</dt>
+                <dd>{{ vehicle.dvla_mot_status }}</dd>
+            </div>
+        {% endif %}
 
-    {% if show_advanced and advanced_fields %}
-        {% for field in advanced_fields %}
-            {% if vehicle.advanced %}
-                {% for key, value in vehicle.advanced.items %}
-                    {% if key == field.slug and value %}
-                        <div>
-                            <dt>{{ field.name }}</dt>
-                            <dd>
-                                {% if field.field_type == 'boolean' %}
-                                    {{ value|yesno:"Yes,No" }}
-                                {% elif field.field_type == 'url' %}
-                                    <a href="{{ value }}" target="_blank" rel="noopener">{{ value }}</a>
-                                {% else %}
-                                    {{ value }}
-                                {% endif %}
-                            </dd>
-                        </div>
-                    {% endif %}
-                {% endfor %}
+        {% if request.user.is_authenticated %}
+            <div>
+                <dt>Your photo count</dt>
+                <dd>{{ photo_log_quantity }}</dd>
+            </div>
+        {% endif %}
+
+        {% if total_photo_count %}
+            <div>
+                <dt>Total photo count</dt>
+                <dd>{{ total_photo_count }}</dd>
+            </div>
+        {% endif %}
+
+        {% for key, value in vehicle.data_get %}
+            {% if value %}
+                <div>
+                    <dt>{{ key }}</dt>
+                    <dd>{{ value }}</dd>
+                </div>
             {% endif %}
         {% endfor %}
-    {% endif %}
-</dl>
+
+        {% if show_advanced and advanced_fields %}
+            {% for field in advanced_fields %}
+                {% if vehicle.advanced %}
+                    {% for key, value in vehicle.advanced.items %}
+                        {% if key == field.slug and value %}
+                            <div>
+                                <dt>{{ field.name }}</dt>
+                                <dd>
+                                    {% if field.field_type == 'boolean' %}
+                                        {{ value|yesno:"Yes,No" }}
+                                    {% elif field.field_type == 'url' %}
+                                        <a href="{{ value }}" target="_blank" rel="noopener">{{ value }}</a>
+                                    {% else %}
+                                        {{ value }}
+                                    {% endif %}
+                                </dd>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    </dl>
+</details>
 
 {% with flickr_link=vehicle.get_flickr_link %}
     <ul class="horizontal">

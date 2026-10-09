@@ -391,9 +391,6 @@ class VehicleBulkAssignOperatorForm(forms.Form):
 
 
 class VehicleBulkEditForm(forms.Form):
-    fleet_number = forms.IntegerField(
-        required=False, help_text="Set fleet number. Leave blank to keep current."
-    )
     prev_registration = forms.CharField(
         required=False,
         max_length=24,
@@ -458,8 +455,13 @@ class VehicleBulkEditForm(forms.Form):
         max_length=50,
         help_text="Set length. Leave blank to keep current.",
     )
-    chassis = forms.ChoiceField(
-        choices=[("", "--------")] + models.get_chassis_choices(),
+    engine = forms.ModelChoiceField(
+        queryset=models.Engine.objects.order_by("name"),
+        required=False,
+        help_text="Set engine. Leave blank to keep current.",
+    )
+    chassis = forms.ModelChoiceField(
+        queryset=models.Chassis.objects.order_by("name"),
         required=False,
         help_text="Set chassis. Leave blank to keep current.",
     )
@@ -468,10 +470,10 @@ class VehicleBulkEditForm(forms.Form):
         required=False,
         help_text="Set gearbox. Leave blank to keep current.",
     )
-    emissions_rating = forms.ChoiceField(
-        choices=[("", "--------")] + models.get_emissions_choices(),
+    emissions_standard = forms.ModelChoiceField(
+        queryset=models.EmissionsStandard.objects.order_by("name"),
         required=False,
-        help_text="Set emissions rating. Leave blank to keep current.",
+        help_text="Set emissions standard. Leave blank to keep current.",
     )
     historical_fleet = forms.ModelChoiceField(
         queryset=Operator.objects.order_by("name"),
@@ -486,6 +488,14 @@ class VehicleBulkEditForm(forms.Form):
         required=False,
         max_length=255,
         help_text="Set historical fleet creator. Leave blank to keep current.",
+    )
+    locked = forms.BooleanField(required=False, help_text="Lock vehicles")
+
+
+class VehicleBulkAdvancedEditForm(forms.Form):
+    advanced = forms.JSONField(
+        required=False,
+        help_text="Set advanced metadata as JSON. Leave blank to keep current.",
     )
     locked = forms.BooleanField(required=False, help_text="Lock vehicles")
 
@@ -617,24 +627,10 @@ class VehicleAdmin(admin.ModelAdmin):
     search_fields = ("code", "fleet_code", "reg")
     ordering = ("-id",)
     actions = (
-        "copy_livery",
-        "copy_type",
-        "make_livery",
-        "mass_change_livery",
-        "mass_change_branding",
-        "mass_assign_features",
-        "mass_log_vehicles",
-        "mass_assign_operator",
-        "mass_edit",
+        "delete_selected",
         "deduplicate",
-        "merge_all_selected",
-        "spare_ticket_machine",
-        "preserve",
-        "unpreserve",
-        "lock",
-        "unlock",
-        "export_basic_fleet",
-        "export_advanced_fleet",
+        "mass_edit",
+        "mass_advanced_edit",
     )
     inlines = [VehicleCodeInline]
     readonly_fields = ["latest_journey_data"]
@@ -1140,7 +1136,6 @@ class VehicleAdmin(admin.ModelAdmin):
             # Build update dict with only fields that were provided
             update_fields = {}
             field_mappings = {
-                "fleet_number": "fleet_number",
                 "prev_registration": "prev_registration",
                 "vehicle_type": "vehicle_type",
                 "colours": "colours",
@@ -1159,9 +1154,10 @@ class VehicleAdmin(admin.ModelAdmin):
                 "year_of_manufacture": "year_of_manufacture",
                 "capacity": "capacity",
                 "length": "length",
+                "engine": "engine",
                 "chassis": "chassis",
                 "gearbox": "gearbox",
-                "emissions_rating": "emissions_rating",
+                "emissions_standard": "emissions_standard",
                 "historical_fleet": "historical_fleet",
                 "historical_fleet_year": "historical_fleet_year",
                 "historical_fleet_creator": "historical_fleet_creator",
@@ -1200,6 +1196,44 @@ class VehicleAdmin(admin.ModelAdmin):
             queryset,
             VehicleBulkEditForm,
             title="Mass edit vehicles",
+            submit_label="Apply changes",
+            apply_handler=apply_handler,
+        )
+
+    @admin.action(description="Mass advanced edit vehicles")
+    def mass_advanced_edit(self, request, queryset):
+        def apply_handler(form, selected_queryset):
+            # Build update dict with only fields that were provided
+            update_fields = {}
+            advanced_data = form.cleaned_data.get("advanced")
+
+            if advanced_data is not None and advanced_data != "":
+                update_fields["advanced"] = advanced_data
+
+            # Always set manual flags
+            update_fields["is_manual"] = True
+            update_fields["manual_updated_at"] = timezone.now()
+
+            if update_fields:
+                updated = selected_queryset.update(**update_fields)
+                self.message_user(
+                    request,
+                    f"Updated {updated} vehicle{'s' if updated != 1 else ''}.",
+                    level=messages.SUCCESS,
+                )
+            else:
+                self.message_user(
+                    request,
+                    "No fields were changed.",
+                    level=messages.WARNING,
+                )
+            return None
+
+        return self._bulk_vehicle_update(
+            request,
+            queryset,
+            VehicleBulkAdvancedEditForm,
+            title="Mass advanced edit vehicles",
             submit_label="Apply changes",
             apply_handler=apply_handler,
         )

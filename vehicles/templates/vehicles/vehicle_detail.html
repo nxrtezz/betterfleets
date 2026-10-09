@@ -24,6 +24,34 @@
         {% endif %}{% endwith %}
     {% endif %}
     <style>
+        /* ── Technical Info Section ─────────────────────────────────── */
+        .technical-info-section {
+            margin: 1rem 0;
+        }
+        .technical-info-section summary {
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            padding: 0.5rem 0;
+        }
+        .technical-info-section summary::-webkit-details-marker {
+            display: none;
+        }
+        .technical-info-section summary::before {
+            content: '▶';
+            font-size: 0.8rem;
+            transition: transform 0.2s;
+        }
+        .technical-info-section[open] summary::before {
+            transform: rotate(90deg);
+        }
+        .technical-info-section[open] summary {
+            margin-bottom: 0.5rem;
+        }
+
         /* ── Review form / card ─────────────────────────────────────── */
         .review-form-card,
         .review-card {
@@ -401,7 +429,8 @@
                 font-size: 1.35rem;
             }
             .vehicle-photo {
-                width: 200px;
+                width: 100%;
+                max-height: 300px;
             }
             .vehicle-photo-caption {
                 font-size: 0.7rem;
@@ -420,15 +449,16 @@
             border-radius: 0.6rem;
             overflow: hidden;
             background: var(--brand-color);
-            width: 240px;
+            width: 320px;
             max-width: 100%;
+            max-height: 500px;
         }
 
         .vehicle-photo img {
             display: block;
             width: 100%;
             height: auto;
-            object-fit: cover;
+            object-fit: contain;
         }
 
         .vehicle-photo-caption {

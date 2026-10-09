@@ -485,6 +485,47 @@ class AdvancedField(models.Model):
         ordering = ("display_order", "name")
 
 
+class Engine(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    manufacturer = models.CharField(max_length=255, blank=True)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        app_label = "vehicles"
+        ordering = ("name",)
+
+
+class Chassis(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    manufacturer = models.CharField(max_length=255, blank=True)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        app_label = "vehicles"
+        ordering = ("name",)
+
+
+class EmissionsStandard(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    code = models.CharField(max_length=50, blank=True)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        app_label = "vehicles"
+        ordering = ("name",)
+        verbose_name = "emissions standard"
+        verbose_name_plural = "emissions standards"
+
+
 class VehicleNamePage(models.Model):
     name = models.CharField(max_length=255, unique=True, db_index=True)
     slug = AutoSlugField(populate_from="name", editable=True, unique=True)
@@ -765,20 +806,34 @@ class Vehicle(models.Model):
         blank=True,
         help_text="Vehicle length (e.g., '12m', '10.5m', '18m articulated')"
     )
-    chassis = models.CharField(
-        max_length=50,
+    engine = models.ForeignKey(
+        Engine,
+        models.SET_NULL,
+        null=True,
         blank=True,
-        help_text="Vehicle chassis type"
+        related_name="vehicles",
+        help_text="Vehicle engine"
+    )
+    chassis = models.ForeignKey(
+        Chassis,
+        models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="vehicles",
+        help_text="Vehicle chassis"
     )
     gearbox = models.CharField(
         max_length=50,
         blank=True,
         help_text="Vehicle gearbox/transmission type"
     )
-    emissions_rating = models.CharField(
-        max_length=32,
+    emissions_standard = models.ForeignKey(
+        EmissionsStandard,
+        models.SET_NULL,
+        null=True,
         blank=True,
-        help_text="Vehicle emissions rating"
+        related_name="vehicles",
+        help_text="Vehicle emissions standard"
     )
     locked = models.BooleanField(default=False)
     advanced = models.JSONField(
