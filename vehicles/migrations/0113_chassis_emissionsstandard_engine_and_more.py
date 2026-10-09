@@ -4,6 +4,14 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 
+def convert_empty_strings_to_null(apps, schema_editor):
+    """Convert empty strings in chassis field to NULL before altering to ForeignKey."""
+    Vehicle = apps.get_model('vehicles', 'Vehicle')
+    for vehicle in Vehicle.objects.filter(chassis=''):
+        vehicle.chassis = None
+        vehicle.save(update_fields=['chassis'])
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -53,6 +61,7 @@ class Migration(migrations.Migration):
             model_name='vehicle',
             name='emissions_rating',
         ),
+        migrations.RunPython(convert_empty_strings_to_null, migrations.RunPython.noop),
         migrations.AlterField(
             model_name='vehicle',
             name='chassis',
