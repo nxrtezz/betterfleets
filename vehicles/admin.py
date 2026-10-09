@@ -75,7 +75,9 @@ def safe_queryset_getter(model, order_by="name"):
 def apply_vehicle_schema_compat(queryset, prefix=""):
     missing = missing_vehicle_field_names()
     if missing:
-        queryset = queryset.defer(*(f"{prefix}{name}" for name in missing))
+        # Don't call defer() on combined queries (union, intersection, etc.)
+        if not queryset.query.combinator:
+            queryset = queryset.defer(*(f"{prefix}{name}" for name in missing))
     return queryset
 
 

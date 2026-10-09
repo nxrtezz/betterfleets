@@ -419,7 +419,9 @@ def missing_vehicle_field_names():
 def apply_vehicle_schema_compat(queryset):
     missing = missing_vehicle_field_names()
     if missing:
-        queryset = queryset.defer(*missing)
+        # Don't call defer() on combined queries (union, intersection, etc.)
+        if not queryset.query.combinator:
+            queryset = queryset.defer(*missing)
     return queryset
 
 
