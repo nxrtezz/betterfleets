@@ -3,6 +3,17 @@
 from django.db import migrations, models
 
 
+def cleanup_orphaned_sequences(apps, schema_editor):
+    """Drop orphaned sequences from failed migration."""
+    with schema_editor.connection.cursor() as cursor:
+        # Drop orphaned sequences if they exist
+        for seq in ['vehicles_gearbox_id_seq', 'vehicles_emissionsrating_id_seq']:
+            try:
+                cursor.execute(f'DROP SEQUENCE IF EXISTS {seq}')
+            except Exception:
+                pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,6 +21,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(cleanup_orphaned_sequences, migrations.RunPython.noop),
         migrations.CreateModel(
             name='Gearbox',
             fields=[
