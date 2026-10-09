@@ -22,7 +22,7 @@ def remove_emissions_field(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('vehicles', '0100_add_length_advanced_field'),
+        ('vehicles', '0101_merge_20260903_0014'),
     ]
 
     operations = [

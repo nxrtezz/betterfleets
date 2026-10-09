@@ -4,7 +4,6 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("vehicles", "0103_drop_orphan_column_not_null"),
-        ("vehicles", "0102_add_float_field_type"),
     ]
 
     operations = [

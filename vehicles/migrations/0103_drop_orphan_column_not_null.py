@@ -42,7 +42,7 @@ def drop_orphan_not_null(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("vehicles", "0102_fix_orphan_technical_columns"),
+        ("vehicles", "0103_merge_20260903_0015"),
     ]
 
     operations = [

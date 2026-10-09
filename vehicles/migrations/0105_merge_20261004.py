@@ -8,6 +8,7 @@ class Migration(migrations.Migration):
         ('vehicles', '0099_vehicle_technical_specs'),
         ('vehicles', '0099_vehiclerevision_permissions'),
         ('vehicles', '0104_vehicle_first_tracked_at'),
+        ('vehicles', '0103_merge_20260903_0015'),
     ]
 
     operations = [
