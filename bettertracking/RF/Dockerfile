@@ -6,6 +6,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gdal-bin \
     libgdal-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
