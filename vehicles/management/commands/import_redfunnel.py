@@ -297,7 +297,7 @@ class Command(ImportLiveVehiclesCommand):
             heading=rotation if rotation is not None else None,
         )
 
-    def handle_item(self, item: dict):
+    def handle_item(self, item, now=None, vehicle=None, latest=None, keep_journey=False):
         """
         Handle a single vehicle item from Red Funnel API.
 
@@ -306,50 +306,29 @@ class Command(ImportLiveVehiclesCommand):
         Args:
             item: Vehicle data from Red Funnel API
         """
+        now = timezone.now()
+
+        # Get or create vehicle
         try:
             vehicle, _ = self.get_vehicle(item)
         except Exception as e:
             logger.exception(f"Error getting vehicle: {e}")
             return
 
+        # Create location
         location = self.create_vehicle_location(item)
         if not location:
             return
 
+        # Set datetime
+        location.datetime = now
+
+        # Get journey
         journey = self.get_journey(item, vehicle)
-        location.datetime = timezone.now()
         location.journey = journey
 
-        # Save to database
-        try:
-            location.save()
-        except IntegrityError:
-            pass
-
-        # Update vehicle
-        vehicle.latest_journey = journey
-        vehicle.save(update_fields=["latest_journey"])
-
-        # Update Redis
-        if redis_client:
-            try:
-                redis_json = location.get_redis_json()
-                redis_json = json.dumps(redis_json, default=str)
-                redis_client.set(f"vehicle{vehicle.id}", redis_json, ex=900)
-                redis_client.geoadd(
-                    "vehicle_location_locations",
-                    (location.latlong.x, location.latlong.y, vehicle.id)
-                )
-
-                if journey.service_id:
-                    redis_client.sadd(f"service{journey.service_id}vehicles", vehicle.id)
-                    redis_client.expire(f"service{journey.service_id}vehicles", 600)
-
-                if vehicle.operator_id:
-                    redis_client.sadd(f"operator{vehicle.operator_id}vehicles", vehicle.id)
-                    redis_client.expire(f"operator{vehicle.operator_id}vehicles", 600)
-            except ConnectionError as e:
-                logger.exception(f"Redis error: {e}")
+        # Use parent class logic to handle saving and Redis updates
+        super().handle_item(item, now=now, vehicle=vehicle, latest=latest, keep_journey=keep_journey)
 
     def update(self):
         """
