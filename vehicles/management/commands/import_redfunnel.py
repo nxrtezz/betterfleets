@@ -35,7 +35,7 @@ from time import sleep
 
 import requests
 from django.contrib.gis.geos import Point
-from django.core.cache import cache
+from django.core.management.base import BaseCommand
 from django.db import IntegrityError
 from django.utils import timezone
 from redis.exceptions import ConnectionError
