@@ -43,7 +43,6 @@ from redis.exceptions import ConnectionError
 from busstops.models import DataSource, Operator, Service
 from vehicles.models import Vehicle, VehicleJourney, VehicleLocation
 from vehicles.utils import redis_client
-from ..import_live_vehicles import ImportLiveVehiclesCommand
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +169,9 @@ def get_journey_identity(item: dict) -> tuple:
     return (vehicle_id, route_number, destination)
 
 
-class Command(ImportLiveVehiclesCommand):
+class Command(BaseCommand):
+    """Red Funnel importer - standalone, not extending ImportLiveVehiclesCommand."""
+
     source_name = "Red Funnel"
     vehicle_code_scheme = "RF"
     url = "http://ais.redfunnel.co.uk/home/boats"
@@ -180,8 +181,9 @@ class Command(ImportLiveVehiclesCommand):
         super().__init__(*args, **kwargs)
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "betterfleet/1.0"})
-        self.journey_identities = {}
+        self.source = None
         self.operator = None
+        self.journey_identities = {}
 
     def do_source(self):
         """Get or create the DataSource for Red Funnel."""
@@ -297,7 +299,7 @@ class Command(ImportLiveVehiclesCommand):
             heading=rotation if rotation is not None else None,
         )
 
-    def handle_item(self, item, now=None, vehicle=None, latest=None, keep_journey=False):
+    def handle_item(self, item: dict):
         """
         Handle a single vehicle item from Red Funnel API.
 
@@ -327,8 +329,44 @@ class Command(ImportLiveVehiclesCommand):
         journey = self.get_journey(item, vehicle)
         location.journey = journey
 
-        # Use parent class logic to handle saving and Redis updates
-        super().handle_item(item, now=now, vehicle=vehicle, latest=latest, keep_journey=keep_journey)
+        # Save to database
+        try:
+            from django.db import IntegrityError
+            location.save()
+        except IntegrityError:
+            pass
+
+        # Update vehicle
+        vehicle.latest_journey = journey
+        vehicle.save(update_fields=["latest_journey"])
+
+        # Update Redis
+        if redis_client:
+            try:
+                redis_json = location.get_redis_json()
+                redis_json = json.dumps(redis_json, default=str)
+                redis_client.set(f"vehicle{vehicle.id}", redis_json, ex=900)
+                redis_client.geoadd(
+                    "vehicle_location_locations",
+                    (location.latlong.x, location.latlong.y, vehicle.id)
+                )
+
+                if journey.service_id:
+                    redis_client.sadd(f"service{journey.service_id}vehicles", vehicle.id)
+                    redis_client.expire(f"service{journey.service_id}vehicles", 600)
+
+                if vehicle.operator_id:
+                    redis_client.sadd(f"operator{vehicle.operator_id}vehicles", vehicle.id)
+                    redis_client.expire(f"operator{vehicle.operator_id}vehicles", 600)
+            except ConnectionError as e:
+                logger.exception(f"Redis error: {e}")
+
+    def handle(self, *args, **options):
+        """Run the importer."""
+        logger.info("Starting Red Funnel vehicle importer")
+        logger.info("THIS IMPORTER IS SPECIFIC TO RED FUNNEL (RF) ONLY")
+
+        self.update()
 
     def update(self):
         """
