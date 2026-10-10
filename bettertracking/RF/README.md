@@ -6,7 +6,7 @@ Do not reuse this code for other operators. Each operator will have their own de
 
 ## Overview
 
-This container fetches live vehicle data from Red Funnel's AIS endpoint and converts it to the BetterFleet format for display on the map.
+This container runs a Django management command that fetches live vehicle data from Red Funnel's AIS endpoint and converts it to the BetterFleet format for display on the map.
 
 ## Endpoint
 
@@ -123,6 +123,6 @@ docker compose down
 When adding new operators:
 1. Create a new subdirectory in `bettertracking/` with the operator's NOC
 2. Create a separate `docker-compose.yml` for that operator
-3. Implement operator-specific transformation logic
+3. Implement operator-specific transformation logic as a Django management command
 4. Add the operator to `start.sh`
 5. **DO NOT** reuse Red Funnel's transformation code

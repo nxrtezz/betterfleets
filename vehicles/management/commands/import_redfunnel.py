@@ -30,31 +30,20 @@ Data mapping:
 
 import json
 import logging
-import os
-import sys
 from datetime import timedelta
 from time import sleep
 
 import requests
-import sentry_sdk
-from django.conf import settings
 from django.contrib.gis.geos import Point
 from django.core.cache import cache
 from django.db import IntegrityError
 from django.utils import timezone
 from redis.exceptions import ConnectionError
 
-# Add parent directory to path to import from main project
-# The script is at /app/bettertracking/RF/import_redfunnel.py
-# We need to add /app to the path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
-import django
-django.setup()
-
 from busstops.models import DataSource, Operator, Service
 from vehicles.models import Vehicle, VehicleJourney, VehicleLocation
 from vehicles.utils import redis_client, find_or_merge_vehicle
+from ..import_live_vehicles import ImportLiveVehiclesCommand
 
 logger = logging.getLogger(__name__)
 
@@ -181,36 +170,28 @@ def get_journey_identity(item: dict) -> tuple:
     return (vehicle_id, route_number, destination)
 
 
-class RedFunnelImporter:
-    """
-    Red Funnel vehicle tracking importer.
+class Command(ImportLiveVehiclesCommand):
+    source_name = "Red Funnel"
+    vehicle_code_scheme = "RF"
+    url = "http://ais.redfunnel.co.uk/home/boats"
+    wait = 60
 
-    THIS CLASS IS SPECIFIC TO RED FUNNEL ONLY.
-    """
-
-    SOURCE_NAME = "Red Funnel"
-    VEHICLE_CODE_SCHEME = "RF"
-    URL = "http://ais.redfunnel.co.uk/home/boats"
-    WAIT = 60
-
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "betterfleet/1.0"})
-        self.source = None
-        self.operator = None
-        self.identifiers = {}
         self.journey_identities = {}
+        self.operator = None
 
-    def get_or_create_source(self):
+    def do_source(self):
         """Get or create the DataSource for Red Funnel."""
         self.source, _ = DataSource.objects.get_or_create(
-            name=self.SOURCE_NAME,
-            defaults={"url": self.URL}
+            name=self.source_name,
+            defaults={"url": self.url}
         )
-
-    def get_or_create_operator(self):
-        """Get the Operator for Red Funnel (RF)."""
+        # Get the RF operator
         self.operator = Operator.objects.get(noc="RF")
+        return self
 
     def get_vehicle(self, item: dict) -> tuple[Vehicle, bool]:
         """
@@ -233,7 +214,7 @@ class RedFunnelImporter:
             source=self.source,
             operator=self.operator,
             code=redfunnel_id,
-            scheme=self.VEHICLE_CODE_SCHEME,
+            scheme=self.vehicle_code_scheme,
         )
 
         return vehicle, created
@@ -365,13 +346,12 @@ class RedFunnelImporter:
 
         THIS LOGIC IS SPECIFIC TO RED FUNNEL ONLY.
         """
-        self.get_or_create_source()
-        self.get_or_create_operator()
+        self.do_source()
 
         while True:
             try:
-                logger.info(f"Fetching {self.URL}")
-                response = self.session.get(self.URL, timeout=20)
+                logger.info(f"Fetching {self.url}")
+                response = self.session.get(self.url, timeout=20)
                 response.raise_for_status()
                 items = response.json()
 
@@ -391,22 +371,11 @@ class RedFunnelImporter:
             except Exception as e:
                 logger.exception(f"Error during update: {e}")
 
-            sleep(self.WAIT)
+            sleep(self.wait)
 
+    def handle(self, *args, **options):
+        """Run the importer."""
+        logger.info("Starting Red Funnel vehicle importer")
+        logger.info("THIS IMPORTER IS SPECIFIC TO RED FUNNEL (RF) ONLY")
 
-def main():
-    """Main entry point."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-
-    logger.info("Starting Red Funnel vehicle importer")
-    logger.info("THIS IMPORTER IS SPECIFIC TO RED FUNNEL (RF) ONLY")
-
-    importer = RedFunnelImporter()
-    importer.update()
-
-
-if __name__ == "__main__":
-    main()
+        self.update()

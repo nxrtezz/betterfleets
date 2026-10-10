@@ -1,16 +1,15 @@
 services:
   rf:
-    build:
-      context: ../../
-      dockerfile: Dockerfile
+    image: ghcr.io/bustimes/bustimes.org/bustimes-base:3.14
     container_name: RF
-    entrypoint: ["/app/.venv/bin/python", "bettertracking/RF/import_redfunnel.py"]
+    working_dir: /app
+    volumes:
+      - ../../:/app:cached
+    network_mode: host
+    command: ["python", "manage.py", "import_redfunnel"]
     environment:
       - DATABASE_URL=${DATABASE_URL-postgis://postgres:postgres:localhost:5432/postgres}
       - REDIS_URL=${REDIS_URL-redis://localhost:6379}
       - SECRET_KEY=${SECRET_KEY-dev}
       - DJANGO_SETTINGS_MODULE=buses.settings
-    volumes:
-      - ../../:/app:cached
-    network_mode: host
     restart: on-failure
