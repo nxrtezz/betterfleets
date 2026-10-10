@@ -81,7 +81,7 @@ services:
     entrypoint: ["uv", "run", "./manage.py", "import_bod_avl"]
     environment:
       - SECRET_KEY=${SECRET_KEY-dev}
-      - DATABASE_URL=${DATABASE_URL-postgis://postgres:postgres@postgres:5432/postgres}
+      - DATABASE_URL=${DATABASE_URL-postgis://postgres:postgres:postgres:5432/postgres}
       - REDIS_URL=${REDIS_URL-redis://redis:6379}
       - BODS_API_KEY=${BODS_API_KEY-}
       - BODS_API_AUTH_MODE=${BODS_API_AUTH_MODE-query}
@@ -93,6 +93,12 @@ services:
       - postgres
       - redis
     restart: on-failure
+
+  # Better Tracking - operator-specific vehicle tracking containers
+  # To start all tracking containers, run:
+  #   cd bettertracking && ./start.sh
+  # This uses host networking to connect to the existing database and Redis
+  # See bettertracking/README.md for more details
 
 volumes:
   postgres_data:
