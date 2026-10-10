@@ -42,7 +42,7 @@ from redis.exceptions import ConnectionError
 
 from busstops.models import DataSource, Operator, Service
 from vehicles.models import Vehicle, VehicleJourney, VehicleLocation
-from vehicles.utils import redis_client, find_or_merge_vehicle
+from vehicles.utils import redis_client
 from ..import_live_vehicles import ImportLiveVehiclesCommand
 
 logger = logging.getLogger(__name__)
@@ -205,19 +205,30 @@ class Command(ImportLiveVehiclesCommand):
         Returns:
             Tuple of (vehicle, created)
         """
+        from vehicles.utils import find_or_merge_vehicle
+
         redfunnel_id = item.get("id")
         slug = get_vehicle_slug(redfunnel_id)
 
         # Use the same vehicle finding/creation logic as BODS
-        vehicle, created = find_or_merge_vehicle(
-            slug,
-            source=self.source,
-            operator=self.operator,
-            code=redfunnel_id,
-            scheme=self.vehicle_code_scheme,
+        vehicle = find_or_merge_vehicle(
+            self.operator,
+            redfunnel_id
         )
 
-        return vehicle, created
+        if vehicle:
+            return vehicle, False
+
+        # Create new vehicle if not found
+        vehicle = Vehicle(
+            slug=slug,
+            code=redfunnel_id,
+            source=self.source,
+            operator=self.operator,
+        )
+        vehicle.save()
+
+        return vehicle, True
 
     def get_journey(self, item: dict, vehicle: Vehicle) -> VehicleJourney:
         """
