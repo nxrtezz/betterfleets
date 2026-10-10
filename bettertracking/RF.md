@@ -1,12 +1,12 @@
 # Red Funnel (RF) Vehicle Tracking
 
-**THIS CONTAINER AND THESE INSTRUCTIONS ARE ONLY FOR THIS OPERATOR (Red Funnel, NOC: RF).**
+**THIS COMMAND AND THESE INSTRUCTIONS ARE ONLY FOR THIS OPERATOR (Red Funnel, NOC: RF).**
 
-Do not reuse this code for other operators. Each operator will have their own dedicated container with their own specific transformation logic and data mapping.
+Do not reuse this code for other operators. Each operator will have their own dedicated management command with their own specific transformation logic and data mapping.
 
 ## Overview
 
-This container runs a Django management command that fetches live vehicle data from Red Funnel's AIS endpoint and converts it to the BetterFleet format for display on the map.
+This Django management command fetches live vehicle data from Red Funnel's AIS endpoint and converts it to the BetterFleet format for display on the map.
 
 ## Endpoint
 
@@ -90,25 +90,22 @@ cd bettertracking
 ./start.sh
 ```
 
-Or start individually:
+Or directly:
 
 ```bash
-cd bettertracking/RF
-docker compose up -d
+docker compose --profile tracking up -d rf
 ```
 
 ### View logs
 
 ```bash
-cd bettertracking/RF
-docker compose logs -f
+docker compose logs -f rf
 ```
 
 ### Stop the container
 
 ```bash
-cd bettertracking/RF
-docker compose down
+docker compose --profile tracking down
 ```
 
 ## Operator Details
@@ -121,8 +118,8 @@ docker compose down
 ## Future Operators
 
 When adding new operators:
-1. Create a new subdirectory in `bettertracking/` with the operator's NOC
-2. Create a separate `docker-compose.yml` for that operator
-3. Implement operator-specific transformation logic as a Django management command
-4. Add the operator to `start.sh`
+1. Create a new Django management command in `vehicles/management/commands/`
+2. Add a service to `docker-compose.yml` with the `tracking` profile
+3. Implement operator-specific transformation logic
+4. Add to `bettertracking/start.sh` if needed
 5. **DO NOT** reuse Red Funnel's transformation code

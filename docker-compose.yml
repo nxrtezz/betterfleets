@@ -77,7 +77,7 @@ services:
 
   bods_avl:
     build: .
-    profiles: ["tools"]
+    profiles: ["tracking"]
     entrypoint: ["uv", "run", "./manage.py", "import_bod_avl"]
     environment:
       - SECRET_KEY=${SECRET_KEY-dev}
@@ -94,11 +94,30 @@ services:
       - redis
     restart: on-failure
 
+  # Red Funnel (RF) vehicle tracking
+  rf:
+    build: .
+    profiles: ["tracking"]
+    entrypoint: ["uv", "run", "./manage.py", "import_redfunnel"]
+    environment:
+      - SECRET_KEY=${SECRET_KEY-dev}
+      - DATABASE_URL=${DATABASE_URL-postgis://postgres:postgres:postgres:5432/postgres}
+      - REDIS_URL=${REDIS_URL-redis://redis:6379}
+    volumes:
+      - .:/app:cached
+    depends_on:
+      - postgres
+      - redis
+    restart: on-failure
+
   # Better Tracking - operator-specific vehicle tracking containers
   # To start all tracking containers, run:
   #   cd bettertracking && ./start.sh
   # This uses host networking to connect to the existing database and Redis
   # See bettertracking/README.md for more details
+  
+  # Alternative: run tracking containers from main stack:
+  # docker compose --profile tracking up -d
 
 volumes:
   postgres_data:
