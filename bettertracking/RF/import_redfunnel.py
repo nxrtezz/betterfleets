@@ -53,8 +53,8 @@ import django
 django.setup()
 
 from busstops.models import DataSource, Operator, Service
-from vehicles.models import Vehicle, VehicleJourney, VehicleLocation, VehicleCode
-from vehicles.utils import redis_client
+from vehicles.models import Vehicle, VehicleJourney, VehicleLocation
+from vehicles.utils import redis_client, find_or_merge_vehicle
 
 logger = logging.getLogger(__name__)
 
@@ -209,21 +209,12 @@ class RedFunnelImporter:
         )
 
     def get_or_create_operator(self):
-        """Get or create the Operator for Red Funnel."""
-        # Try to find existing operator by NOC
-        self.operator = Operator.objects.filter(noc="RF").first()
-        if not self.operator:
-            # Create operator if not exists
-            self.operator = Operator.objects.create(
-                id="RF",
-                name="Red Funnel",
-                noc="RF",
-                vehicle_mode="ferry"
-            )
+        """Get the Operator for Red Funnel (RF)."""
+        self.operator = Operator.objects.get(noc="RF")
 
     def get_vehicle(self, item: dict) -> tuple[Vehicle, bool]:
         """
-        Get or create vehicle from Red Funnel data.
+        Get or create vehicle from Red Funnel data using find_or_merge_vehicle.
 
         THIS LOGIC IS SPECIFIC TO RED FUNNEL ONLY.
 
@@ -236,46 +227,16 @@ class RedFunnelImporter:
         redfunnel_id = item.get("id")
         slug = get_vehicle_slug(redfunnel_id)
 
-        # Try to find by code first
-        vehicle_code = VehicleCode.objects.filter(
-            code=redfunnel_id,
-            scheme=self.VEHICLE_CODE_SCHEME
-        ).first()
-
-        if vehicle_code:
-            return vehicle_code.vehicle, False
-
-        # Try to find by slug
-        try:
-            vehicle = Vehicle.objects.get(slug=slug)
-            # Create vehicle code
-            VehicleCode.objects.create(
-                code=redfunnel_id,
-                scheme=self.VEHICLE_CODE_SCHEME,
-                vehicle=vehicle
-            )
-            return vehicle, False
-        except Vehicle.DoesNotExist:
-            pass
-
-        # Create new vehicle
-        vehicle = Vehicle(
-            slug=slug,
-            code=redfunnel_id,
+        # Use the same vehicle finding/creation logic as BODS
+        vehicle, created = find_or_merge_vehicle(
+            slug,
             source=self.source,
             operator=self.operator,
-            vehicle_type_id=None,  # Will be set later if needed
-        )
-        vehicle.save()
-
-        # Create vehicle code
-        VehicleCode.objects.create(
             code=redfunnel_id,
             scheme=self.VEHICLE_CODE_SCHEME,
-            vehicle=vehicle
         )
 
-        return vehicle, True
+        return vehicle, created
 
     def get_journey(self, item: dict, vehicle: Vehicle) -> VehicleJourney:
         """
@@ -407,9 +368,6 @@ class RedFunnelImporter:
         self.get_or_create_source()
         self.get_or_create_operator()
 
-        logger.info(f"Operator: {self.operator.name} (NOC: {self.operator.noc})")
-        logger.info(f"Operator ID: {self.operator.id}")
-
         while True:
             try:
                 logger.info(f"Fetching {self.URL}")
@@ -423,15 +381,10 @@ class RedFunnelImporter:
                     journey_identity = get_journey_identity(item)
                     vehicle_id = item.get("id")
 
-                    logger.info(f"Vehicle {vehicle_id}: journey_identity={journey_identity}")
-
                     # Check if journey has changed
                     if self.journey_identities.get(vehicle_id) != journey_identity:
-                        logger.info(f"Vehicle {vehicle_id}: journey changed, processing...")
                         self.handle_item(item)
                         self.journey_identities[vehicle_id] = journey_identity
-                    else:
-                        logger.info(f"Vehicle {vehicle_id}: journey unchanged, skipping")
 
                 logger.info("Update complete")
 
@@ -450,12 +403,6 @@ def main():
 
     logger.info("Starting Red Funnel vehicle importer")
     logger.info("THIS IMPORTER IS SPECIFIC TO RED FUNNEL (RF) ONLY")
-
-    # Test the coordinate transformation
-    logger.info("Testing coordinate transformation...")
-    test_x, test_y = 807, 132
-    test_lat, test_lon = redfunnel_to_latlong(test_x, test_y)
-    logger.info(f"Test: x={test_x}, y={test_y} -> lat={test_lat}, lon={test_lon}")
 
     importer = RedFunnelImporter()
     importer.update()
