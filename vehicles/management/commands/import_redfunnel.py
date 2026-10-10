@@ -195,6 +195,9 @@ class Command(BaseCommand):
         self.operator = Operator.objects.get(noc="RF")
         return self
 
+    def add_arguments(self, parser):
+        parser.add_argument("--immediate", action="store_true")
+
     def get_vehicle(self, item: dict) -> tuple[Vehicle, bool]:
         """
         Get or create vehicle from Red Funnel data using find_or_merge_vehicle.
@@ -361,13 +364,6 @@ class Command(BaseCommand):
             except ConnectionError as e:
                 logger.exception(f"Redis error: {e}")
 
-    def handle(self, *args, **options):
-        """Run the importer."""
-        logger.info("Starting Red Funnel vehicle importer")
-        logger.info("THIS IMPORTER IS SPECIFIC TO RED FUNNEL (RF) ONLY")
-
-        self.update()
-
     def update(self):
         """
         Main update loop for Red Funnel importer.
@@ -406,4 +402,24 @@ class Command(BaseCommand):
         logger.info("Starting Red Funnel vehicle importer")
         logger.info("THIS IMPORTER IS SPECIFIC TO RED FUNNEL (RF) ONLY")
 
-        self.update()
+        self.do_source()
+
+        if options.get("immediate"):
+            # Run once and exit
+            try:
+                logger.info(f"Fetching {self.url}")
+                response = self.session.get(self.url, timeout=20)
+                response.raise_for_status()
+                items = response.json()
+
+                logger.info(f"Processing {len(items)} vehicles")
+
+                for item in items:
+                    self.handle_item(item)
+
+                logger.info("Update complete")
+            except Exception as e:
+                logger.exception(f"Error during update: {e}")
+        else:
+            # Run continuously
+            self.update()
