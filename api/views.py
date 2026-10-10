@@ -268,6 +268,11 @@ class VehicleJourneyViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = CursorPaginationWithSmallerPageSize
     filter_backends = [DjangoFilterBackend]
     filterset_class = filters.VehicleJourneyFilter
+    authentication_classes = [authentication.OptionalAPIKeyAuthentication, authentication.CsrfExemptSessionAuthentication]
+    permission_classes = []
+
+    def get_authenticators(self):
+        return [authentication.OptionalAPIKeyAuthentication(), authentication.CsrfExemptSessionAuthentication()]
 
     def retrieve(self, request, *args, pk, **kwargs):
         instance = self.get_object()
@@ -388,85 +393,6 @@ class VehicleJourneyViewSet(viewsets.ReadOnlyModelViewSet):
             'message': 'Vehicle created'
         })
 
-
-class SiteInfoViewSet(viewsets.ViewSet):
-    def list(self, request):
-        from django.contrib.auth import get_user_model
-
-        User = get_user_model()
-
-        data = {
-            "services": Service.objects.filter(current=True).count(),
-            "operators": Operator.objects.count(),
-            "vehicles": Vehicle.objects.count(),
-            "users": User.objects.count(),
-        }
-        serializer = serializers.SiteInfoSerializer(data)
-        return Response(serializer.data)
-
-
-class UserViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = User.objects.annotate(
-        approved_edit_count=Count(
-            "edited_revisions", filter=Q(edited_revisions__pending=False, edited_revisions__disapproved=False)
-        ),
-        disapproved_edit_count=Count(
-            "edited_revisions", filter=Q(edited_revisions__disapproved=True)
-        ),
-        pending_edit_count=Count(
-            "edited_revisions", filter=Q(edited_revisions__pending=True)
-        ),
-        photo_count=Count("photo", distinct=True),
-        ride_count=Count("fleet_ride_logs", distinct=True),
-    )
-    serializer_class = serializers.UserSerializer
-    pagination_class = CursorPagination
-    authentication_classes = [authentication.OptionalAPIKeyAuthentication]
-    permission_classes = []
-
-    def get_authenticators(self):
-        # Allow both API key and session authentication
-        return [authentication.OptionalAPIKeyAuthentication(), authentication.SessionAuthentication()]
-    queryset = User.objects.annotate(
-        approved_edit_count=Count(
-            "edited_revisions", filter=Q(edited_revisions__pending=False, edited_revisions__disapproved=False)
-        ),
-        disapproved_edit_count=Count(
-            "edited_revisions", filter=Q(edited_revisions__disapproved=True)
-        ),
-        pending_edit_count=Count(
-            "edited_revisions", filter=Q(edited_revisions__pending=True)
-        ),
-        photo_count=Count("photo", distinct=True),
-        ride_count=Count("fleet_ride_logs", distinct=True),
-    )
-    serializer_class = serializers.UserSerializer
-    pagination_class = CursorPagination
-    authentication_classes = [authentication.OptionalAPIKeyAuthentication]
-    permission_classes = []
-
-    def get_authenticators(self):
-        return [authentication.OptionalAPIKeyAuthentication()]
-
-    @action(detail=False, methods=['get'])
-    def permissions(self, request):
-        """Check current user's permissions"""
-        user = request.user
-        if not user.is_authenticated:
-            return Response({'overland': False}, status=401)
-
-        from django.contrib.auth.models import Permission
-        overland_perm = Permission.objects.filter(
-            codename='use_overland',
-            content_type__app_label='fleet'
-        ).first()
-
-        has_overland = user.has_perm('fleet.use_overland')
-
-        return Response({
-            'overland': has_overland,
-        })
-
     @action(detail=False, methods=['post'])
     def start_tracking(self, request):
         """Start a new tracking session"""
@@ -475,6 +401,7 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
         from bustimes.models import Route, Calendar, Trip, StopTime
         from vehicles.models import Vehicle, VehicleJourney
         from django.utils import timezone
+        from datetime import datetime, time
         from secrets import token_urlsafe
         import json
 
@@ -487,8 +414,8 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
 
         data = request.data
         vehicle_slug = data.get('vehicle_slug')
-        destination = data.get('destination')
-        route_number = data.get('route_number')
+        destination = (data.get('destination') or '').strip()
+        route_number = (data.get('route_number') or '').strip()
         tracking_date_str = data.get('tracking_date')
         trip_id = data.get('trip_id')
         service_id = data.get('service_id')
@@ -498,15 +425,18 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
         if not vehicle_slug:
             return Response({'error': 'Vehicle slug required'}, status=400)
 
-        try:
-            vehicle = Vehicle.objects.get(slug=vehicle_slug)
-        except Vehicle.DoesNotExist:
+        vehicle = (
+            Vehicle.objects.filter(slug=vehicle_slug).first()
+            or Vehicle.objects.filter(fleet_code__iexact=vehicle_slug).first()
+            or (Vehicle.objects.filter(pk=int(vehicle_slug)).first() if str(vehicle_slug).isdigit() else None)
+        )
+        if not vehicle:
             return Response({'error': 'Vehicle not found'}, status=404)
 
         # Parse tracking date
         if tracking_date_str:
             try:
-                tracking_date = timezone.datetime.strptime(tracking_date_str, '%Y-%m-%d').date()
+                tracking_date = datetime.strptime(tracking_date_str, '%Y-%m-%d').date()
             except ValueError:
                 return Response({'error': 'Invalid tracking date'}, status=400)
         else:
@@ -544,7 +474,7 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
         stop_rows = []
         if stops_str:
             try:
-                stops_data = json.loads(stops_str)
+                stops_data = json.loads(stops_str) if isinstance(stops_str, str) else stops_str
                 for stop_data in stops_data:
                     stop = StopPoint.objects.get(atco_code=stop_data['stop_id'])
                     stop_rows.append({
@@ -553,7 +483,7 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
                         'departure': stop_data.get('departure'),
                         'sequence': stop_data.get('sequence', 0)
                     })
-            except (json.JSONDecodeError, StopPoint.DoesNotExist):
+            except (json.JSONDecodeError, StopPoint.DoesNotExist, TypeError, KeyError):
                 return Response({'error': 'Invalid stops data'}, status=400)
 
         # Create scheduled trip data if stops provided
@@ -605,12 +535,12 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
             journey_datetime = scheduled_trip.start_datetime(tracking_date)
             journey_destination = destination or scheduled_trip.headsign or ""
             journey_route = scheduled_trip.route.line_name
-            journey_code = scheduled_trip.vehicle_journey_code or route_number
+            journey_code = scheduled_trip.vehicle_journey_code or route_number or f"overland-{vehicle.slug}"
             journey_service = scheduled_trip.route.service
             journey_direction = "inbound" if scheduled_trip.inbound else ""
         else:
             journey_datetime = timezone.make_aware(
-                timezone.datetime.combine(tracking_date, timezone.datetime.min.time())
+                datetime.combine(tracking_date, time.min)
             )
             journey_destination = destination
             journey_route = route_number or "Overland"
@@ -631,6 +561,10 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
             service=journey_service,
         )
 
+        vehicle.latest_journey = journey
+        vehicle.latest_journey_id = journey.id
+        vehicle.save(update_fields=["latest_journey", "latest_journey_id"])
+
         # Create subscription
         auth_key = token_urlsafe(32)
         subscription = OverlandSubscription.objects.create(
@@ -638,7 +572,7 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
             vehicle=vehicle,
             destination=destination,
             route_number=route_number,
-            trip_id=str(scheduled_trip.pk) if scheduled_trip else trip_id,
+            trip_id=str(scheduled_trip.pk) if scheduled_trip else (str(trip_id) if trip_id else ""),
             scheduled_trip=scheduled_trip,
             tracking_date=tracking_date,
             journey=journey,
@@ -650,3 +584,68 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
             'journey_id': journey.pk,
             'auth_key': auth_key,
         })
+
+
+class SiteInfoViewSet(viewsets.ViewSet):
+    def list(self, request):
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
+        data = {
+            "services": Service.objects.filter(current=True).count(),
+            "operators": Operator.objects.count(),
+            "vehicles": Vehicle.objects.count(),
+            "users": User.objects.count(),
+        }
+        serializer = serializers.SiteInfoSerializer(data)
+        return Response(serializer.data)
+
+
+class UserViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = User.objects.annotate(
+        approved_edit_count=Count(
+            "edited_revisions", filter=Q(edited_revisions__pending=False, edited_revisions__disapproved=False)
+        ),
+        disapproved_edit_count=Count(
+            "edited_revisions", filter=Q(edited_revisions__disapproved=True)
+        ),
+        pending_edit_count=Count(
+            "edited_revisions", filter=Q(edited_revisions__pending=True)
+        ),
+        photo_count=Count("photo", distinct=True),
+        ride_count=Count("fleet_ride_logs", distinct=True),
+    )
+    serializer_class = serializers.UserSerializer
+    pagination_class = CursorPagination
+    authentication_classes = [authentication.OptionalAPIKeyAuthentication, authentication.CsrfExemptSessionAuthentication]
+    permission_classes = []
+
+    def get_authenticators(self):
+        # Allow both API key and session authentication
+        return [authentication.OptionalAPIKeyAuthentication(), authentication.CsrfExemptSessionAuthentication()]
+
+    @action(detail=False, methods=['get'])
+    def permissions(self, request):
+        """Check current user's permissions"""
+        user = request.user
+        if not user.is_authenticated:
+            return Response({'overland': False}, status=401)
+
+        from django.contrib.auth.models import Permission
+        overland_perm = Permission.objects.filter(
+            codename='use_overland',
+            content_type__app_label='fleet'
+        ).first()
+
+        has_overland = user.has_perm('fleet.use_overland')
+
+        return Response({
+            'overland': has_overland,
+        })
+
+    @action(detail=False, methods=['post'])
+    def start_tracking(self, request):
+        """Delegate start_tracking to VehicleJourneyViewSet for backwards compatibility"""
+        return VehicleJourneyViewSet().start_tracking(request)
+

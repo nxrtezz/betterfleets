@@ -45,7 +45,9 @@ from django.utils import timezone
 from redis.exceptions import ConnectionError
 
 # Add parent directory to path to import from main project
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# The script is at /app/bettertracking/RF/import_redfunnel.py
+# We need to add /app to the path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import django
 django.setup()
@@ -405,6 +407,9 @@ class RedFunnelImporter:
         self.get_or_create_source()
         self.get_or_create_operator()
 
+        logger.info(f"Operator: {self.operator.name} (NOC: {self.operator.noc})")
+        logger.info(f"Operator ID: {self.operator.id}")
+
         while True:
             try:
                 logger.info(f"Fetching {self.URL}")
@@ -418,10 +423,15 @@ class RedFunnelImporter:
                     journey_identity = get_journey_identity(item)
                     vehicle_id = item.get("id")
 
+                    logger.info(f"Vehicle {vehicle_id}: journey_identity={journey_identity}")
+
                     # Check if journey has changed
                     if self.journey_identities.get(vehicle_id) != journey_identity:
+                        logger.info(f"Vehicle {vehicle_id}: journey changed, processing...")
                         self.handle_item(item)
                         self.journey_identities[vehicle_id] = journey_identity
+                    else:
+                        logger.info(f"Vehicle {vehicle_id}: journey unchanged, skipping")
 
                 logger.info("Update complete")
 
@@ -440,6 +450,12 @@ def main():
 
     logger.info("Starting Red Funnel vehicle importer")
     logger.info("THIS IMPORTER IS SPECIFIC TO RED FUNNEL (RF) ONLY")
+
+    # Test the coordinate transformation
+    logger.info("Testing coordinate transformation...")
+    test_x, test_y = 807, 132
+    test_lat, test_lon = redfunnel_to_latlong(test_x, test_y)
+    logger.info(f"Test: x={test_x}, y={test_y} -> lat={test_lat}, lon={test_lon}")
 
     importer = RedFunnelImporter()
     importer.update()

@@ -2,11 +2,11 @@ services:
   rf:
     build:
       context: ../../
-      dockerfile: bettertracking/RF/Dockerfile
+      dockerfile: Dockerfile
     container_name: RF
     entrypoint: ["uv", "run", "python", "bettertracking/RF/import_redfunnel.py"]
     environment:
-      - DATABASE_URL=${DATABASE_URL-postgis://postgres:postgres@localhost:5432/postgres}
+      - DATABASE_URL=${DATABASE_URL-postgis://postgres:postgres:localhost:5432/postgres}
       - REDIS_URL=${REDIS_URL-redis://localhost:6379}
       - SECRET_KEY=${SECRET_KEY-dev}
     volumes:

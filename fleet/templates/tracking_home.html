@@ -804,11 +804,29 @@
 
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <script>
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+
     // Tracking Application State
     const trackingState = {
       currentSection: 'tracking',
       activeTrackingSession: null,
       trackingInterval: null,
+      watchId: null,
+      latestCoords: null,
+      latestHeading: null,
       isPaused: false,
       currentCapacity: 0,
       capacityMax: 0,
@@ -865,7 +883,11 @@
       switch(section) {
         case 'tracking':
           content.innerHTML = await getTrackingSectionHTML();
-          setupTrackingSection();
+          if (trackingState.activeTrackingSession) {
+            initializeActiveTracking();
+          } else {
+            setupTrackingSection();
+          }
           break;
         case 'vehicles':
           content.innerHTML = await getVehiclesSectionHTML();

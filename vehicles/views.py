@@ -2248,8 +2248,15 @@ def vehicles_json(request) -> JsonResponse:
         overland_query = overland_query.filter(vehicle__operator_id__in=operator_ids)
     
     # Filter by specific vehicle IDs if specified
-    if vehicle_ids:
-        overland_query = overland_query.filter(vehicle_id__in=vehicle_ids)
+    if "id" in request.GET:
+        overland_query = overland_query.filter(vehicle_id__in=request.GET["id"].split(","))
+    
+    # Filter by service if specified
+    if service_ids:
+        overland_query = overland_query.filter(
+            Q(scheduled_trip__route__service_id__in=service_ids)
+            | Q(journey__service_id__in=service_ids)
+        )
     
     for subscription in overland_query:
         if subscription.latitude is None or subscription.longitude is None or not subscription.last_timestamp:
@@ -2262,6 +2269,12 @@ def vehicles_json(request) -> JsonResponse:
             trail_redis_key = f"journey_trail_{vehicle.latest_journey_id}"
             trail_data = cache.get(trail_redis_key, [])
         
+        service_id = None
+        if subscription.journey and subscription.journey.service_id:
+            service_id = subscription.journey.service_id
+        elif subscription.scheduled_trip and subscription.scheduled_trip.route and subscription.scheduled_trip.route.service_id:
+            service_id = subscription.scheduled_trip.route.service_id
+
         overland_item = {
             "id": vehicle.id,
             "coordinates": [float(subscription.longitude), float(subscription.latitude)],
@@ -2269,7 +2282,7 @@ def vehicles_json(request) -> JsonResponse:
             "datetime": subscription.last_timestamp.isoformat(),
             "destination": subscription.destination,
             "trip_id": int(subscription.trip_id) if subscription.trip_id and subscription.trip_id.isdigit() else None,
-            "service_id": None,
+            "service_id": service_id,
             "service": {"line_name": subscription.route_number} if subscription.route_number else None,
             "operator": {
                 "name": vehicle.operator.name,
@@ -2279,6 +2292,7 @@ def vehicles_json(request) -> JsonResponse:
             "source": "overland",
             "trail": trail_data,  # Include tracking trail for map display
         }
+        locations = [item for item in locations if item.get("id") != vehicle.id]
         locations.append(overland_item)
 
     response = JsonResponse(locations, safe=False)

@@ -736,7 +736,10 @@ def rail_replacement_timetable(request):
 def overland_ingest(request, uuid):
     subscription = get_object_or_404(OverlandSubscription, uuid=uuid)
     auth_key = request.GET.get("auth", "")
-    if not auth_key or not subscription.check_auth_key(auth_key):
+    is_valid_auth = bool(auth_key and subscription.check_auth_key(auth_key))
+    if not is_valid_auth and request.user.is_authenticated and subscription.user_id == request.user.id:
+        is_valid_auth = True
+    if not is_valid_auth:
         return JsonResponse({"error": "Invalid auth key"}, status=403)
 
     try:
@@ -889,6 +892,20 @@ def overland_ingest(request, uuid):
             "coordinates": [float(longitude), float(latitude)]
         }
         cache.set(vehicle_redis_key, vehicle_data, timeout=3600)  # 1 hour
+        from vehicles.utils import redis_client
+        if redis_client:
+            try:
+                redis_client.set(
+                    vehicle_redis_key,
+                    json.dumps(vehicle_data),
+                    ex=3600,
+                )
+                redis_client.geoadd(
+                    "vehicle_location_locations",
+                    float(longitude), float(latitude), vehicle.id,
+                )
+            except Exception:
+                pass
             
     except (KeyError, TypeError, ValueError, IndexError, json.JSONDecodeError):
         return JsonResponse({"error": "Invalid Overland payload"}, status=400)
@@ -898,8 +915,32 @@ def overland_ingest(request, uuid):
 
 @require_safe
 def overland_json(request):
-    # This endpoint is deprecated - all data now goes through vehicles.json
-    return JsonResponse([], safe=False)
+    cutoff = timezone.now() - timedelta(minutes=10)
+    overland_query = OverlandSubscription.objects.filter(
+        last_timestamp__gte=cutoff
+    ).select_related("vehicle", "vehicle__operator", "vehicle__livery")
+    locations = []
+    for subscription in overland_query:
+        if subscription.latitude is None or subscription.longitude is None or not subscription.last_timestamp:
+            continue
+        vehicle = subscription.vehicle
+        locations.append({
+            "id": vehicle.id,
+            "coordinates": [float(subscription.longitude), float(subscription.latitude)],
+            "heading": subscription.heading,
+            "datetime": subscription.last_timestamp.isoformat(),
+            "destination": subscription.destination,
+            "trip_id": int(subscription.trip_id) if subscription.trip_id and subscription.trip_id.isdigit() else None,
+            "service_id": None,
+            "service": {"line_name": subscription.route_number} if subscription.route_number else None,
+            "operator": {
+                "name": vehicle.operator.name,
+                "url": vehicle.operator.get_absolute_url(),
+            } if vehicle.operator else None,
+            "vehicle": vehicle.get_json(),
+            "source": "overland",
+        })
+    return JsonResponse(locations, safe=False)
 
 
 @require_POST

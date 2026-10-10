@@ -58,3 +58,10 @@ class OptionalAPIKeyAuthentication(authentication.BaseAuthentication):
         key_obj.save(update_fields=['last_used_at'])
         
         return (key_obj.user, None)
+
+
+class CsrfExemptSessionAuthentication(authentication.SessionAuthentication):
+    """Session authentication without CSRF enforcement for internal API calls."""
+
+    def enforce_csrf(self, request):
+        return
