@@ -16,6 +16,7 @@ from busstops.models import (
     Locality,
     Operator,
     OperatorCode,
+    OperatorGroup,
     Service,
     ServiceCode,
     StopPoint,
@@ -192,6 +193,12 @@ class Command(ImportLiveVehiclesCommand):
             defaults["operator"] = operator
             if operator.group_id:
                 condition = Q(operator__group_id=operator.group_id)
+                # Also include operators in the same organisation (e.g., Go South Coast)
+                if operator.group.organisation_id:
+                    organisation_groups = OperatorGroup.objects.filter(
+                        organisation_id=operator.group.organisation_id
+                    )
+                    condition |= Q(operator__group_id__in=organisation_groups)
                 vehicles = self.vehicles.filter(condition)
             else:
                 vehicles = self.vehicles.filter(operator=operator)
@@ -201,7 +208,18 @@ class Command(ImportLiveVehiclesCommand):
                 if operator.noc == operator_ref:
                     # National Express rather than Dublin Express for example
                     defaults["operator"] = operator
-            vehicles = self.vehicles.filter(operator__in=operators)
+            # Include operators in the same organisation as well
+            operator_ids = set(op.id for op in operators)
+            for operator in operators:
+                if operator.group_id and operator.group.organisation_id:
+                    organisation_groups = OperatorGroup.objects.filter(
+                        organisation_id=operator.group.organisation_id
+                    )
+                    organisation_operators = Operator.objects.filter(
+                        group_id__in=organisation_groups
+                    )
+                    operator_ids.update(op.id for op in organisation_operators)
+            vehicles = self.vehicles.filter(operator_id__in=operator_ids)
 
         condition = Q(code__iexact=vehicle_ref)
         if vehicle_ref.isdigit():

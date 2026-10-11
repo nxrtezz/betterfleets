@@ -1717,7 +1717,7 @@ class VehicleJourneyAdmin(admin.ModelAdmin):
     list_display = (
         "datetime",
         "code",
-        "vehicle",
+        "vehicles_display",
         "operator",
         "route_name",
         "service",
@@ -1725,6 +1725,7 @@ class VehicleJourneyAdmin(admin.ModelAdmin):
     )
     list_select_related = ("vehicle", "service", "vehicle__operator")
     raw_id_fields = ("vehicle", "service", "source", "trip")
+    filter_horizontal = ("vehicles",)
     list_filter = (
         "datetime",
         ("service", admin.EmptyFieldListFilter),
@@ -1738,6 +1739,14 @@ class VehicleJourneyAdmin(admin.ModelAdmin):
     @admin.display(ordering="vehicle__operator")
     def operator(self, obj):
         return obj.vehicle.operator if obj.vehicle else None
+
+    @admin.display(description="Vehicles")
+    def vehicles_display(self, obj):
+        vehicles = [obj.vehicle] if obj.vehicle else []
+        vehicles.extend(obj.vehicles.all())
+        if not vehicles:
+            return "-"
+        return ", ".join(str(v) for v in vehicles)
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)

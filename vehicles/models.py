@@ -1607,7 +1607,12 @@ class VehicleJourney(models.Model):
     route_name = models.CharField(max_length=64, blank=True)
     source = models.ForeignKey(DataSource, models.CASCADE)
     vehicle = models.ForeignKey(
-        Vehicle, models.CASCADE, null=True, blank=True, db_index=False
+        Vehicle, models.CASCADE, null=True, blank=True, db_index=False,
+        related_name="journeys"
+    )
+    vehicles = models.ManyToManyField(
+        Vehicle, blank=True,
+        related_name="additional_journeys"
     )
     code = models.CharField(max_length=255, blank=True)
     destination = models.CharField(max_length=255, blank=True)

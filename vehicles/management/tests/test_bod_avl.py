@@ -13,6 +13,7 @@ from busstops.models import (
     Operator,
     OperatorCode,
     OperatorGroup,
+    Organisation,
     Region,
     Service,
     StopPoint,
@@ -796,6 +797,78 @@ class BusOpenDataVehicleLocationsTest(TestCase):
 
         vj = VehicleJourney.objects.get()
         self.assertEqual(str(vj.datetime), "2025-10-23 05:30:00+00:00")
+
+    def test_organisation_vehicle_finding(self):
+        """Test that vehicles are found across operators in the same organisation (e.g., Go South Coast)"""
+        # Create an organisation (like Go South Coast)
+        organisation = Organisation.objects.create(name="Go South Coast")
+        
+        # Create two groups in the same organisation
+        unilink_group = OperatorGroup.objects.create(
+            name="Uni-Link",
+            slug="unilink",
+            organisation=organisation
+        )
+        bluestar_group = OperatorGroup.objects.create(
+            name="Bluestar",
+            slug="bluestar",
+            organisation=organisation
+        )
+        
+        # Create operators in different groups but same organisation
+        unilink = Operator.objects.create(
+            noc="UNIL",
+            name="Uni-Link",
+            group=unilink_group,
+            region=Region.objects.get(id="EA")
+        )
+        bluestar = Operator.objects.create(
+            noc="BLST",
+            name="Bluestar",
+            group=bluestar_group,
+            region=Region.objects.get(id="EA")
+        )
+        
+        # Create a vehicle for Uni-Link
+        unilink_vehicle = Vehicle.objects.create(
+            operator=unilink,
+            code="123",
+            reg="AB12 CDE"
+        )
+        
+        # Set up operator codes for Bluestar
+        OperatorCode.objects.create(
+            operator=bluestar,
+            source=self.source,
+            code="BLST"
+        )
+        
+        command = import_bod_avl.Command()
+        command.source = self.source
+        command.get_operator.cache_clear()
+        
+        # Simulate BODS data from Bluestar with a vehicle code that belongs to Uni-Link
+        item = {
+            "ItemIdentifier": "test-1",
+            "RecordedAtTime": "2024-01-01T10:00:00+00:00",
+            "ValidUntilTime": "2024-01-01T10:05:00+00:00",
+            "MonitoredVehicleJourney": {
+                "LineRef": "1",
+                "VehicleRef": "123",
+                "OperatorRef": "BLST",
+                "DirectionRef": "outbound",
+                "VehicleLocation": {"Latitude": "50.9", "Longitude": "-1.4"},
+                "PublishedLineName": "1",
+                "VehicleJourneyRef": "1_20240101_10_00",
+            },
+        }
+        
+        # The vehicle should be found (the existing Uni-Link vehicle), not create a new one
+        vehicle, created = command.get_vehicle(item)
+        
+        self.assertFalse(created, "Should not create a new vehicle - should find the existing Uni-Link vehicle")
+        self.assertEqual(vehicle.id, unilink_vehicle.id, "Should return the existing Uni-Link vehicle")
+        self.assertEqual(vehicle.operator_id, "UNIL", "Vehicle should still be assigned to Uni-Link")
 
         # OriginAimedDepsrtureTime has changed,
         # but DatedVehicleJourneyRef has not - it's more like a BlockRef here
