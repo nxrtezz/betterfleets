@@ -204,18 +204,9 @@ class EditVehicleForm(
         )
 
     field_order = [
-        "withdrawn",
-        "preserved",
-        "fleet_support_vehicle",
-        "vor",
-        "awaiting_delivery",
-        "trainer_vehicle",
-        "demonstrator",
-        "spare_ticket_machine",
         "fleet_number",
         "reg",
         "operator",
-        "operated_by",
         "garage",
         "vehicle_type",
         "colours",
@@ -225,48 +216,47 @@ class EditVehicleForm(
         "name",
         "previous_reg",
         "joined_fleet",
-        "left_fleet",
-        "previous_operators",
-        "add_previous_operator",
-        "add_previous_operator_joined_fleet",
         "features",
         "accessibility_features",
         "notes",
+        "withdrawn",
+        "preserved",
+        "fleet_support_vehicle",
+        "vor",
+        "awaiting_delivery",
+        "trainer_vehicle",
+        "demonstrator",
+        "spare_ticket_machine",
     ]
     spare_ticket_machine = forms.BooleanField(
         required=False,
-        help_text="i.e. the ticket machine code is something like SPARE",
+        label="Spare ticket machine",
     )
     withdrawn = forms.BooleanField(
-        label="Remove from list",
+        label="Withdrawn",
         required=False,
-        help_text="Rarely necessary, unless you're sure this vehicle has definitely been permenantly withdrawn",
     )
     preserved = forms.BooleanField(
         required=False,
-        help_text="For preserved vehicles kept as records outside the active fleet list.",
     )
     fleet_support_vehicle = forms.BooleanField(
         required=False,
         label="Fleet Support Vehicle",
-        help_text="Use for fleet support vehicles. This stays in sync with the Fleet Support feature.",
     )
     vor = forms.BooleanField(
         required=False,
         label="VOR",
-        help_text="Vehicle off road.",
     )
     awaiting_delivery = forms.BooleanField(
         required=False,
-        help_text="Use for vehicles that are still awaiting delivery or entry into service.",
+        label="Awaiting delivery",
     )
     trainer_vehicle = forms.BooleanField(
         required=False,
-        help_text="Use for vehicles primarily assigned to training duties.",
+        label="Trainer vehicle",
     )
     demonstrator = forms.BooleanField(
         required=False,
-        help_text="Use for demonstrators so they appear in manufacturer demonstrator fleets.",
     )
 
     fleet_number = forms.CharField(required=False, max_length=24)
@@ -277,13 +267,6 @@ class EditVehicleForm(
         widget=AutocompleteWidget(field=Vehicle.operator.field),
         required=False,
         empty_label="",
-    )
-    operated_by = forms.ModelChoiceField(
-        queryset=Operator.objects,
-        widget=AutocompleteWidget(field=Vehicle.operated_by.field),
-        required=False,
-        empty_label="",
-        help_text="Loan operator (if this vehicle is on loan to a different operator)",
     )
     garage = forms.ModelChoiceField(
         queryset=Garage.objects,
@@ -340,33 +323,6 @@ class EditVehicleForm(
         label="Delivered",
         required=False,
         max_length=7,
-        help_text="MM-YYYY format (e.g., 01-2024)",
-    )
-    left_fleet = forms.CharField(
-        label="Left fleet",
-        required=False,
-        max_length=7,
-        help_text="MM-YYYY format (e.g., 12-2024)",
-    )
-
-    previous_operators = forms.CharField(
-        label="Previous operators",
-        required=False,
-        widget=forms.HiddenInput,
-    )
-
-    # Helper field for adding a new previous operator
-    add_previous_operator = forms.ModelChoiceField(
-        queryset=Operator.objects,
-        widget=AutocompleteWidget(field=Vehicle.operator.field),
-        required=False,
-        empty_label="",
-        label="Add previous operator",
-    )
-    add_previous_operator_joined_fleet = forms.CharField(
-        required=False,
-        max_length=7,
-        label="Joined fleet",
         help_text="MM-YYYY format (e.g., 01-2024)",
     )
 
