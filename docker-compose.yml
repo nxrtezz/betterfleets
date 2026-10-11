@@ -78,7 +78,7 @@ services:
   bods_avl:
     build: .
     profiles: ["tracking"]
-    entrypoint: ["uv", "run", "./manage.py", "import_bod_avl"]
+    entrypoint: ["sh", "-c", "uv sync --frozen; uv run ./manage.py import_bod_avl"]
     environment:
       - SECRET_KEY=${SECRET_KEY-dev}
       - DATABASE_URL=${DATABASE_URL-postgis://postgres:postgres:postgres:5432/postgres}
