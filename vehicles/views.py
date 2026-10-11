@@ -5531,7 +5531,7 @@ def search_vehicles_merge(request):
     current_organisation_id = None
 
     if current_vehicle and current_vehicle.operator:
-        current_operator_id = current_vehicle.operator.id
+        current_operator_id = current_vehicle.operator.id if hasattr(current_vehicle.operator, "id") else None
         if current_vehicle.operator.group:
             current_group_id = current_vehicle.operator.group.id
             if current_vehicle.operator.group.organisation:
@@ -5547,13 +5547,13 @@ def search_vehicles_merge(request):
         
         score = 0
         # Same operator gets highest priority
-        if vehicle.operator.id == current_operator_id:
+        if hasattr(vehicle.operator, "id") and vehicle.operator.id == current_operator_id:
             score = 100
         # Same group (but different operator)
-        elif vehicle.operator.group and vehicle.operator.group.id == current_group_id:
+        elif hasattr(vehicle.operator, "group") and vehicle.operator.group and vehicle.operator.group.id == current_group_id:
             score = 50
         # Same organisation (but different group)
-        elif (vehicle.operator.group and 
+        elif (hasattr(vehicle.operator, "group") and vehicle.operator.group and 
               vehicle.operator.group.organisation and 
               vehicle.operator.group.organisation.id == current_organisation_id):
             score = 25

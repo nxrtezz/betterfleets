@@ -65,7 +65,14 @@
 
     <form action="{{ vehicle.get_edit_url }}{% if request.GET.advanced %}?advanced{% endif %}" method="POST">
         <div class="edit-vehicle">
-            {{ form.as_p }}
+            {% for field in form %}
+    <div class="form-field">
+        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+        {{ field }}
+        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+        {% if field.errors %}<div class="error">{{ field.errors }}</div>{% endif %}
+    </div>
+{% endfor %}
         </div>
 
         {% if not request.GET.advanced %}

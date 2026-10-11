@@ -98,7 +98,7 @@ services:
   rf:
     build: .
     profiles: ["tracking"]
-    entrypoint: ["uv", "run", "./manage.py", "import_redfunnel"]
+    entrypoint: ["sh", "-c", "uv sync --frozen; uv run ./manage.py import_redfunnel"]
     environment:
       - SECRET_KEY=${SECRET_KEY-dev}
       - DATABASE_URL=${DATABASE_URL-postgis://postgres:postgres:postgres:5432/postgres}

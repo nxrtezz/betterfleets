@@ -48,16 +48,16 @@ logger = logging.getLogger(__name__)
 
 # Coordinate transformation constants for Red Funnel's custom projection
 # Derived from reference points:
-# - x=807, y=132 → lat=50.894394558883086, lon=-1.4053852469929418
-# - x=900, y=708 → lat=50.759230392116166, lon=-1.2904174657707368
+# - x=808, y=132 → lat=50.894, lon=-1.405 (Southampton)
+# - x=1122, y=713 → lat=50.759, lon=-1.290 (East Cowes)
 # LAT_SCALE = (lat2 - lat1) / (y2 - y1)
 # LAT_OFFSET = lat1 - LAT_SCALE * y1
 # LON_SCALE = (lon2 - lon1) / (x2 - x1)
 # LON_OFFSET = lon1 - LON_SCALE * x1
-LAT_SCALE = (50.759230392116166 - 50.894394558883086) / (708 - 132)
-LAT_OFFSET = 50.894394558883086 - LAT_SCALE * 132
-LON_SCALE = (-1.2904174657707368 - (-1.4053852469929418)) / (900 - 807)
-LON_OFFSET = -1.4053852469929418 - LON_SCALE * 807
+LAT_SCALE = -0.00023235800344233737
+LAT_OFFSET = 50.92467125645439
+LON_SCALE = 0.00036624203821656047
+LON_OFFSET = -1.7009235668789808
 
 
 def redfunnel_to_latlong(x: float, y: float) -> tuple[float, float]:
@@ -166,7 +166,8 @@ def get_journey_identity(item: dict) -> tuple:
     destination = get_destination(info)
     route_number = get_route_number(vehicle_class, info)
 
-    return (vehicle_id, route_number, destination)
+    status = info[0] if info else ""
+    return (vehicle_id, route_number, destination, status)
 
 
 class Command(BaseCommand):
@@ -235,7 +236,9 @@ class Command(BaseCommand):
 
         return vehicle, True
 
-    def get_journey(self, item: dict, vehicle: Vehicle) -> VehicleJourney:
+    def get_journey(self, item: dict, vehicle: Vehicle, now=None) -> VehicleJourney:
+        if now is None:
+            now = timezone.now()
         """
         Get or create journey from Red Funnel data.
 
@@ -259,6 +262,7 @@ class Command(BaseCommand):
             route_name=route_number or "",
             source=self.source,
             vehicle=vehicle,
+            date=timezone.localdate(now),
         )
 
         # Try to match service
@@ -308,10 +312,18 @@ class Command(BaseCommand):
 
         THIS LOGIC IS SPECIFIC TO RED FUNNEL ONLY.
 
-        Args:
-            item: Vehicle data from Red Funnel API
+        Journey rules:
+        - Create new journey when "On route to" or "On journey to"
+        - End journey when "At destination"
+        - If "Not in service", create journey but don't end until next "On route to"
         """
         now = timezone.now()
+        vehicle_id = item.get("id")
+        vehicle_class = item.get("class")
+        info = item.get("label", {}).get("info", [])
+        status = info[0] if info else ""
+        destination = get_destination(info)
+        route_number = get_route_number(vehicle_class, info)
 
         # Get or create vehicle
         try:
@@ -325,25 +337,76 @@ class Command(BaseCommand):
         if not location:
             return
 
-        # Set datetime
         location.datetime = now
 
-        # Get journey
-        journey = self.get_journey(item, vehicle)
-        location.journey = journey
+        # Get the current latest journey
+        latest_journey = vehicle.latest_journey
 
-        # Save to database
-        try:
-            from django.db import IntegrityError
-            location.save()
-        except IntegrityError:
-            pass
+        # Determine if we should create/update a journey
+        should_create_journey = False
+        should_end_journey = False
 
-        # Update vehicle
-        vehicle.latest_journey = journey
-        vehicle.save(update_fields=["latest_journey"])
+        if status == "At destination":
+            # End the current journey if it exists
+            if latest_journey:
+                should_end_journey = True
+        elif status == "On route to" or status == "On journey to":
+            # Create a new journey if we don't have one or if the current one is different
+            if not latest_journey:
+                should_create_journey = True
+            elif latest_journey.destination != destination or latest_journey.route_name != route_number:
+                should_create_journey = True
+        elif status == "Not in service":
+            # Only create a journey if we don't have one at all
+            if not latest_journey:
+                should_create_journey = True
 
-        # Update Redis
+        if should_create_journey:
+            # Create new journey
+            journey = VehicleJourney(
+                datetime=now,
+                destination=destination,
+                route_name=route_number or "",
+                source=self.source,
+                vehicle=vehicle,
+                date=timezone.localdate(now),
+            )
+
+            # Try to match service
+            if route_number:
+                service = Service.objects.filter(
+                    line_name__iexact=route_number,
+                    operator=self.operator,
+                    current=True
+                ).first()
+                if service:
+                    journey.service = service
+
+            journey.save()
+            location.journey = journey
+
+            # Update vehicle
+            vehicle.latest_journey = journey
+            vehicle.save(update_fields=["latest_journey"])
+        elif should_end_journey:
+            # Use the existing journey (don't create a new one)
+            location.journey = latest_journey
+        else:
+            # Not in service with existing journey - keep using it
+            if latest_journey:
+                location.journey = latest_journey
+            else:
+                # No journey and not creating one - don't save to database
+                location.journey = None
+
+        # Only save journey if we created a new one
+        if should_create_journey:
+            journey.save()
+
+        # Set location id for Redis
+        location.id = vehicle.id
+
+        # Update Redis (always update Redis even if we didn't create a journey)
         if redis_client:
             try:
                 redis_json = location.get_redis_json()
@@ -354,16 +417,15 @@ class Command(BaseCommand):
                     (location.latlong.x, location.latlong.y, vehicle.id)
                 )
 
-                if journey.service_id:
-                    redis_client.sadd(f"service{journey.service_id}vehicles", vehicle.id)
-                    redis_client.expire(f"service{journey.service_id}vehicles", 600)
+                if location.journey and location.journey.service_id:
+                    redis_client.sadd(f"service{location.journey.service_id}vehicles", vehicle.id)
+                    redis_client.expire(f"service{location.journey.service_id}vehicles", 600)
 
                 if vehicle.operator_id:
                     redis_client.sadd(f"operator{vehicle.operator_id}vehicles", vehicle.id)
                     redis_client.expire(f"operator{vehicle.operator_id}vehicles", 600)
             except ConnectionError as e:
                 logger.exception(f"Redis error: {e}")
-
     def update(self):
         """
         Main update loop for Red Funnel importer.
