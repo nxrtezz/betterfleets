@@ -77,7 +77,7 @@ class Command(ImportLiveVehiclesCommand):
                     service.save(update_fields=["tracking"])
 
             date = timezone.localdate(recorded_at_time)
-            journey = vehicle.vehiclejourney_set.filter(
+            journey = vehicle.journeys.filter(
                 date=date, code=journey_code
             ).first()
 

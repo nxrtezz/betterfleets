@@ -169,7 +169,7 @@ def log_vehicle_journey(service, data, time, destination, source_name, url, trip
     route_name = data.get("LineName") or data.get("LineRef")
 
     date = timezone.localdate(time)
-    journeys = vehicle.vehiclejourney_set.filter(date=date)
+    journeys = vehicle.journeys.filter(date=date)
     if (
         journeys.filter(datetime=time).exists()
         or journey_ref

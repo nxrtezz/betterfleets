@@ -24,7 +24,7 @@ class Command(BaseCommand):
         for v in vehicles.filter(
             Exists("vehiclejourney", filter=Q(datetime__date=yesterday))
         ):
-            journeys = v.vehiclejourney_set.filter(date=yesterday)
+            journeys = v.journeys.filter(date=yesterday)
             trip_ids = [j.trip_id for j in journeys]
             if trip_ids[0]:
                 for previous_vehicle in vehicles.filter(
@@ -33,7 +33,7 @@ class Command(BaseCommand):
                         filter=Q(date=before_yesterday, trip=trip_ids[0]),
                     )
                 ):
-                    previous_journeys = previous_vehicle.vehiclejourney_set.filter(
+                    previous_journeys = previous_vehicle.journeys.filter(
                         date=yesterday
                     )
                     previous_trip_ids = [j.trip_id for j in previous_journeys]

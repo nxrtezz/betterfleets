@@ -1195,7 +1195,7 @@ class VehicleAdmin(admin.ModelAdmin):
                             continue
                         
                         # Move all related data from vehicle to existing_vehicle
-                        vehicle.vehiclejourney_set.update(vehicle=existing_vehicle)
+                        vehicle.journeys.update(vehicle=existing_vehicle)
                         vehicle.vehiclecode_set.update(vehicle=existing_vehicle)
                         vehicle.vehiclerevision_set.update(vehicle=existing_vehicle)
                         
@@ -1446,7 +1446,7 @@ class VehicleAdmin(admin.ModelAdmin):
                     messages.WARNING,
                 )
                 continue
-            vehicle.vehiclejourney_set.update(vehicle=duplicate)
+            vehicle.journeys.update(vehicle=duplicate)
             vehicle.vehiclecode_set.update(vehicle=duplicate)
             vehicle.vehiclerevision_set.update(vehicle=duplicate)
 

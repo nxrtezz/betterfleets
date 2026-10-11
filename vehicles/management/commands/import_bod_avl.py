@@ -452,7 +452,7 @@ class Command(ImportLiveVehiclesCommand):
 
         journey = None
 
-        journeys = vehicle.vehiclejourney_set
+        journeys = vehicle.journeys
 
         datetime = self.get_datetime(item)
 

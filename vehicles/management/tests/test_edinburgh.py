@@ -7,7 +7,7 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from busstops.models import DataSource, Operator, Region, Service
-from ...models import Vehicle
+from ...models import Vehicle, VehicleJourney
 from ..commands.lothian import Command
 
 
@@ -56,7 +56,7 @@ class EdinburghImportTest(TestCase):
                 with self.assertNumQueries(4):
                     command.update()
 
-        journey = command.source.vehiclejourney_set.first()
+        journey = VehicleJourney.objects.filter(source=command.source).first()
 
         self.assertEqual("NovWedAL23907804", journey.code)
         self.assertEqual("Surgeons' Hall", journey.destination)

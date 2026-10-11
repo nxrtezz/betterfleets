@@ -2305,7 +2305,7 @@ def get_dates(vehicle=None, service=None):
         # the database query for a service is too slow
         return
 
-    journeys = vehicle.vehiclejourney_set
+    journeys = vehicle.journeys
 
     dates = (
         journeys.filter(date__isnull=False)
@@ -2497,7 +2497,7 @@ class VehicleDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        journeys = self.object.vehiclejourney_set.select_related("service")
+        journeys = self.object.journeys.select_related("service")
         journeys = journeys.annotate(
             line_name=Coalesce("trip__route__line_name", "route_name")
         )

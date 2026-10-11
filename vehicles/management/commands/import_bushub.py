@@ -128,7 +128,7 @@ class Command(ImportLiveVehiclesCommand):
             return latest_journey
 
         if datetime and (
-            journey := vehicle.vehiclejourney_set.filter(
+            journey := vehicle.journeys.filter(
                 date=timezone.localdate(datetime), datetime=datetime
             ).first()
         ):

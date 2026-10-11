@@ -135,7 +135,7 @@ class Command(ImportLiveVehiclesCommand):
         
         # Check if journey already exists
         if datetime:
-            existing_journey = vehicle.vehiclejourney_set.filter(
+            existing_journey = vehicle.journeys.filter(
                 datetime=datetime
             ).first()
             if existing_journey:

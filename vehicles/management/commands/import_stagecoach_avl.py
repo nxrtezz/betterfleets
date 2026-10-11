@@ -132,7 +132,7 @@ class Command(ImportLiveVehiclesCommand):
             ):
                 return vehicle.latest_journey
 
-            if journey := vehicle.vehiclejourney_set.filter(
+            if journey := vehicle.journeys.filter(
                 date=localdate(departure_time), datetime=departure_time
             ).first():
                 return journey

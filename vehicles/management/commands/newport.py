@@ -46,7 +46,7 @@ class Command(ImportLiveVehiclesCommand):
             journey = latest_journey
         else:
             date = localdate(datetime)
-            journey = vehicle.vehiclejourney_set.filter(
+            journey = vehicle.journeys.filter(
                 date=date, datetime=datetime
             ).first()
             if not journey:
