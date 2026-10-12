@@ -1,0 +1,105 @@
+{% extends 'gtfsdesigner/base.html' %}
+
+{% block title %}{{ project.name }} - GTFS Designer{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2>{{ project.name }}</h2>
+        <a href="{% url 'gtfsdesigner:index' %}" class="btn btn-secondary">Back to Projects</a>
+    </div>
+
+    <div class="progress-steps">
+        <div class="step {% if operators %}completed{% else %}active{% endif %}">1. Operator</div>
+        <div class="step {% if routes %}completed{% else %}active{% endif %}">2. Route</div>
+        <div class="step {% if stops %}completed{% else %}active{% endif %}">3. Stops</div>
+        <div class="step {% if calendars %}completed{% else %}active{% endif %}">4. Calendar</div>
+        <div class="step {% if trips %}completed{% else %}active{% endif %}">5. Timetable</div>
+        <div class="step">6. Export</div>
+    </div>
+
+    <div class="form-row">
+        <div class="card" style="margin-bottom: 0;">
+            <h3 style="margin-bottom: 1rem;">Operators</h3>
+            {% if operators %}
+                <ul style="list-style: none; margin-bottom: 1rem;">
+                    {% for operator in operators %}
+                        <li style="padding: 0.5rem 0; border-bottom: 1px solid #e5e7eb;">
+                            <strong>{{ operator.name }}</strong> ({{ operator.noc }})
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p style="color: #64748b; margin-bottom: 1rem;">No operators yet</p>
+            {% endif %}
+            <a href="{% url 'gtfsdesigner:create_operator' project.id %}" class="btn btn-primary">Add Operator</a>
+        </div>
+
+        <div class="card" style="margin-bottom: 0;">
+            <h3 style="margin-bottom: 1rem;">Routes</h3>
+            {% if routes %}
+                <ul style="list-style: none; margin-bottom: 1rem;">
+                    {% for route in routes %}
+                        <li style="padding: 0.5rem 0; border-bottom: 1px solid #e5e7eb;">
+                            <strong>{{ route.route_short_name }}</strong> - {{ route.route_long_name or route.route_desc }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p style="color: #64748b; margin-bottom: 1rem;">No routes yet</p>
+            {% endif %}
+            {% if operators %}
+                <a href="{% url 'gtfsdesigner:create_route' project.id %}" class="btn btn-primary">Add Route</a>
+            {% else %}
+                <button class="btn btn-secondary" disabled>Add an operator first</button>
+            {% endif %}
+        </div>
+
+        <div class="card" style="margin-bottom: 0;">
+            <h3 style="margin-bottom: 1rem;">Stops</h3>
+            <p style="color: #64748b; margin-bottom: 1rem;">{{ stops.count }} stops</p>
+            {% if routes %}
+                <a href="{% url 'gtfsdesigner:select_stops' project.id %}" class="btn btn-primary">Select Stops</a>
+            {% else %}
+                <button class="btn btn-secondary" disabled>Add a route first</button>
+            {% endif %}
+        </div>
+
+        <div class="card" style="margin-bottom: 0;">
+            <h3 style="margin-bottom: 1rem;">Calendar</h3>
+            {% if calendars %}
+                <ul style="list-style: none; margin-bottom: 1rem;">
+                    {% for calendar in calendars %}
+                        <li style="padding: 0.5rem 0; border-bottom: 1px solid #e5e7eb;">
+                            {{ calendar }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p style="color: #64748b; margin-bottom: 1rem;">No calendars yet</p>
+            {% endif %}
+            <a href="{% url 'gtfsdesigner:create_calendar' project.id %}" class="btn btn-primary">Add Calendar</a>
+        </div>
+
+        <div class="card" style="margin-bottom: 0;">
+            <h3 style="margin-bottom: 1rem;">Timetable</h3>
+            <p style="color: #64748b; margin-bottom: 1rem;">{{ trips.count }} trips</p>
+            {% if routes and calendars %}
+                <a href="{% url 'gtfsdesigner:timetable_builder' project.id %}" class="btn btn-primary">Build Timetable</a>
+            {% else %}
+                <button class="btn btn-secondary" disabled>Add route and calendar first</button>
+            {% endif %}
+        </div>
+
+        <div class="card" style="margin-bottom: 0;">
+            <h3 style="margin-bottom: 1rem;">Export</h3>
+            <p style="color: #64748b; margin-bottom: 1rem;">Export as GTFS ZIP</p>
+            {% if trips %}
+                <a href="{% url 'gtfsdesigner:export_gtfs' project.id %}" class="btn btn-success">Export GTFS</a>
+            {% else %}
+                <button class="btn btn-secondary" disabled>Complete timetable first</button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

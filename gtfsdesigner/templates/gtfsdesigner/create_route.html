@@ -1,0 +1,81 @@
+{% extends 'gtfsdesigner/base.html' %}
+
+{% block title %}Create Route - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 800px; margin: 0 auto;">
+    <h2 style="margin-bottom: 1.5rem;">Create Route</h2>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="operator">Operator *</label>
+            <select id="operator" name="operator" required>
+                <option value="">Select an operator...</option>
+                {% for operator in operators %}
+                    <option value="{{ operator.id }}">{{ operator.name }} ({{ operator.noc }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="route_id">Route ID *</label>
+                <input type="text" id="route_id" name="route_id" required placeholder="e.g., route_001">
+            </div>
+            <div class="form-group">
+                <label for="route_short_name">Route Short Name (Service Number) *</label>
+                <input type="text" id="route_short_name" name="route_short_name" required placeholder="e.g., 21">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="route_long_name">Route Long Name</label>
+            <input type="text" id="route_long_name" name="route_long_name" placeholder="e.g., City Centre to Airport">
+        </div>
+
+        <div class="form-group">
+            <label for="route_desc">Route Description</label>
+            <input type="text" id="route_desc" name="route_desc" placeholder="e.g., Via High Street">
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="route_type">Route Type</label>
+                <select id="route_type" name="route_type">
+                    <option value="3" selected>Bus</option>
+                    <option value="0">Tram</option>
+                    <option value="1">Metro</option>
+                    <option value="2">Rail</option>
+                    <option value="4">Ferry</option>
+                    <option value="5">Cable Tram</option>
+                    <option value="6">Aerial Lift</option>
+                    <option value="7">Funicular</option>
+                    <option value="11">Trolleybus</option>
+                    <option value="12">Monorail</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="route_url">Route URL</label>
+                <input type="url" id="route_url" name="route_url" placeholder="https://...">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="route_color">Route Color (Hex)</label>
+                <input type="text" id="route_color" name="route_color" placeholder="e.g., 00FF00" maxlength="6">
+            </div>
+            <div class="form-group">
+                <label for="route_text_color">Text Color (Hex)</label>
+                <input type="text" id="route_text_color" name="route_text_color" value="FFFFFF" maxlength="6">
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary">Create Route</button>
+            <a href="{% url 'gtfsdesigner:project_detail' project.id %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

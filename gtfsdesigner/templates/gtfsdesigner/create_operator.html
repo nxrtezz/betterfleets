@@ -1,0 +1,61 @@
+{% extends 'gtfsdesigner/base.html' %}
+
+{% block title %}Create Operator - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 800px; margin: 0 auto;">
+    <h2 style="margin-bottom: 1.5rem;">Create Operator (Agency)</h2>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label for="name">Operator Name *</label>
+                <input type="text" id="name" name="name" required placeholder="e.g., First Bus">
+            </div>
+            <div class="form-group">
+                <label for="noc">NOC (National Operator Code) *</label>
+                <input type="text" id="noc" name="noc" required placeholder="e.g., FBNX" maxlength="10">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="url">Website URL</label>
+                <input type="url" id="url" name="url" placeholder="https://www.firstbus.co.uk">
+            </div>
+            <div class="form-group">
+                <label for="timezone">Timezone</label>
+                <input type="text" id="timezone" name="timezone" value="Europe/London">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="lang">Language</label>
+                <input type="text" id="lang" name="lang" value="en" maxlength="10">
+            </div>
+            <div class="form-group">
+                <label for="phone">Phone</label>
+                <input type="text" id="phone" name="phone" placeholder="e.g., 03456 000 000">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" placeholder="e.g., info@firstbus.co.uk">
+            </div>
+            <div class="form-group">
+                <label for="fare_url">Fare URL</label>
+                <input type="url" id="fare_url" name="fare_url" placeholder="https://www.firstbus.co.uk/fares">
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary">Create Operator</button>
+            <a href="{% url 'gtfsdesigner:project_detail' project.id %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,378 @@
+{% extends 'gtfsdesigner/base.html' %}
+
+{% block title %}Select Stops - {{ project.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stop-selection-container {
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        gap: 1rem;
+        height: calc(100vh - 200px);
+    }
+
+    .stop-list {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        padding: 1rem;
+        overflow-y: auto;
+    }
+
+    .map-container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        padding: 1rem;
+        position: relative;
+    }
+
+    #map {
+        width: 100%;
+        height: 100%;
+        min-height: 500px;
+        border-radius: 4px;
+    }
+
+    .stop-item {
+        padding: 0.75rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .stop-item:hover {
+        background: #f3f4f6;
+    }
+
+    .stop-item.selected {
+        background: #dbeafe;
+        border-color: #2563eb;
+    }
+
+    .stop-item .stop-name {
+        font-weight: 600;
+    }
+
+    .stop-item .stop-details {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin-top: 0.25rem;
+    }
+
+    .search-box {
+        margin-bottom: 1rem;
+    }
+
+    .search-box input {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+    }
+
+    .direction-toggle {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .direction-toggle button {
+        flex: 1;
+        padding: 0.5rem;
+        border: 1px solid #d1d5db;
+        background: white;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .direction-toggle button.active {
+        background: #2563eb;
+        color: white;
+        border-color: #2563eb;
+    }
+
+    .stop-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .stop-actions button {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    .inbound-path {
+        stroke: #2563eb;
+        stroke-width: 3;
+        stroke-dasharray: 5, 5;
+        fill: none;
+        opacity: 0.5;
+    }
+
+    .outbound-path {
+        stroke: #16a34a;
+        stroke-width: 3;
+        fill: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2>Select Stops</h2>
+        <a href="{% url 'gtfsdesigner:project_detail' project.id %}" class="btn btn-secondary">Back to Project</a>
+    </div>
+
+    <div class="direction-toggle">
+        <button id="inbound-btn" class="active" onclick="setDirection('inbound')">Inbound</button>
+        <button id="outbound-btn" onclick="setDirection('outbound')">Outbound</button>
+    </div>
+
+    <div class="stop-selection-container">
+        <div class="stop-list">
+            <div class="search-box">
+                <input type="text" id="stop-search" placeholder="Search stops..." onkeyup="searchStops()">
+            </div>
+
+            <div id="selected-stops">
+                <h3 style="margin-bottom: 0.5rem; font-size: 1rem;">Selected Stops (Inbound)</h3>
+                <div id="inbound-stops"></div>
+                <div id="outbound-stops" style="display: none;"></div>
+            </div>
+
+            <div id="search-results" style="margin-top: 1rem;">
+                <h3 style="margin-bottom: 0.5rem; font-size: 1rem;">Search Results</h3>
+                <div id="search-results-list"></div>
+            </div>
+
+            <div style="margin-top: 1rem;">
+                <button class="btn btn-primary" onclick="showAddStopModal()">+ Add New Stop</button>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+        <button class="btn btn-primary" onclick="saveStops()">Save Stops</button>
+        <a href="{% url 'gtfsdesigner:project_detail' project.id %}" class="btn btn-secondary">Cancel</a>
+    </div>
+</div>
+
+<!-- Add Stop Modal -->
+<div id="add-stop-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div class="card" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 500px; width: 90%;">
+        <h3 style="margin-bottom: 1rem;">Add New Stop</h3>
+        <form onsubmit="addNewStop(event)">
+            {% csrf_token %}
+            <input type="hidden" id="project_id" value="{{ project.id }}">
+            <div class="form-group">
+                <label for="new_stop_id">Stop ID *</label>
+                <input type="text" id="new_stop_id" required>
+            </div>
+            <div class="form-group">
+                <label for="new_stop_name">Stop Name *</label>
+                <input type="text" id="new_stop_name" required>
+            </div>
+            <div class="form-group">
+                <label for="new_stop_lat">Latitude *</label>
+                <input type="number" step="any" id="new_stop_lat" required>
+            </div>
+            <div class="form-group">
+                <label for="new_stop_lon">Longitude *</label>
+                <input type="number" step="any" id="new_stop_lon" required>
+            </div>
+            <div style="display: flex; gap: 1rem;">
+                <button type="submit" class="btn btn-primary">Add Stop</button>
+                <button type="button" class="btn btn-secondary" onclick="hideAddStopModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    let map;
+    let currentDirection = 'inbound';
+    let inboundStops = [];
+    let outboundStops = [];
+    let selectedStop = null;
+    let markers = {};
+    let inboundPath = null;
+    let outboundPath = null;
+
+    function initMap() {
+        map = L.map('map').setView([51.505, -0.09], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        map.on('click', function(e) {
+            document.getElementById('new_stop_lat').value = e.latlng.lat.toFixed(6);
+            document.getElementById('new_stop_lon').value = e.latlng.lng.toFixed(6);
+        });
+    }
+
+    function setDirection(direction) {
+        currentDirection = direction;
+        document.getElementById('inbound-btn').classList.toggle('active', direction === 'inbound');
+        document.getElementById('outbound-btn').classList.toggle('active', direction === 'outbound');
+        document.getElementById('inbound-stops').style.display = direction === 'inbound' ? 'block' : 'none';
+        document.getElementById('outbound-stops').style.display = direction === 'outbound' ? 'block' : 'none';
+        document.querySelector('#selected-stops h3').textContent = `Selected Stops (${direction.charAt(0).toUpperCase() + direction.slice(1)})`;
+
+        // Show/hide paths
+        if (inboundPath) inboundPath.setStyle({ opacity: direction === 'inbound' ? 1 : 0.3 });
+        if (outboundPath) outboundPath.setStyle({ opacity: direction === 'outbound' ? 1 : 0.3 });
+    }
+
+    function searchStops() {
+        const query = document.getElementById('stop-search').value;
+        if (query.length < 2) {
+            document.getElementById('search-results-list').innerHTML = '';
+            return;
+        }
+
+        fetch(`{% url 'gtfsdesigner:api_search_stops' %}?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                const results = data.stops.map(stop => `
+                    <div class="stop-item" onclick="selectStop('${stop.id}', '${stop.name}', ${stop.latlong[0]}, ${stop.latlong[1]}, 'existing')">
+                        <div class="stop-name">${stop.name}</div>
+                        <div class="stop-details">${stop.naptan_code || ''} ${stop.locality ? '- ' + stop.locality : ''}</div>
+                    </div>
+                `).join('');
+                document.getElementById('search-results-list').innerHTML = results;
+            });
+    }
+
+    function selectStop(id, name, lat, lon, type) {
+        const stopData = { id, name, lat, lon, type };
+        const stops = currentDirection === 'inbound' ? inboundStops : outboundStops;
+
+        // Check if already selected
+        if (stops.find(s => s.id === id)) return;
+
+        stops.push(stopData);
+        renderSelectedStops();
+        addMarker(stopData);
+
+        // Update path
+        updatePath();
+    }
+
+    function addMarker(stopData) {
+        const marker = L.marker([stopData.lat, stopData.lon]).addTo(map);
+        marker.bindPopup(`<b>${stopData.name}</b>`);
+        marker.on('click', () => {
+            showStopOnMap(stopData);
+        });
+        markers[stopData.id] = marker;
+    }
+
+    function showStopOnMap(stopData) {
+        map.setView([stopData.lat, stopData.lon], 16);
+        if (markers[stopData.id]) {
+            markers[stopData.id].openPopup();
+        }
+    }
+
+    function renderSelectedStops() {
+        const container = currentDirection === 'inbound' ? 'inbound-stops' : 'outbound-stops';
+        const stops = currentDirection === 'inbound' ? inboundStops : outboundStops;
+
+        const html = stops.map((stop, index) => `
+            <div class="stop-item selected" onclick="showStopOnMap(${JSON.stringify(stop).replace(/"/g, '&quot;')})">
+                <div class="stop-name">${index + 1}. ${stop.name}</div>
+                <div class="stop-details">${stop.lat.toFixed(4)}, ${stop.lon.toFixed(4)}</div>
+                <div class="stop-actions">
+                    <button class="btn btn-secondary" onclick="removeStop('${stop.id}')">Remove</button>
+                </div>
+            </div>
+        `).join('');
+
+        document.getElementById(container).innerHTML = html;
+    }
+
+    function removeStop(id) {
+        const stops = currentDirection === 'inbound' ? inboundStops : outboundStops;
+        const index = stops.findIndex(s => s.id === id);
+        if (index > -1) {
+            stops.splice(index, 1);
+            if (markers[id]) {
+                map.removeLayer(markers[id]);
+                delete markers[id];
+            }
+            renderSelectedStops();
+            updatePath();
+        }
+    }
+
+    function updatePath() {
+        const stops = currentDirection === 'inbound' ? inboundStops : outboundStops;
+        if (stops.length < 2) return;
+
+        const latlngs = stops.map(s => [s.lat, s.lon]);
+
+        if (currentDirection === 'inbound') {
+            if (inboundPath) map.removeLayer(inboundPath);
+            inboundPath = L.polyline(latlngs, { color: '#2563eb', weight: 3, dashArray: '5, 5' }).addTo(map);
+        } else {
+            if (outboundPath) map.removeLayer(outboundPath);
+            outboundPath = L.polyline(latlngs, { color: '#16a34a', weight: 3 }).addTo(map);
+        }
+    }
+
+    function showAddStopModal() {
+        document.getElementById('add-stop-modal').style.display = 'block';
+    }
+
+    function hideAddStopModal() {
+        document.getElementById('add-stop-modal').style.display = 'none';
+    }
+
+    function addNewStop(event) {
+        event.preventDefault();
+        const stopId = document.getElementById('new_stop_id').value;
+        const stopName = document.getElementById('new_stop_name').value;
+        const stopLat = parseFloat(document.getElementById('new_stop_lat').value);
+        const stopLon = parseFloat(document.getElementById('new_stop_lon').value);
+
+        const formData = new FormData();
+        formData.append('project_id', document.getElementById('project_id').value);
+        formData.append('stop_id', stopId);
+        formData.append('stop_name', stopName);
+        formData.append('stop_lat', stopLat);
+        formData.append('stop_lon', stopLon);
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+        fetch(`{% url 'gtfsdesigner:api_create_stop' %}`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            selectStop(data.stop_id, data.stop_name, data.stop_lat, data.stop_lon, 'new');
+            hideAddStopModal();
+        });
+    }
+
+    function saveStops() {
+        // TODO: Save stops to database
+        alert('Stops saved! (TODO: Implement database save)');
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', initMap);
+</script>
+{% endblock %}

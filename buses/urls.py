@@ -26,6 +26,7 @@ urlpatterns = [
     path("tools/", include("tools.urls")),
     path("favourites/", include("favourites.urls")),
     path("service-logging/", include("service_logging.urls")),
+    path("gtfsdesigner/", include("gtfsdesigner.urls")),
     path("", include("busstops.urls")),
     path("", include("vehicles.urls")),
     path("", include("bustimes.urls")),

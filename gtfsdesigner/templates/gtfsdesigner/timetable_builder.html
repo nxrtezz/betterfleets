@@ -1,0 +1,423 @@
+{% extends 'gtfsdesigner/base.html' %}
+
+{% block title %}Timetable Builder - {{ project.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .timetable-container {
+        overflow-x: auto;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .timetable {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 1200px;
+    }
+
+    .timetable th,
+    .timetable td {
+        border: 1px solid #e5e7eb;
+        padding: 0.5rem;
+        text-align: center;
+        min-width: 80px;
+    }
+
+    .timetable th {
+        background: #f9fafb;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .timetable th:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 20;
+        min-width: 200px;
+        text-align: left;
+    }
+
+    .timetable td:first-child {
+        position: sticky;
+        left: 0;
+        background: white;
+        z-index: 5;
+        text-align: left;
+        font-weight: 500;
+    }
+
+    .timetable td.timing-point {
+        background: #dbeafe;
+    }
+
+    .timetable td.pickup-only {
+        background: #fef3c7;
+    }
+
+    .timetable td.dropoff-only {
+        background: #fce7f3;
+    }
+
+    .timetable input[type="time"] {
+        width: 100%;
+        padding: 0.25rem;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+
+    .timetable input[type="time"]:focus {
+        outline: none;
+        border-color: #2563eb;
+    }
+
+    .timetable-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        background: #f9fafb;
+        border-bottom: 1px solid #e5e7eb;
+        border-radius: 8px 8px 0 0;
+    }
+
+    .day-selector {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .day-selector select {
+        padding: 0.5rem;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+    }
+
+    .stop-settings {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        z-index: 1000;
+        max-width: 400px;
+        width: 90%;
+    }
+
+    .stop-settings.active {
+        display: block;
+    }
+
+    .stop-settings-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 999;
+    }
+
+    .stop-settings-overlay.active {
+        display: block;
+    }
+
+    .checkbox-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin: 1rem 0;
+    }
+
+    .checkbox-group label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .trip-header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .trip-number {
+        font-weight: 600;
+    }
+
+    .trip-actions {
+        display: flex;
+        gap: 0.25rem;
+        justify-content: center;
+    }
+
+    .trip-actions button {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2>Timetable Builder</h2>
+        <a href="{% url 'gtfsdesigner:project_detail' project.id %}" class="btn btn-secondary">Back to Project</a>
+    </div>
+
+    <div class="timetable-toolbar">
+        <div class="day-selector">
+            <label for="day-select">Day:</label>
+            <select id="day-select" onchange="loadDay()">
+                <option value="">Select a day...</option>
+                {% if calendar %}
+                    <option value="weekday">Weekdays</option>
+                    <option value="saturday">Saturday</option>
+                    <option value="sunday">Sunday</option>
+                {% endif %}
+                <option value="custom">Custom Date</option>
+            </select>
+            <input type="date" id="custom-date" style="display: none; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px;">
+        </div>
+
+        <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-primary" onclick="addTrip()">+ Add Trip</button>
+            <button class="btn btn-secondary" onclick="copyFromDay()">Copy from Day</button>
+            <button class="btn btn-success" onclick="saveTimetable()">Save Timetable</button>
+        </div>
+    </div>
+
+    <div class="timetable-container">
+        <table class="timetable" id="timetable">
+            <thead>
+                <tr>
+                    <th>Stop</th>
+                    <th colspan="3" id="trips-header">No trips added yet</th>
+                </tr>
+            </thead>
+            <tbody id="timetable-body">
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 2rem; color: #64748b;">
+                        Select a day and add trips to build your timetable
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Stop Settings Modal -->
+<div class="stop-settings-overlay" id="stop-settings-overlay" onclick="closeStopSettings()"></div>
+<div class="stop-settings" id="stop-settings">
+    <h3 style="margin-bottom: 1rem;">Stop Settings</h3>
+    <p id="stop-settings-name" style="color: #64748b; margin-bottom: 1rem;"></p>
+
+    <div class="checkbox-group">
+        <label>
+            <input type="checkbox" id="is-timing-point" onchange="updateStopSetting()">
+            <strong>Timing Point</strong>
+            <span style="font-size: 0.85rem; color: #64748b;">- This stop will have exact times</span>
+        </label>
+        <label>
+            <input type="checkbox" id="pickup-only" onchange="updateStopSetting()">
+            <strong>Pickup Only</strong>
+            <span style="font-size: 0.85rem; color: #64748b;">- Passengers can only board here</span>
+        </label>
+        <label>
+            <input type="checkbox" id="dropoff-only" onchange="updateStopSetting()">
+            <strong>Drop-off Only</strong>
+            <span style="font-size: 0.85rem; color: #64748b;">- Passengers can only alight here</span>
+        </label>
+    </div>
+
+    <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+        <button class="btn btn-primary" onclick="closeStopSettings()">Done</button>
+    </div>
+</div>
+
+<!-- Copy from Day Modal -->
+<div class="stop-settings-overlay" id="copy-overlay" onclick="closeCopyModal()"></div>
+<div class="stop-settings" id="copy-modal">
+    <h3 style="margin-bottom: 1rem;">Copy Timetable from Day</h3>
+
+    <div class="form-group">
+        <label for="copy-from">Copy from:</label>
+        <select id="copy-from">
+            <option value="weekday">Weekdays</option>
+            <option value="saturday">Saturday</option>
+            <option value="sunday">Sunday</option>
+        </select>
+    </div>
+
+    <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+        <button class="btn btn-primary" onclick="performCopy()">Copy</button>
+        <button class="btn btn-secondary" onclick="closeCopyModal()">Cancel</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentDay = null;
+    let currentStopId = null;
+    let trips = [];
+    let stops = [];
+
+    // Sample data - in production, this would come from the database
+    stops = [
+        { id: 'stop1', name: 'City Centre', isTimingPoint: true, pickupOnly: false, dropoffOnly: false },
+        { id: 'stop2', name: 'High Street', isTimingPoint: true, pickupOnly: false, dropoffOnly: false },
+        { id: 'stop3', name: 'Station Road', isTimingPoint: false, pickupOnly: false, dropoffOnly: false },
+        { id: 'stop4', name: 'Shopping Centre', isTimingPoint: true, pickupOnly: false, dropoffOnly: false },
+        { id: 'stop5', name: 'Airport Terminal', isTimingPoint: true, pickupOnly: false, dropoffOnly: false },
+    ];
+
+    function loadDay() {
+        const daySelect = document.getElementById('day-select');
+        const customDate = document.getElementById('custom-date');
+
+        if (daySelect.value === 'custom') {
+            customDate.style.display = 'block';
+        } else {
+            customDate.style.display = 'none';
+            currentDay = daySelect.value;
+            renderTimetable();
+        }
+    }
+
+    function renderTimetable() {
+        const thead = document.querySelector('#timetable thead');
+        const tbody = document.querySelector('#timetable tbody');
+
+        // Render header
+        let headerHtml = '<th>Stop</th>';
+        trips.forEach((trip, index) => {
+            headerHtml += `
+                <th>
+                    <div class="trip-header">
+                        <span class="trip-number">Trip ${index + 1}</span>
+                        <div class="trip-actions">
+                            <button class="btn btn-secondary" onclick="deleteTrip(${index})">Delete</button>
+                        </div>
+                    </div>
+                </th>
+            `;
+        });
+        headerHtml += '<th style="min-width: 100px;">Actions</th>';
+        thead.innerHTML = `<tr>${headerHtml}</tr>`;
+
+        // Render body
+        let bodyHtml = '';
+        stops.forEach((stop, stopIndex) => {
+            let rowClass = '';
+            if (stop.isTimingPoint) rowClass += ' timing-point';
+            if (stop.pickupOnly) rowClass += ' pickup-only';
+            if (stop.dropoffOnly) rowClass += ' dropoff-only';
+
+            bodyHtml += `<tr><td class="${rowClass}" onclick="openStopSettings('${stop.id}')" style="cursor: pointer;">
+                ${stop.name}
+                ${stop.isTimingPoint ? ' ⏱' : ''}
+                ${stop.pickupOnly ? ' 🚌' : ''}
+                ${stop.dropoffOnly ? ' 🚶' : ''}
+            </td>`;
+
+            trips.forEach((trip, tripIndex) => {
+                const time = trip.times[stop.id] || '';
+                bodyHtml += `<td><input type="time" value="${time}" onchange="updateTime(${tripIndex}, '${stop.id}', this.value)"></td>`;
+            });
+
+            bodyHtml += `<td>
+                <button class="btn btn-secondary" onclick="openStopSettings('${stop.id}')" style="font-size: 0.8rem;">Settings</button>
+            </td></tr>`;
+        });
+
+        tbody.innerHTML = bodyHtml;
+    }
+
+    function addTrip() {
+        const newTrip = {
+            id: `trip_${Date.now()}`,
+            times: {}
+        };
+        stops.forEach(stop => {
+            newTrip.times[stop.id] = '';
+        });
+        trips.push(newTrip);
+        renderTimetable();
+    }
+
+    function deleteTrip(index) {
+        if (confirm('Delete this trip?')) {
+            trips.splice(index, 1);
+            renderTimetable();
+        }
+    }
+
+    function updateTime(tripIndex, stopId, value) {
+        trips[tripIndex].times[stopId] = value;
+    }
+
+    function openStopSettings(stopId) {
+        currentStopId = stopId;
+        const stop = stops.find(s => s.id === stopId);
+
+        document.getElementById('stop-settings-name').textContent = stop.name;
+        document.getElementById('is-timing-point').checked = stop.isTimingPoint;
+        document.getElementById('pickup-only').checked = stop.pickupOnly;
+        document.getElementById('dropoff-only').checked = stop.dropoffOnly;
+
+        document.getElementById('stop-settings').classList.add('active');
+        document.getElementById('stop-settings-overlay').classList.add('active');
+    }
+
+    function closeStopSettings() {
+        document.getElementById('stop-settings').classList.remove('active');
+        document.getElementById('stop-settings-overlay').classList.remove('active');
+        currentStopId = null;
+    }
+
+    function updateStopSetting() {
+        if (!currentStopId) return;
+
+        const stop = stops.find(s => s.id === currentStopId);
+        stop.isTimingPoint = document.getElementById('is-timing-point').checked;
+        stop.pickupOnly = document.getElementById('pickup-only').checked;
+        stop.dropoffOnly = document.getElementById('dropoff-only').checked;
+
+        renderTimetable();
+    }
+
+    function copyFromDay() {
+        document.getElementById('copy-modal').classList.add('active');
+        document.getElementById('copy-overlay').classList.add('active');
+    }
+
+    function closeCopyModal() {
+        document.getElementById('copy-modal').classList.remove('active');
+        document.getElementById('copy-overlay').classList.remove('active');
+    }
+
+    function performCopy() {
+        // TODO: Implement copy logic
+        alert('Timetable copied!');
+        closeCopyModal();
+    }
+
+    function saveTimetable() {
+        // TODO: Save to database
+        alert('Timetable saved! (TODO: Implement database save)');
+    }
+
+    // Initialize with empty state
+    renderTimetable();
+</script>
+{% endblock %}

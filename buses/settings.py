@@ -127,6 +127,7 @@ INSTALLED_APPS = [
     "service_requests.apps.ServiceRequestsConfig",
     "favourites",
     "service_logging",
+    "gtfsdesigner",
 ]
 
 

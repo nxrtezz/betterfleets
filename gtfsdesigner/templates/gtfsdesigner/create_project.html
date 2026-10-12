@@ -1,0 +1,22 @@
+{% extends 'gtfsdesigner/base.html' %}
+
+{% block title %}Create Project - GTFS Designer{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 0 auto;">
+    <h2 style="margin-bottom: 1.5rem;">Create New GTFS Project</h2>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="name">Project Name</label>
+            <input type="text" id="name" name="name" required placeholder="e.g., London Bus Network 2027">
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary">Create Project</button>
+            <a href="{% url 'gtfsdesigner:index' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
