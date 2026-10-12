@@ -146,12 +146,18 @@ def select_stops(request, route_id, direction):
     # Get all stops in the project
     all_stops = project.stops.all()
 
+    # Get some pre-existing stops from StopPoint database for the map
+    from busstops.models import StopPoint
+    # Get stops near the project or just get some recent ones
+    preexisting_stops = StopPoint.objects.filter(active=True).select_related('locality')[:100]
+
     return render(request, 'gtfsdesigner/select_stops.html', {
         'project': project,
         'route': route,
         'direction': direction,
         'existing_route_stops': existing_route_stops,
         'all_stops': all_stops,
+        'preexisting_stops': preexisting_stops,
     })
 
 
@@ -176,7 +182,43 @@ def save_stops(request, route_id, direction):
 
     # Create new RouteStop records
     for index, stop_data in enumerate(stops):
-        stop = get_object_or_404(models.GTFSStop, id=stop_data['id'], project=route.project)
+        # Handle different stop types
+        if stop_data.get('type') == 'preexisting':
+            # Preexisting stop from StopPoint database - create GTFSStop
+            from busstops.models import StopPoint
+            stop_point = get_object_or_404(StopPoint, atco_code=stop_data['stop_id'])
+
+            # Check if GTFSStop already exists for this StopPoint
+            gtfs_stop, created = models.GTFSStop.objects.get_or_create(
+                project=route.project,
+                stop_id=stop_data['stop_id'],
+                defaults={
+                    'stop_name': stop_data['name'],
+                    'stop_lat': stop_data['lat'],
+                    'stop_lon': stop_data['lon'],
+                    'existing_stop': stop_point
+                }
+            )
+            # Update name if it changed
+            if not created and gtfs_stop.stop_name != stop_data['name']:
+                gtfs_stop.stop_name = stop_data['name']
+                gtfs_stop.save()
+
+            stop = gtfs_stop
+        else:
+            # New or existing GTFSStop
+            if stop_data.get('id'):
+                stop = get_object_or_404(models.GTFSStop, id=stop_data['id'], project=route.project)
+            else:
+                # Create new GTFSStop
+                stop = models.GTFSStop.objects.create(
+                    project=route.project,
+                    stop_id=stop_data['stop_id'],
+                    stop_name=stop_data['name'],
+                    stop_lat=stop_data['lat'],
+                    stop_lon=stop_data['lon']
+                )
+
         models.RouteStop.objects.create(
             route=route,
             stop=stop,

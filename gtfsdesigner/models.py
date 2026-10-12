@@ -94,7 +94,7 @@ class GTFSCalendarDate(models.Model):
 class GTFSStop(models.Model):
     """GTFS stop (can be new or reference existing StopPoint)"""
     project = models.ForeignKey(GTFSProject, models.CASCADE, related_name='stops')
-    stop_id = models.CharField(max_length=255, unique=True)
+    stop_id = models.CharField(max_length=255)  # Not unique - can be same across projects
     stop_code = models.CharField(max_length=50, blank=True)
     stop_name = models.CharField(max_length=255)
     stop_lat = models.FloatField()
@@ -108,6 +108,9 @@ class GTFSStop(models.Model):
 
     # Reference to existing StopPoint if selected from database
     existing_stop = models.ForeignKey(StopPoint, models.SET_NULL, null=True, blank=True, related_name='gtfs_stops')
+
+    class Meta:
+        unique_together = ['project', 'stop_id']
 
     def __str__(self):
         return f"{self.stop_name} ({self.stop_id})"

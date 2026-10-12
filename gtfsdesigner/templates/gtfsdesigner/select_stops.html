@@ -41,6 +41,9 @@
         margin-bottom: 0.5rem;
         cursor: pointer;
         transition: background 0.2s;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
 
     .stop-item:hover {
@@ -52,6 +55,10 @@
         border-color: #2563eb;
     }
 
+    .stop-item .stop-info {
+        flex: 1;
+    }
+
     .stop-item .stop-name {
         font-weight: 600;
     }
@@ -60,6 +67,20 @@
         font-size: 0.85rem;
         color: #64748b;
         margin-top: 0.25rem;
+    }
+
+    .stop-item .edit-btn {
+        padding: 0.25rem 0.5rem;
+        background: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        line-height: 1;
+    }
+
+    .stop-item .edit-btn:hover {
+        background: #e5e7eb;
     }
 
     .search-box {
@@ -89,6 +110,37 @@
         stroke-width: 3;
         {% if direction == 1 %}stroke-dasharray: 5, 5;{% endif %}
         fill: none;
+    }
+
+    .preexisting-marker {
+        background: #9ca3af;
+        border: 2px solid #6b7280;
+        border-radius: 50%;
+        width: 12px;
+        height: 12px;
+    }
+
+    .context-menu {
+        position: absolute;
+        background: white;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        z-index: 1000;
+        min-width: 150px;
+    }
+
+    .context-menu button {
+        width: 100%;
+        padding: 0.5rem 1rem;
+        border: none;
+        background: white;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .context-menu button:hover {
+        background: #f3f4f6;
     }
 </style>
 {% endblock %}
@@ -126,6 +178,9 @@
 
         <div class="map-container">
             <div id="map"></div>
+            <div id="context-menu" class="context-menu" style="display: none;">
+                <button onclick="addStopAtContext()">Add Stop Here</button>
+            </div>
         </div>
     </div>
 
@@ -174,7 +229,9 @@
     let map;
     let selectedStops = [];
     let markers = {};
+    let preexistingMarkers = {};
     let routePath = null;
+    let contextMenuLatLng = null;
     const routeId = {{ route.id }};
     const direction = {{ direction }};
     const projectId = {{ project.id }};
@@ -193,21 +250,83 @@
         {% endfor %}
     ];
 
+    // Load pre-existing stops from StopPoint database
+    const preexistingStops = [
+        {% for stop in preexisting_stops %}
+        {
+            id: '{{ stop.atco_code }}',
+            name: '{{ stop.common_name }}',
+            naptan_code: '{{ stop.naptan_code|default:"" }}',
+            locality: '{{ stop.locality.name|default:"" }}',
+            lat: {{ stop.latlong.y if stop.latlong else 0 }},
+            lon: {{ stop.latlong.x if stop.latlong else 0 }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+
     function initMap() {
         map = L.map('map').setView([51.505, -0.09], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        map.on('click', function(e) {
-            document.getElementById('new_stop_lat').value = e.latlng.lat.toFixed(6);
-            document.getElementById('new_stop_lon').value = e.latlng.lng.toFixed(6);
+        // Right-click to add stop
+        map.on('contextmenu', function(e) {
+            e.originalEvent.preventDefault();
+            contextMenuLatLng = e.latlng;
+            showContextMenu(e.originalEvent.clientX, e.originalEvent.clientY);
+        });
+
+        // Click elsewhere to hide context menu
+        map.on('click', function() {
+            hideContextMenu();
         });
 
         // Load existing stops
         selectedStops = [...existingStops];
         renderSelectedStops();
         updatePath();
+
+        // Show pre-existing stops on map
+        preexistingStops.forEach(stop => {
+            if (stop.lat && stop.lon) {
+                const marker = L.circleMarker([stop.lat, stop.lon], {
+                    radius: 6,
+                    fillColor: '#9ca3af',
+                    color: '#6b7280',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 1
+                }).addTo(map);
+                marker.bindPopup(`<b>${stop.name}</b><br>${stop.naptan_code}<br>${stop.locality}`);
+                marker.on('click', function() {
+                    // Allow selecting pre-existing stop
+                    selectStop(stop.id, stop.name, stop.lat, stop.lon, 'preexisting');
+                });
+                preexistingMarkers[stop.id] = marker;
+            }
+        });
+    }
+
+    function showContextMenu(x, y) {
+        const menu = document.getElementById('context-menu');
+        menu.style.display = 'block';
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+    }
+
+    function hideContextMenu() {
+        document.getElementById('context-menu').style.display = 'none';
+        contextMenuLatLng = null;
+    }
+
+    function addStopAtContext() {
+        if (!contextMenuLatLng) return;
+
+        document.getElementById('new_stop_lat').value = contextMenuLatLng.lat.toFixed(6);
+        document.getElementById('new_stop_lon').value = contextMenuLatLng.lng.toFixed(6);
+        hideContextMenu();
+        showAddStopModal();
     }
 
     function searchStops() {
@@ -266,15 +385,30 @@
     function renderSelectedStops() {
         const html = selectedStops.map((stop, index) => `
             <div class="stop-item selected" onclick="showStopOnMap(${JSON.stringify(stop).replace(/"/g, '&quot;')})">
-                <div class="stop-name">${index + 1}. ${stop.name}</div>
-                <div class="stop-details">${stop.lat.toFixed(4)}, ${stop.lon.toFixed(4)}</div>
-                <div class="stop-actions">
-                    <button class="btn btn-secondary" onclick="removeStop('${stop.stop_id}')">Remove</button>
+                <div class="stop-info">
+                    <div class="stop-name">${index + 1}. ${stop.name}</div>
+                    <div class="stop-details">${stop.lat.toFixed(4)}, ${stop.lon.toFixed(4)}</div>
                 </div>
+                <button class="edit-btn" onclick="event.stopPropagation(); editStopName('${stop.stop_id}')" title="Edit name">✏</button>
             </div>
         `).join('');
 
         document.getElementById('stops-list').innerHTML = html;
+    }
+
+    function editStopName(stopId) {
+        const stop = selectedStops.find(s => s.stop_id === stopId);
+        if (!stop) return;
+
+        const newName = prompt('Enter new stop name:', stop.name);
+        if (newName && newName.trim()) {
+            stop.name = newName.trim();
+            renderSelectedStops();
+            // Update marker popup
+            if (markers[stopId]) {
+                markers[stopId].setPopupContent(`<b>${stop.name}</b>`);
+            }
+        }
     }
 
     function removeStop(stopId) {
