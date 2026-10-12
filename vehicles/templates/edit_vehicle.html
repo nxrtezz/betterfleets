@@ -162,7 +162,7 @@
         <div class="form-section">
             <h2>Basic Information</h2>
             {% for field in form %}
-                {% if field.name in ['fleet_number', 'reg', 'operator', 'garage', 'vehicle_type', 'colours', 'other_colour', 'branding', 'rear_advert', 'name', 'previous_reg', 'joined_fleet'] %}
+                {% if field.name == 'fleet_number' or field.name == 'reg' or field.name == 'operator' or field.name == 'garage' or field.name == 'vehicle_type' or field.name == 'colours' or field.name == 'other_colour' or field.name == 'branding' or field.name == 'rear_advert' or field.name == 'name' or field.name == 'previous_reg' or field.name == 'joined_fleet' %}
                     <div class="form-field">
                         <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
                         {{ field }}
@@ -176,7 +176,7 @@
         <div class="form-section">
             <h2>Features</h2>
             {% for field in form %}
-                {% if field.name in ['features', 'accessibility_features', 'notes'] %}
+                {% if field.name == 'features' or field.name == 'accessibility_features' or field.name == 'notes' %}
                     <div class="form-field">
                         <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
                         {{ field }}
@@ -191,7 +191,7 @@
             <h2>Status</h2>
             <div class="checkbox-group">
                 {% for field in form %}
-                    {% if field.name in ['withdrawn', 'preserved', 'fleet_support_vehicle', 'vor', 'awaiting_delivery', 'trainer_vehicle', 'demonstrator', 'spare_ticket_machine'] %}
+                    {% if field.name == 'withdrawn' or field.name == 'preserved' or field.name == 'fleet_support_vehicle' or field.name == 'vor' or field.name == 'awaiting_delivery' or field.name == 'trainer_vehicle' or field.name == 'demonstrator' or field.name == 'spare_ticket_machine' %}
                         <div class="checkbox-field">
                             {{ field }}
                             <label for="{{ field.id_for_label }}">{{ field.label }}</label>
