@@ -448,8 +448,10 @@ link to a picture to prove it. Be polite.""",
         super().__init__(self._normalize_bound_data(data), *args, **kwargs)
 
         self.fields["operator"].initial = vehicle.operator
-        self.fields["operated_by"].initial = vehicle.operated_by
-        self.fields["garage"].initial = vehicle.garage
+        if "operated_by" in self.fields:
+            self.fields["operated_by"].initial = vehicle.operated_by
+        if "garage" in self.fields:
+            self.fields["garage"].initial = vehicle.garage
 
         # Filter garage queryset by operator like Django admin
         if "operator" in self.fields and "garage" in self.fields:
@@ -461,52 +463,73 @@ link to a picture to prove it. Be polite.""",
             else:
                 self.fields["garage"].queryset = self.fields["garage"].queryset.none()
 
-        self.fields["reg"].initial = vehicle.reg
-        self.fields["vehicle_type"].initial = vehicle.vehicle_type
-        self.fields["colours"].initial = vehicle.livery_id
+        if "reg" in self.fields:
+            self.fields["reg"].initial = vehicle.reg
+        if "vehicle_type" in self.fields:
+            self.fields["vehicle_type"].initial = vehicle.vehicle_type
+        if "colours" in self.fields:
+            self.fields["colours"].initial = vehicle.livery_id
 
-        if not vehicle.vehicle_type_id:
+        if not vehicle.vehicle_type_id and "vehicle_type" in self.fields:
             self.fields["vehicle_type"].widget.attrs["data-suggested"] = ",".join(
                 str(v.vehicle_type_id)
                 for v in sibling_vehicles
                 if v and v.vehicle_type_id
             )
-        if not vehicle.livery_id:
+        if not vehicle.livery_id and "colours" in self.fields:
             self.fields["colours"].widget.attrs["data-suggested"] = ",".join(
                 str(v.livery_id) for v in sibling_vehicles if v and v.livery_id
             )
 
-        self.fields["other_colour"].initial = vehicle.colours or ""
-        self.fields["accessibility_features"].initial = vehicle.features.filter(
-            category=VehicleFeature.Category.ACCESSIBILITY
-        )
-        self.fields["features"].initial = vehicle.features.filter(
-            category=VehicleFeature.Category.FEATURE
-        )
-        self.fields["branding"].initial = vehicle.branding
-        self.fields["rear_advert"].initial = vehicle.rear_advert
-        self.fields["name"].initial = vehicle.name
-        self.fields["previous_reg"].initial = vehicle.prev_registration or (
-            vehicle.data and vehicle.data.get("Previous reg") or None
-        )
-        self.fields["joined_fleet"].initial = vehicle.joined_fleet or ""
-        self.fields["left_fleet"].initial = vehicle.left_fleet or ""
-        if vehicle.previous_operators:
+        if "other_colour" in self.fields:
+            self.fields["other_colour"].initial = vehicle.colours or ""
+        if "accessibility_features" in self.fields:
+            self.fields["accessibility_features"].initial = vehicle.features.filter(
+                category=VehicleFeature.Category.ACCESSIBILITY
+            )
+        if "features" in self.fields:
+            self.fields["features"].initial = vehicle.features.filter(
+                category=VehicleFeature.Category.FEATURE
+            )
+        if "branding" in self.fields:
+            self.fields["branding"].initial = vehicle.branding
+        if "rear_advert" in self.fields:
+            self.fields["rear_advert"].initial = vehicle.rear_advert
+        if "name" in self.fields:
+            self.fields["name"].initial = vehicle.name
+        if "previous_reg" in self.fields:
+            self.fields["previous_reg"].initial = vehicle.prev_registration or (
+                vehicle.data and vehicle.data.get("Previous reg") or None
+            )
+        if "joined_fleet" in self.fields:
+            self.fields["joined_fleet"].initial = vehicle.joined_fleet or ""
+        if "left_fleet" in self.fields:
+            self.fields["left_fleet"].initial = vehicle.left_fleet or ""
+        if vehicle.previous_operators and "previous_operators" in self.fields:
             import json
 
             self.fields["previous_operators"].initial = json.dumps(
                 vehicle.previous_operators
             )
         # Don't initialize helper fields - they're for adding new entries only
-        self.fields["notes"].initial = vehicle.notes
-        self.fields["withdrawn"].initial = vehicle.withdrawn
-        self.fields["preserved"].initial = vehicle.preserved
-        self.fields["fleet_support_vehicle"].initial = vehicle.fleet_support_vehicle
-        self.fields["vor"].initial = vehicle.vor
-        self.fields["awaiting_delivery"].initial = vehicle.awaiting_delivery
-        self.fields["trainer_vehicle"].initial = vehicle.trainer_vehicle
-        self.fields["demonstrator"].initial = vehicle.demonstrator
-        self.fields["spare_ticket_machine"].initial = vehicle.is_spare_ticket_machine()
+        if "notes" in self.fields:
+            self.fields["notes"].initial = vehicle.notes
+        if "withdrawn" in self.fields:
+            self.fields["withdrawn"].initial = vehicle.withdrawn
+        if "preserved" in self.fields:
+            self.fields["preserved"].initial = vehicle.preserved
+        if "fleet_support_vehicle" in self.fields:
+            self.fields["fleet_support_vehicle"].initial = vehicle.fleet_support_vehicle
+        if "vor" in self.fields:
+            self.fields["vor"].initial = vehicle.vor
+        if "awaiting_delivery" in self.fields:
+            self.fields["awaiting_delivery"].initial = vehicle.awaiting_delivery
+        if "trainer_vehicle" in self.fields:
+            self.fields["trainer_vehicle"].initial = vehicle.trainer_vehicle
+        if "demonstrator" in self.fields:
+            self.fields["demonstrator"].initial = vehicle.demonstrator
+        if "spare_ticket_machine" in self.fields:
+            self.fields["spare_ticket_machine"].initial = vehicle.is_spare_ticket_machine()
         self.add_operator_vehicle_column_fields(vehicle.operator, vehicle.data)
 
         # Add advanced fields if in advanced mode
@@ -551,18 +574,20 @@ link to a picture to prove it. Be polite.""",
                     id__in=feature_ids
                 )
 
-        if vehicle.fleet_code:
-            self.fields["fleet_number"].initial = vehicle.fleet_code
-        elif vehicle.fleet_number is not None:
-            self.fields["fleet_number"].initial = str(vehicle.fleet_number)
+        if "fleet_number" in self.fields:
+            if vehicle.fleet_code:
+                self.fields["fleet_number"].initial = vehicle.fleet_code
+            elif vehicle.fleet_number is not None:
+                self.fields["fleet_number"].initial = str(vehicle.fleet_number)
 
         if vehicle.vehicle_type_id and not vehicle.is_spare_ticket_machine():
             if "spare_ticket_machine" in self.fields:
                 del self.fields["spare_ticket_machine"]
 
-        if not (vehicle.livery_id and vehicle.vehicle_type_id and vehicle.reg):
-            self.fields["summary"].required = False
-            self.fields["summary"].label = "Summary (optional)"
+        if "summary" in self.fields:
+            if not (vehicle.livery_id and vehicle.vehicle_type_id and vehicle.reg):
+                self.fields["summary"].required = False
+                self.fields["summary"].label = "Summary (optional)"
 
         if not user.is_superuser:
             if not (
