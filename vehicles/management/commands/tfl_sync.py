@@ -139,19 +139,12 @@ class Command(BaseCommand):
         existing_livery = Livery.objects.filter(name=livery_name).first()
         
         if existing_livery:
-            # Check if CSS matches
-            if (
-                existing_livery.left_css == left_css
-                and existing_livery.right_css == right_css
-            ):
-                vehicle.livery = existing_livery
-                vehicle.save(update_fields=["livery"])
-                return True
-            else:
-                # CSS doesn't match, create new livery
-                pass
+            # Use existing livery even if CSS differs (avoid duplicates)
+            vehicle.livery = existing_livery
+            vehicle.save(update_fields=["livery"])
+            return True
 
-        # Create new livery
+        # Create new livery only if no livery with that name exists
         new_livery = Livery.objects.create(
             name=livery_name,
             left_css=left_css,
