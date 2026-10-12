@@ -12,17 +12,18 @@
             margin: 0 auto;
         }
         .form-section {
-            background: #f5f5f5;
+            background: var(--background-color, #f5f5f5);
             padding: 1.5rem;
             border-radius: 8px;
             margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color, #ddd);
         }
         .form-section h2 {
             margin-top: 0;
             margin-bottom: 1rem;
             font-size: 1.25rem;
-            color: #333;
-            border-bottom: 2px solid #ddd;
+            color: var(--text-color, #333);
+            border-bottom: 2px solid var(--border-color, #ddd);
             padding-bottom: 0.5rem;
         }
         .form-field {
@@ -32,7 +33,7 @@
             display: block;
             margin-bottom: 0.5rem;
             font-weight: 600;
-            color: #333;
+            color: var(--text-color, #333);
         }
         .form-field input[type="text"],
         .form-field input[type="number"],
@@ -40,23 +41,26 @@
         .form-field textarea {
             width: 100%;
             padding: 0.625rem;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-color, #ddd);
             border-radius: 4px;
             font-size: 1rem;
             box-sizing: border-box;
+            background: var(--background-color, #fff);
+            color: var(--text-color, #333);
         }
         .form-field input[type="text"]:focus,
         .form-field input[type="number"]:focus,
         .form-field select:focus,
         .form-field textarea:focus {
             outline: none;
-            border-color: #4a90e2;
-            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+            border-color: var(--brand-color, #4a90e2);
+            box-shadow: 0 0 0 3px var(--brand-color-darker, rgba(74, 144, 226, 0.1));
         }
         .form-field small {
             display: block;
             margin-top: 0.375rem;
-            color: #666;
+            color: var(--text-color, #666);
+            opacity: 0.7;
             font-size: 0.875rem;
         }
         .form-field .error {
@@ -89,8 +93,8 @@
             margin-top: 1.5rem;
         }
         .form-actions input[type="submit"] {
-            background: #4a90e2;
-            color: white;
+            background: var(--button-background, #4a90e2);
+            color: var(--button-foreground, #fff);
             border: none;
             padding: 0.75rem 2rem;
             border-radius: 4px;
@@ -100,7 +104,7 @@
             transition: background 0.2s;
         }
         .form-actions input[type="submit"]:hover {
-            background: #357abd;
+            background: var(--brand-color-darker, #357abd);
         }
     </style>
 {% endblock head %}
