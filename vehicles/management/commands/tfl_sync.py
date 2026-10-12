@@ -9,7 +9,7 @@ from django.conf import settings
 
 from busstops.bustimes_sync import BustimesApiClient
 from busstops.models import Operator
-from vehicles.models import Livery, Vehicle, VehicleType
+from vehicles.models import Livery, Vehicle, VehicleType, VehicleFeature
 from vehicles.tasks import schedule_tfl_vehicle_check
 
 logger = logging.getLogger(__name__)
@@ -108,81 +108,99 @@ class Command(BaseCommand):
         bustimes_vehicle = data["results"][0]
         updated = False
 
+        # Collect all updates
+        update_fields = []
+
+        # Sync operator
+        if bustimes_vehicle.get("operator") and bustimes_vehicle["operator"].get("id"):
+            operator_noc = bustimes_vehicle["operator"]["id"]
+            if vehicle.operator and vehicle.operator.noc != operator_noc:
+                new_operator = Operator.objects.filter(noc=operator_noc).first()
+                if new_operator:
+                    vehicle.operator = new_operator
+                    update_fields.append("operator")
+                    logger.info("Will update operator to %s for vehicle %s", operator_noc, vehicle.reg)
+                    updated = True
+
         # Sync livery using name and CSS
         if bustimes_vehicle.get("livery"):
-            updated |= self._sync_livery(vehicle, bustimes_vehicle["livery"])
+            livery_name = bustimes_vehicle["livery"].get("name")
+            if livery_name:
+                existing_livery = Livery.objects.filter(name=livery_name).first()
+                if existing_livery:
+                    if not vehicle.livery or vehicle.livery.name != livery_name:
+                        vehicle.livery = existing_livery
+                        update_fields.append("livery")
+                        updated = True
+                else:
+                    left_css = bustimes_vehicle["livery"].get("left", "")
+                    right_css = bustimes_vehicle["livery"].get("right", "")
+                    new_livery = Livery.objects.create(
+                        name=livery_name,
+                        left_css=left_css,
+                        right_css=right_css,
+                        published=True,
+                    )
+                    vehicle.livery = new_livery
+                    update_fields.append("livery")
+                    logger.info("Created new livery: %s", livery_name)
+                    updated = True
 
         # Sync vehicle type using name
         if bustimes_vehicle.get("vehicle_type"):
-            updated |= self._sync_vehicle_type(vehicle, bustimes_vehicle["vehicle_type"])
+            vehicle_type_name = bustimes_vehicle["vehicle_type"].get("name")
+            if vehicle_type_name:
+                existing_type = VehicleType.objects.filter(name=vehicle_type_name).first()
+                if existing_type:
+                    if not vehicle.vehicle_type or vehicle.vehicle_type.name != vehicle_type_name:
+                        vehicle.vehicle_type = existing_type
+                        update_fields.append("vehicle_type")
+                        updated = True
+                else:
+                    new_type = VehicleType.objects.create(
+                        name=vehicle_type_name,
+                        style=bustimes_vehicle["vehicle_type"].get("style", ""),
+                        fuel=bustimes_vehicle["vehicle_type"].get("fuel", ""),
+                        company=bustimes_vehicle["vehicle_type"].get("company", ""),
+                        manufacturer=bustimes_vehicle["vehicle_type"].get("manufacturer", ""),
+                        group=bustimes_vehicle["vehicle_type"].get("group", ""),
+                    )
+                    vehicle.vehicle_type = new_type
+                    update_fields.append("vehicle_type")
+                    logger.info("Created new vehicle type: %s", vehicle_type_name)
+                    updated = True
+
+        # Sync branding
+        if bustimes_vehicle.get("branding"):
+            branding = bustimes_vehicle["branding"]
+            if vehicle.branding != branding:
+                vehicle.branding = branding
+                update_fields.append("branding")
+                updated = True
+
+        # Sync fleet code
+        if bustimes_vehicle.get("fleet_code"):
+            fleet_code = bustimes_vehicle["fleet_code"]
+            if vehicle.fleet_code != fleet_code:
+                vehicle.fleet_code = fleet_code
+                update_fields.append("fleet_code")
+                updated = True
+
+        # Save all field updates at once
+        if update_fields:
+            vehicle.save(update_fields=update_fields)
+
+        # Sync special features (separate M2M operation)
+        if bustimes_vehicle.get("special_features"):
+            for feature_name in bustimes_vehicle["special_features"]:
+                feature, created = VehicleFeature.objects.get_or_create(name=feature_name)
+                if feature not in vehicle.features.all():
+                    vehicle.features.add(feature)
+                    logger.info("Added feature %s to vehicle %s", feature_name, vehicle.reg)
+                    updated = True
 
         if updated:
             self.stdout.write(f"Updated vehicle {vehicle.code} ({vehicle.reg})")
             return "updated"
 
         return "no_change"
-
-    def _sync_livery(self, vehicle, livery_data):
-        """Sync livery using name and CSS"""
-        livery_name = livery_data.get("name")
-        left_css = livery_data.get("left_css", "")
-        right_css = livery_data.get("right_css", "")
-
-        if not livery_name:
-            return False
-
-        # Check if vehicle already has a matching livery by name
-        if vehicle.livery and vehicle.livery.name == livery_name:
-            return False
-
-        # Try to find existing livery by name
-        existing_livery = Livery.objects.filter(name=livery_name).first()
-        
-        if existing_livery:
-            # Use existing livery even if CSS differs (avoid duplicates)
-            vehicle.livery = existing_livery
-            vehicle.save(update_fields=["livery"])
-            return True
-
-        # Create new livery only if no livery with that name exists
-        new_livery = Livery.objects.create(
-            name=livery_name,
-            left_css=left_css,
-            right_css=right_css,
-            published=True,
-        )
-        vehicle.livery = new_livery
-        vehicle.save(update_fields=["livery"])
-        logger.info("Created new livery: %s", livery_name)
-        return True
-
-    def _sync_vehicle_type(self, vehicle, vehicle_type_data):
-        """Sync vehicle type using name"""
-        vehicle_type_name = vehicle_type_data.get("name")
-        
-        if not vehicle_type_name:
-            return False
-
-        # Check if vehicle already has a matching vehicle type by name
-        if vehicle.vehicle_type and vehicle.vehicle_type.name == vehicle_type_name:
-            return False
-
-        # Try to find existing vehicle type by name
-        existing_type = VehicleType.objects.filter(name=vehicle_type_name).first()
-        
-        if existing_type:
-            vehicle.vehicle_type = existing_type
-            vehicle.save(update_fields=["vehicle_type"])
-            return True
-
-        # Create new vehicle type
-        new_type = VehicleType.objects.create(
-            name=vehicle_type_name,
-            style=vehicle_type_data.get("style", ""),
-            fuel=vehicle_type_data.get("fuel", ""),
-            company=vehicle_type_data.get("company", ""),
-        )
-        vehicle.vehicle_type = new_type
-        vehicle.save(update_fields=["vehicle_type"])
-        logger.info("Created new vehicle type: %s", vehicle_type_name)
-        return True
