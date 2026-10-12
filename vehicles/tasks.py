@@ -9,6 +9,7 @@ from django.db import IntegrityError
 from django.db.models import Count, Q
 from django.utils import timezone
 from django.conf import settings
+from django.core.management import call_command
 from huey import crontab
 from huey.contrib.djhuey import db_periodic_task, db_task
 
@@ -369,3 +370,59 @@ def refresh_dvla_tax_statuses():
                 "dvla_tax_status_checked_at",
             ]
         )
+
+
+@db_task()
+def schedule_tfl_vehicle_check(vehicle_id):
+    """
+    Schedule a TFLO vehicle to be checked against bustimes.org API in 2 hours.
+    This is called when a new TFLO vehicle is created.
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    # Check vehicle in 2 hours
+    check_time = timezone.now() + timedelta(hours=2)
+    
+    # Use Huey's schedule functionality to run the check at the specified time
+    # For now, we'll just log and let a periodic task handle the checking
+    logger.info("Scheduled TFLO vehicle %s to be checked at %s", vehicle_id, check_time)
+    
+    # Store the scheduled check time in cache for the periodic task to process
+    cache_key = f"tfl_check_scheduled_{vehicle_id}"
+    cache.set(cache_key, check_time.isoformat(), timeout=7200)  # 2 hours
+
+
+@db_periodic_task(crontab(minute="*/5"))
+def process_scheduled_tfl_checks():
+    """
+    Process scheduled TFLO vehicle checks.
+    Runs every 5 minutes to check if any scheduled checks are due.
+    """
+    from django.core.cache import cache
+    from django.utils import timezone
+    
+    # Get all TFLO vehicles
+    tflo_vehicles = Vehicle.objects.filter(operator_id="TFLO").exclude(reg="")
+    
+    for vehicle in tflo_vehicles:
+        cache_key = f"tfl_check_scheduled_{vehicle.id}"
+        scheduled_time_str = cache.get(cache_key)
+        
+        if not scheduled_time_str:
+            continue
+        
+        scheduled_time = timezone.now().fromisoformat(scheduled_time_str)
+        
+        # Check if it's time to run the check (within 5 minutes window)
+        if timezone.now() >= scheduled_time:
+            logger.info("Running scheduled TFLO check for vehicle %s", vehicle.id)
+            
+            # Run the check
+            try:
+                call_command("tfl_sync", "--vehicle-id", str(vehicle.id))
+            except Exception as exc:
+                logger.exception("Error running TFLO sync for vehicle %s: %s", vehicle.id, exc)
+            
+            # Remove the scheduled check from cache
+            cache.delete(cache_key)

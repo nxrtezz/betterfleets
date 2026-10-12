@@ -19,6 +19,11 @@ def vehicle_cache_update(sender, instance, created, **kwargs):
         from fleet.notifications import notify_new_vehicle
 
         transaction.on_commit(lambda: notify_new_vehicle(instance.pk))
+        
+        # Schedule TFLO vehicle check if this is a TFLO vehicle
+        if instance.operator_id == "TFLO":
+            from .tasks import schedule_tfl_vehicle_check
+            transaction.on_commit(lambda: schedule_tfl_vehicle_check(instance.pk))
 
 
 @receiver(m2m_changed, sender=Vehicle.features.through)
