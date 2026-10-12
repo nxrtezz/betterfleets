@@ -41,7 +41,7 @@
                 <ul style="list-style: none; margin-bottom: 1rem;">
                     {% for route in routes %}
                         <li style="padding: 0.5rem 0; border-bottom: 1px solid #e5e7eb;">
-                            <strong>{{ route.route_short_name }}</strong> - {{ route.route_long_name or route.route_desc }}
+                            <strong>{{ route.route_short_name }}</strong> - {{ route.route_long_name|default:route.route_desc }}
                         </li>
                     {% endfor %}
                 </ul>
