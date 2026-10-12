@@ -3,6 +3,7 @@ import io
 from datetime import datetime
 from django.http import HttpResponse
 from . import models
+from .models import RouteStop
 
 
 def generate_gtfs_zip(project):
@@ -91,18 +92,23 @@ def generate_stop_times_txt(project):
     lines = ['trip_id,arrival_time,departure_time,stop_id,stop_sequence,stop_headsign,pickup_type,drop_off_type,shape_dist_traveled,timepoint']
 
     for trip in project.trips.all():
-        for trip_stop in trip.trip_stops.all().order_by('sequence'):
-            timing = trip_stop.timings.first() if hasattr(trip_stop, 'timings') else None
+        # Get route stops for this trip's direction
+        route_stops = RouteStop.objects.filter(route=trip.route, direction=trip.direction_id).order_by('sequence')
+
+        for route_stop in route_stops:
+            # Find corresponding trip stop
+            trip_stop = trip.trip_stops.filter(stop=route_stop.stop).first()
+            timing = trip_stop.timings.first() if trip_stop and hasattr(trip_stop, 'timings') else None
 
             arrival_time = timing.arrival_time.strftime('%H:%M:%S') if timing and timing.arrival_time else ''
             departure_time = timing.departure_time.strftime('%H:%M:%S') if timing and timing.departure_time else ''
             stop_headsign = timing.stop_headsign if timing else ''
-            pickup_type = timing.pickup_type if timing else trip_stop.pickup_type
-            drop_off_type = timing.drop_off_type if timing else trip_stop.drop_off_type
+            pickup_type = timing.pickup_type if timing else 0
+            drop_off_type = timing.drop_off_type if timing else 0
             shape_dist_traveled = timing.shape_dist_traveled if timing else ''
-            timepoint = timing.timepoint if timing else trip_stop.timepoint
+            timepoint = timing.timepoint if timing else 1
 
-            line = f"{trip.trip_id},{arrival_time},{departure_time},{trip_stop.stop.stop_id},{trip_stop.sequence},{stop_headsign},{pickup_type},{drop_off_type},{shape_dist_traveled},{timepoint}"
+            line = f"{trip.trip_id},{arrival_time},{departure_time},{route_stop.stop.stop_id},{route_stop.sequence},{stop_headsign},{pickup_type},{drop_off_type},{shape_dist_traveled},{timepoint}"
             lines.append(line)
 
     return '\n'.join(lines)

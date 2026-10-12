@@ -1,6 +1,6 @@
 {% extends 'gtfsdesigner/base.html' %}
 
-{% block title %}Select Stops - {{ project.name }}{% endblock %}
+{% block title %}Select {% if direction == 1 %}Inbound{% else %}Outbound{% endif %} Stops - {{ route.route_short_name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -73,27 +73,6 @@
         border-radius: 4px;
     }
 
-    .direction-toggle {
-        display: flex;
-        gap: 0.5rem;
-        margin-bottom: 1rem;
-    }
-
-    .direction-toggle button {
-        flex: 1;
-        padding: 0.5rem;
-        border: 1px solid #d1d5db;
-        background: white;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-
-    .direction-toggle button.active {
-        background: #2563eb;
-        color: white;
-        border-color: #2563eb;
-    }
-
     .stop-actions {
         display: flex;
         gap: 0.5rem;
@@ -105,17 +84,10 @@
         font-size: 0.8rem;
     }
 
-    .inbound-path {
-        stroke: #2563eb;
+    .route-path {
+        stroke: {% if direction == 1 %}#2563eb{% else %}#16a34a{% endif %};
         stroke-width: 3;
-        stroke-dasharray: 5, 5;
-        fill: none;
-        opacity: 0.5;
-    }
-
-    .outbound-path {
-        stroke: #16a34a;
-        stroke-width: 3;
+        {% if direction == 1 %}stroke-dasharray: 5, 5;{% endif %}
         fill: none;
     }
 </style>
@@ -124,13 +96,11 @@
 {% block content %}
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h2>Select Stops</h2>
-        <a href="{% url 'gtfsdesigner:project_detail' project.id %}" class="btn btn-secondary">Back to Project</a>
-    </div>
-
-    <div class="direction-toggle">
-        <button id="inbound-btn" class="active" onclick="setDirection('inbound')">Inbound</button>
-        <button id="outbound-btn" onclick="setDirection('outbound')">Outbound</button>
+        <div>
+            <h2>Select {% if direction == 1 %}Inbound{% else %}Outbound{% endif %} Stops</h2>
+            <p style="color: #64748b; margin-top: 0.5rem;">{{ route.route_short_name }} - {{ route.route_long_name|default:route.route_desc }}</p>
+        </div>
+        <a href="{% url 'gtfsdesigner:route_detail' route.id %}" class="btn btn-secondary">Back to Route</a>
     </div>
 
     <div class="stop-selection-container">
@@ -140,9 +110,8 @@
             </div>
 
             <div id="selected-stops">
-                <h3 style="margin-bottom: 0.5rem; font-size: 1rem;">Selected Stops (Inbound)</h3>
-                <div id="inbound-stops"></div>
-                <div id="outbound-stops" style="display: none;"></div>
+                <h3 style="margin-bottom: 0.5rem; font-size: 1rem;">Selected Stops ({{ selected_stops.count }})</h3>
+                <div id="stops-list"></div>
             </div>
 
             <div id="search-results" style="margin-top: 1rem;">
@@ -162,7 +131,7 @@
 
     <div style="margin-top: 1rem; display: flex; gap: 1rem;">
         <button class="btn btn-primary" onclick="saveStops()">Save Stops</button>
-        <a href="{% url 'gtfsdesigner:project_detail' project.id %}" class="btn btn-secondary">Cancel</a>
+        <a href="{% url 'gtfsdesigner:route_detail' route.id %}" class="btn btn-secondary">Cancel</a>
     </div>
 </div>
 
@@ -203,13 +172,26 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     let map;
-    let currentDirection = 'inbound';
-    let inboundStops = [];
-    let outboundStops = [];
-    let selectedStop = null;
+    let selectedStops = [];
     let markers = {};
-    let inboundPath = null;
-    let outboundPath = null;
+    let routePath = null;
+    const routeId = {{ route.id }};
+    const direction = {{ direction }};
+    const projectId = {{ project.id }};
+
+    // Load existing stops
+    const existingStops = [
+        {% for route_stop in existing_route_stops %}
+        {
+            id: {{ route_stop.stop.id }},
+            stop_id: '{{ route_stop.stop.stop_id }}',
+            name: '{{ route_stop.stop.stop_name }}',
+            lat: {{ route_stop.stop.stop_lat }},
+            lon: {{ route_stop.stop.stop_lon }},
+            sequence: {{ route_stop.sequence }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
 
     function initMap() {
         map = L.map('map').setView([51.505, -0.09], 13);
@@ -221,19 +203,11 @@
             document.getElementById('new_stop_lat').value = e.latlng.lat.toFixed(6);
             document.getElementById('new_stop_lon').value = e.latlng.lng.toFixed(6);
         });
-    }
 
-    function setDirection(direction) {
-        currentDirection = direction;
-        document.getElementById('inbound-btn').classList.toggle('active', direction === 'inbound');
-        document.getElementById('outbound-btn').classList.toggle('active', direction === 'outbound');
-        document.getElementById('inbound-stops').style.display = direction === 'inbound' ? 'block' : 'none';
-        document.getElementById('outbound-stops').style.display = direction === 'outbound' ? 'block' : 'none';
-        document.querySelector('#selected-stops h3').textContent = `Selected Stops (${direction.charAt(0).toUpperCase() + direction.slice(1)})`;
-
-        // Show/hide paths
-        if (inboundPath) inboundPath.setStyle({ opacity: direction === 'inbound' ? 1 : 0.3 });
-        if (outboundPath) outboundPath.setStyle({ opacity: direction === 'outbound' ? 1 : 0.3 });
+        // Load existing stops
+        selectedStops = [...existingStops];
+        renderSelectedStops();
+        updatePath();
     }
 
     function searchStops() {
@@ -257,17 +231,19 @@
     }
 
     function selectStop(id, name, lat, lon, type) {
-        const stopData = { id, name, lat, lon, type };
-        const stops = currentDirection === 'inbound' ? inboundStops : outboundStops;
-
         // Check if already selected
-        if (stops.find(s => s.id === id)) return;
+        if (selectedStops.find(s => s.stop_id === id)) return;
 
-        stops.push(stopData);
+        selectedStops.push({
+            id: null,  // Will be set when saved
+            stop_id: id,
+            name: name,
+            lat: lat,
+            lon: lon,
+            type: type
+        });
         renderSelectedStops();
-        addMarker(stopData);
-
-        // Update path
+        addMarker(selectedStops[selectedStops.length - 1]);
         updatePath();
     }
 
@@ -277,41 +253,37 @@
         marker.on('click', () => {
             showStopOnMap(stopData);
         });
-        markers[stopData.id] = marker;
+        markers[stopData.stop_id] = marker;
     }
 
     function showStopOnMap(stopData) {
         map.setView([stopData.lat, stopData.lon], 16);
-        if (markers[stopData.id]) {
-            markers[stopData.id].openPopup();
+        if (markers[stopData.stop_id]) {
+            markers[stopData.stop_id].openPopup();
         }
     }
 
     function renderSelectedStops() {
-        const container = currentDirection === 'inbound' ? 'inbound-stops' : 'outbound-stops';
-        const stops = currentDirection === 'inbound' ? inboundStops : outboundStops;
-
-        const html = stops.map((stop, index) => `
+        const html = selectedStops.map((stop, index) => `
             <div class="stop-item selected" onclick="showStopOnMap(${JSON.stringify(stop).replace(/"/g, '&quot;')})">
                 <div class="stop-name">${index + 1}. ${stop.name}</div>
                 <div class="stop-details">${stop.lat.toFixed(4)}, ${stop.lon.toFixed(4)}</div>
                 <div class="stop-actions">
-                    <button class="btn btn-secondary" onclick="removeStop('${stop.id}')">Remove</button>
+                    <button class="btn btn-secondary" onclick="removeStop('${stop.stop_id}')">Remove</button>
                 </div>
             </div>
         `).join('');
 
-        document.getElementById(container).innerHTML = html;
+        document.getElementById('stops-list').innerHTML = html;
     }
 
-    function removeStop(id) {
-        const stops = currentDirection === 'inbound' ? inboundStops : outboundStops;
-        const index = stops.findIndex(s => s.id === id);
+    function removeStop(stopId) {
+        const index = selectedStops.findIndex(s => s.stop_id === stopId);
         if (index > -1) {
-            stops.splice(index, 1);
-            if (markers[id]) {
-                map.removeLayer(markers[id]);
-                delete markers[id];
+            selectedStops.splice(index, 1);
+            if (markers[stopId]) {
+                map.removeLayer(markers[stopId]);
+                delete markers[stopId];
             }
             renderSelectedStops();
             updatePath();
@@ -319,18 +291,22 @@
     }
 
     function updatePath() {
-        const stops = currentDirection === 'inbound' ? inboundStops : outboundStops;
-        if (stops.length < 2) return;
-
-        const latlngs = stops.map(s => [s.lat, s.lon]);
-
-        if (currentDirection === 'inbound') {
-            if (inboundPath) map.removeLayer(inboundPath);
-            inboundPath = L.polyline(latlngs, { color: '#2563eb', weight: 3, dashArray: '5, 5' }).addTo(map);
-        } else {
-            if (outboundPath) map.removeLayer(outboundPath);
-            outboundPath = L.polyline(latlngs, { color: '#16a34a', weight: 3 }).addTo(map);
+        if (selectedStops.length < 2) {
+            if (routePath) {
+                map.removeLayer(routePath);
+                routePath = null;
+            }
+            return;
         }
+
+        const latlngs = selectedStops.map(s => [s.lat, s.lon]);
+
+        if (routePath) map.removeLayer(routePath);
+        routePath = L.polyline(latlngs, {
+            color: direction === 1 ? '#2563eb' : '#16a34a',
+            weight: 3,
+            dashArray: direction === 1 ? '5, 5' : null
+        }).addTo(map);
     }
 
     function showAddStopModal() {
@@ -349,7 +325,7 @@
         const stopLon = parseFloat(document.getElementById('new_stop_lon').value);
 
         const formData = new FormData();
-        formData.append('project_id', document.getElementById('project_id').value);
+        formData.append('project_id', projectId);
         formData.append('stop_id', stopId);
         formData.append('stop_name', stopName);
         formData.append('stop_lat', stopLat);
@@ -368,8 +344,24 @@
     }
 
     function saveStops() {
-        // TODO: Save stops to database
-        alert('Stops saved! (TODO: Implement database save)');
+        const stopsData = JSON.stringify(selectedStops);
+        const formData = new FormData();
+        formData.append('stops', stopsData);
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+        fetch(`/gtfsdesigner/route/${routeId}/stops/${direction}/save/`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Stops saved successfully!');
+                window.location.href = `/gtfsdesigner/route/${routeId}/`;
+            } else {
+                alert('Error saving stops: ' + (data.error || 'Unknown error'));
+            }
+        });
     }
 
     // Initialize

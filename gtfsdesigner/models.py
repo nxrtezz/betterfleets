@@ -113,6 +113,24 @@ class GTFSStop(models.Model):
         return f"{self.stop_name} ({self.stop_id})"
 
 
+class RouteStop(models.Model):
+    """Link between a route and a stop with direction and sequence"""
+    route = models.ForeignKey(GTFSRoute, models.CASCADE, related_name='route_stops')
+    stop = models.ForeignKey(GTFSStop, models.CASCADE, related_name='route_stops')
+    direction = models.IntegerField(
+        choices=[(0, 'Outbound'), (1, 'Inbound')],
+        help_text="0 for outbound, 1 for inbound"
+    )
+    sequence = models.IntegerField(help_text="Order of stops in the route")
+
+    class Meta:
+        unique_together = ['route', 'direction', 'sequence']
+        ordering = ['direction', 'sequence']
+
+    def __str__(self):
+        return f"{self.route} - {self.stop} ({'Inbound' if self.direction == 1 else 'Outbound'} #{self.sequence})"
+
+
 class GFSTripStop(models.Model):
     """Intermediate model for trip stops with timing point and pickup/dropoff settings"""
     trip = models.ForeignKey('GFSTrip', models.CASCADE, related_name='trip_stops')

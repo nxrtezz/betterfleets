@@ -44,6 +44,13 @@ class GTFSStopAdmin(admin.ModelAdmin):
     search_fields = ['stop_name', 'stop_id', 'stop_code']
 
 
+@admin.register(models.RouteStop)
+class RouteStopAdmin(admin.ModelAdmin):
+    list_display = ['route', 'stop', 'direction', 'sequence']
+    list_filter = ['route', 'direction']
+    search_fields = ['route__route_short_name', 'stop__stop_name']
+
+
 @admin.register(models.GFSTrip)
 class GFSTripAdmin(admin.ModelAdmin):
     list_display = ['trip_id', 'trip_headsign', 'route', 'direction_id', 'project']

@@ -102,7 +102,7 @@ def create_route(request, project_id):
             route_color=request.POST.get('route_color', ''),
             route_text_color=request.POST.get('route_text_color', 'FFFFFF'),
         )
-        return redirect('gtfsdesigner:project_detail', project_id=project.id)
+        return redirect('gtfsdesigner:route_detail', route_id=route.id)
 
     return render(request, 'gtfsdesigner/create_route.html', {
         'project': project,
@@ -112,46 +112,77 @@ def create_route(request, project_id):
 
 @login_required
 @superuser_required
-def select_stops(request, project_id):
-    """Select stops for a route (inbound and outbound)"""
-    project = get_object_or_404(models.GTFSProject, id=project_id, created_by=request.user)
-    route_id = request.GET.get('route_id')
+def route_detail(request, route_id):
+    """Show route detail with stop selection and timetable options"""
+    route = get_object_or_404(models.GTFSRoute, id=route_id, project__created_by=request.user)
+    project = route.project
 
-    if route_id:
-        route = get_object_or_404(models.GTFSRoute, id=route_id, project=project)
-    else:
-        route = None
+    # Get inbound and outbound stops
+    inbound_stops = route.route_stops.filter(direction=1).order_by('sequence')
+    outbound_stops = route.route_stops.filter(direction=0).order_by('sequence')
 
-    # Get existing stops for the project
-    existing_stops = project.stops.all()
+    # Get calendars
+    calendars = project.calendars.all()
 
-    return render(request, 'gtfsdesigner/select_stops.html', {
+    return render(request, 'gtfsdesigner/route_detail.html', {
         'project': project,
         'route': route,
-        'existing_stops': existing_stops,
+        'inbound_stops': inbound_stops,
+        'outbound_stops': outbound_stops,
+        'calendars': calendars,
     })
 
 
 @login_required
 @superuser_required
-def save_stops(request, project_id):
+def select_stops(request, route_id, direction):
+    """Select stops for a route (inbound or outbound)"""
+    route = get_object_or_404(models.GTFSRoute, id=route_id, project__created_by=request.user)
+    project = route.project
+
+    # Get existing stops for this direction
+    existing_route_stops = route.route_stops.filter(direction=direction).order_by('sequence')
+
+    # Get all stops in the project
+    all_stops = project.stops.all()
+
+    return render(request, 'gtfsdesigner/select_stops.html', {
+        'project': project,
+        'route': route,
+        'direction': direction,
+        'existing_route_stops': existing_route_stops,
+        'all_stops': all_stops,
+    })
+
+
+@login_required
+@superuser_required
+def save_stops(request, route_id, direction):
     """Save selected stops for a route"""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
-    project = get_object_or_404(models.GTFSProject, id=project_id, created_by=request.user)
-    route_id = request.POST.get('route_id')
-    direction = request.POST.get('direction')  # 'inbound' or 'outbound'
+    route = get_object_or_404(models.GTFSRoute, id=route_id, project__created_by=request.user)
     stops_data = request.POST.get('stops')  # JSON array of stop data
 
-    if not route_id or not direction or not stops_data:
-        return JsonResponse({'error': 'Missing required fields'}, status=400)
+    if not stops_data:
+        return JsonResponse({'error': 'Missing stops data'}, status=400)
 
     import json
     stops = json.loads(stops_data)
 
-    # TODO: Save stops to route with direction
-    # This would require a RouteStop model to link stops to routes with direction
+    # Delete existing stops for this direction
+    models.RouteStop.objects.filter(route=route, direction=direction).delete()
+
+    # Create new RouteStop records
+    for index, stop_data in enumerate(stops):
+        stop = get_object_or_404(models.GTFSStop, id=stop_data['id'], project=route.project)
+        models.RouteStop.objects.create(
+            route=route,
+            stop=stop,
+            direction=direction,
+            sequence=index + 1
+        )
 
     return JsonResponse({'success': True, 'stops_count': len(stops)})
 
@@ -183,49 +214,47 @@ def create_calendar(request, project_id):
 
 @login_required
 @superuser_required
-def timetable_builder(request, project_id):
+def timetable_builder(request, route_id, direction):
     """Build timetables in a spreadsheet-like interface"""
-    project = get_object_or_404(models.GTFSProject, id=project_id, created_by=request.user)
-    route_id = request.GET.get('route_id')
+    route = get_object_or_404(models.GTFSRoute, id=route_id, project__created_by=request.user)
+    project = route.project
     calendar_id = request.GET.get('calendar_id')
-
-    if route_id:
-        route = get_object_or_404(models.GTFSRoute, id=route_id, project=project)
-    else:
-        route = None
 
     if calendar_id:
         calendar = get_object_or_404(models.GTFSCalendar, id=calendar_id, project=project)
     else:
         calendar = None
 
-    # Get existing trips for this route and calendar
+    # Get stops for this direction
+    route_stops = route.route_stops.filter(direction=direction).order_by('sequence')
+
+    # Get existing trips for this route, direction, and calendar
     trips = []
-    if route and calendar:
-        trips = project.trips.filter(route=route, service_id=calendar.service_id)
+    if calendar:
+        trips = project.trips.filter(route=route, service_id=calendar.service_id, direction_id=direction)
 
     return render(request, 'gtfsdesigner/timetable_builder.html', {
         'project': project,
         'route': route,
+        'direction': direction,
         'calendar': calendar,
+        'route_stops': route_stops,
         'trips': trips,
     })
 
 
 @login_required
 @superuser_required
-def save_timetable(request, project_id):
+def save_timetable(request, route_id, direction):
     """Save timetable data"""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
-    project = get_object_or_404(models.GTFSProject, id=project_id, created_by=request.user)
-    route_id = request.POST.get('route_id')
+    route = get_object_or_404(models.GTFSRoute, id=route_id, project__created_by=request.user)
     calendar_id = request.POST.get('calendar_id')
-    day = request.POST.get('day')
     trips_data = request.POST.get('trips')  # JSON array of trip data
 
-    if not route_id or not calendar_id or not trips_data:
+    if not calendar_id or not trips_data:
         return JsonResponse({'error': 'Missing required fields'}, status=400)
 
     import json
