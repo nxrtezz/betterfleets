@@ -254,12 +254,12 @@
     const preexistingStops = [
         {% for stop in preexisting_stops %}
         {
-            id: '{{ stop.atco_code }}',
-            name: '{{ stop.common_name }}',
-            naptan_code: '{{ stop.naptan_code|default:"" }}',
-            locality: '{{ stop.locality.name|default:"" }}',
-            lat: {{ stop.latlong.y if stop.latlong else 0 }},
-            lon: {{ stop.latlong.x if stop.latlong else 0 }}
+            id: '{{ stop.id }}',
+            name: '{{ stop.name }}',
+            naptan_code: '{{ stop.naptan_code }}',
+            locality: '{{ stop.locality }}',
+            lat: {{ stop.lat }},
+            lon: {{ stop.lon }}
         }{% if not forloop.last %},{% endif %}
         {% endfor %}
     ];

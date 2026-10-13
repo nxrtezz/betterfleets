@@ -151,13 +151,25 @@ def select_stops(request, route_id, direction):
     # Get stops near the project or just get some recent ones
     preexisting_stops = StopPoint.objects.filter(active=True).select_related('locality')[:100]
 
+    # Prepare preexisting stops data for template
+    preexisting_stops_data = []
+    for stop in preexisting_stops:
+        preexisting_stops_data.append({
+            'id': stop.atco_code,
+            'name': stop.common_name,
+            'naptan_code': stop.naptan_code or '',
+            'locality': stop.locality.name if stop.locality else '',
+            'lat': stop.latlong.y if stop.latlong else 0,
+            'lon': stop.latlong.x if stop.latlong else 0,
+        })
+
     return render(request, 'gtfsdesigner/select_stops.html', {
         'project': project,
         'route': route,
         'direction': direction,
         'existing_route_stops': existing_route_stops,
         'all_stops': all_stops,
-        'preexisting_stops': preexisting_stops,
+        'preexisting_stops': preexisting_stops_data,
     })
 
 

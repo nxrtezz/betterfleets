@@ -4124,7 +4124,7 @@ def edit_vehicle(request, **kwargs):
     context["livery"] = vehicle.livery
 
     if form_data:
-        if form.has_changed() is False or form.changed_data == ["summary"]:
+        if form.has_changed() is False:
             form.add_error(None, "You haven't changed anything")
 
         if form.is_valid():
