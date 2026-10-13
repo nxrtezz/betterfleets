@@ -205,6 +205,20 @@
             </div>
         </div>
 
+        <div class="form-section">
+            <h2>Summary</h2>
+            {% for field in form %}
+                {% if field.name == 'summary' %}
+                    <div class="form-field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+                        {{ field }}
+                        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                        {% if field.errors %}<div class="error">{{ field.errors }}</div>{% endif %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+
         {% if request.GET.advanced %}
         <div class="form-section">
             <h2>Advanced</h2>
