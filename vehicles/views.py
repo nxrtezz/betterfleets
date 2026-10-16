@@ -2211,6 +2211,12 @@ def vehicles_json(request) -> JsonResponse:
         # ids of all vehicles
         vehicle_ids = redis_client.zrange("vehicle_location_locations", 0, -1)
 
+    # Additional filters for map
+    livery_id = request.GET.get("livery")
+    vehicle_type_id = request.GET.get("type")
+    garage_id = request.GET.get("garage")
+    ridden = request.GET.get("ridden")
+
     if trip_id := request.GET.get("trip"):
         try:
             trip_id = int(trip_id)
@@ -2226,6 +2232,29 @@ def vehicles_json(request) -> JsonResponse:
         )
     except BadRequest:
         return cachable_400()
+
+    # Apply additional filters to locations
+    if livery_id or vehicle_type_id or garage_id or ridden:
+        vehicle_ids_with_data = {item.get("id") for item in locations if item.get("id")}
+        if vehicle_ids_with_data:
+            vehicles_qs = Vehicle.objects.filter(id__in=vehicle_ids_with_data).select_related(
+                "livery", "vehicle_type", "garage"
+            )
+
+            if livery_id:
+                vehicles_qs = vehicles_qs.filter(livery_id=livery_id)
+            if vehicle_type_id:
+                vehicles_qs = vehicles_qs.filter(vehicle_type_id=vehicle_type_id)
+            if garage_id:
+                vehicles_qs = vehicles_qs.filter(garage_id=garage_id)
+            if ridden is not None:
+                if ridden.lower() == "true":
+                    vehicles_qs = vehicles_qs.filter(has_been_ridden=True)
+                elif ridden.lower() == "false":
+                    vehicles_qs = vehicles_qs.filter(has_been_ridden=False)
+
+            allowed_vehicle_ids = set(vehicles_qs.values_list("id", flat=True))
+            locations = [item for item in locations if item.get("id") in allowed_vehicle_ids]
 
     # Add Overland vehicles
     
@@ -2257,6 +2286,19 @@ def vehicles_json(request) -> JsonResponse:
             Q(scheduled_trip__route__service_id__in=service_ids)
             | Q(journey__service_id__in=service_ids)
         )
+
+    # Apply additional filters to Overland query
+    if livery_id:
+        overland_query = overland_query.filter(vehicle__livery_id=livery_id)
+    if vehicle_type_id:
+        overland_query = overland_query.filter(vehicle__vehicle_type_id=vehicle_type_id)
+    if garage_id:
+        overland_query = overland_query.filter(vehicle__garage_id=garage_id)
+    if ridden is not None:
+        if ridden.lower() == "true":
+            overland_query = overland_query.filter(vehicle__has_been_ridden=True)
+        elif ridden.lower() == "false":
+            overland_query = overland_query.filter(vehicle__has_been_ridden=False)
     
     for subscription in overland_query:
         if subscription.latitude is None or subscription.longitude is None or not subscription.last_timestamp:

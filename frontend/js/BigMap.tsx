@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 
 import { Hash, type LngLatBounds, type Map as MapGL } from "maplibre-gl";
@@ -15,7 +16,7 @@ import {
   type ViewStateChangeEvent,
   useMap,
 } from "react-map-gl/maplibre";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 import debounce from "lodash/debounce";
 
@@ -42,6 +43,171 @@ declare global {
   interface Window {
     INITIAL_VIEW_STATE: MapProps["initialViewState"];
   }
+}
+
+type FilterState = {
+  operator?: string;
+  ridden?: "true" | "false";
+  livery?: string;
+  type?: string;
+  garage?: string;
+};
+
+type Option = {
+  id: string;
+  name: string;
+};
+
+function MapFilters({ filters, setFilters }: { filters: FilterState; setFilters: (filters: FilterState) => void }) {
+  const [operators, setOperators] = useState<Option[]>([]);
+  const [liveries, setLiveries] = useState<Option[]>([]);
+  const [types, setTypes] = useState<Option[]>([]);
+  const [garages, setGarages] = useState<Option[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const [opsRes, livRes, typeRes, garRes] = await Promise.all([
+          fetch("/api/operators/?page_size=1000"),
+          fetch("/api/liveries/?page_size=1000"),
+          fetch("/api/vehicletypes/?page_size=1000"),
+          fetch("/api/garages/?page_size=1000"),
+        ]);
+
+        const opsData = await opsRes.json();
+        const livData = await livRes.json();
+        const typeData = await typeRes.json();
+        const garData = await garRes.json();
+
+        setOperators(opsData.results || []);
+        setLiveries(livData.results || []);
+        setTypes(typeData.results || []);
+        setGarages(garData.results || []);
+      } catch (error) {
+        console.error("Error fetching filter options:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFilterOptions();
+  }, []);
+
+  const updateFilter = (key: keyof FilterState, value: string) => {
+    setFilters({
+      ...filters,
+      [key]: value || undefined,
+    });
+  };
+
+  // Clear dependent filters when operator changes
+  const handleOperatorChange = (value: string) => {
+    updateFilter("operator", value);
+    // Clear dependent filters
+    setFilters({
+      operator: value || undefined,
+      ridden: undefined,
+      livery: undefined,
+      type: undefined,
+      garage: undefined,
+    });
+  };
+
+  if (loading) {
+    return <div className="map-filters loading">Loading filters...</div>;
+  }
+
+  return (
+    <div className="map-filters">
+      <h3>Map Filters</h3>
+
+      <div className="filter-group">
+        <label htmlFor="operator-filter">Operator</label>
+        <select
+          id="operator-filter"
+          value={filters.operator || ""}
+          onChange={(e) => handleOperatorChange(e.target.value)}
+        >
+          <option value="">All operators</option>
+          {operators.map((op) => (
+            <option key={op.id} value={op.id}>
+              {op.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="filter-group">
+        <label htmlFor="ridden-filter">Ridden status</label>
+        <select
+          id="ridden-filter"
+          value={filters.ridden || ""}
+          onChange={(e) => updateFilter("ridden", e.target.value as "true" | "false")}
+        >
+          <option value="">All</option>
+          <option value="true">Ridden</option>
+          <option value="false">Not ridden</option>
+        </select>
+      </div>
+
+      <div className="filter-group">
+        <label htmlFor="type-filter">Vehicle type</label>
+        <select
+          id="type-filter"
+          value={filters.type || ""}
+          onChange={(e) => updateFilter("type", e.target.value)}
+        >
+          <option value="">All types</option>
+          {types.map((type) => (
+            <option key={type.id} value={type.id}>
+              {type.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="filter-group">
+        <label htmlFor="livery-filter">Livery</label>
+        <select
+          id="livery-filter"
+          value={filters.livery || ""}
+          onChange={(e) => updateFilter("livery", e.target.value)}
+        >
+          <option value="">All liveries</option>
+          {liveries.map((livery) => (
+            <option key={livery.id} value={livery.id}>
+              {livery.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="filter-group">
+        <label htmlFor="garage-filter">Garage</label>
+        <select
+          id="garage-filter"
+          value={filters.garage || ""}
+          onChange={(e) => updateFilter("garage", e.target.value)}
+        >
+          <option value="">All garages</option>
+          {garages.map((garage) => (
+            <option key={garage.id} value={garage.id}>
+              {garage.name || garage.code}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <button
+        className="clear-filters"
+        onClick={() => setFilters({})}
+        disabled={!filters.operator && !filters.ridden && !filters.livery && !filters.type && !filters.garage}
+      >
+        Clear filters
+      </button>
+    </div>
+  );
 }
 
 const updateLocalStorage = debounce((zoom: number, latLng) => {
@@ -510,6 +676,7 @@ export default function BigMap(
   ),
 ) {
   const mapRef = React.useRef<MapGL | null>(null);
+  const [location] = useLocation();
 
   const [trip, setTrip] = React.useState<Trip | undefined>(props.trip);
 
@@ -518,6 +685,42 @@ export default function BigMap(
   const [vehicles, setVehicles] = React.useState<VehicleLocation[]>();
 
   const [zoom, setZoom] = React.useState<number>();
+
+  // Map filters state
+  const [filters, setFilters] = useState<FilterState>(() => {
+    const params = new URLSearchParams(location.split("?")[1] || "");
+    return {
+      operator: params.get("operator") || undefined,
+      ridden: (params.get("ridden") as "true" | "false") || undefined,
+      livery: params.get("livery") || undefined,
+      type: params.get("type") || undefined,
+      garage: params.get("garage") || undefined,
+    };
+  });
+
+  // Update URL when filters change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filters.operator) params.set("operator", filters.operator);
+    if (filters.ridden) params.set("ridden", filters.ridden);
+    if (filters.livery) params.set("livery", filters.livery);
+    if (filters.type) params.set("type", filters.type);
+    if (filters.garage) params.set("garage", filters.garage);
+
+    const queryString = params.toString();
+    const newLocation = queryString ? `/map?${queryString}` : "/map";
+
+    if (newLocation !== location) {
+      window.history.replaceState({}, "", newLocation);
+    }
+  }, [filters, location]);
+
+  // Reload vehicles when filters change
+  useEffect(() => {
+    if (props.mode === MapMode.Slippy) {
+      loadVehicles(true);
+    }
+  }, [filters, props.mode, loadVehicles]);
 
   const [clickedStopUrl, setClickedStopURL] = React.useState(() => {
     if (document.referrer && props.mode !== MapMode.Slippy) {
@@ -619,6 +822,18 @@ export default function BigMap(
         return;
       }
 
+      // Add filter parameters
+      const filterParams: string[] = [];
+      if (filters.operator) filterParams.push(`operator=${filters.operator}`);
+      if (filters.ridden) filterParams.push(`ridden=${filters.ridden}`);
+      if (filters.livery) filterParams.push(`livery=${filters.livery}`);
+      if (filters.type) filterParams.push(`type=${filters.type}`);
+      if (filters.garage) filterParams.push(`garage=${filters.garage}`);
+
+      if (filterParams.length > 0) {
+        url += (url.includes("?") ? "&" : "?") + filterParams.join("&");
+      }
+
       setLoadingBuses(true);
 
       vehiclesAbortController.current = new AbortController();
@@ -689,7 +904,7 @@ export default function BigMap(
         vehiclesTimeout.current = window.setTimeout(loadVehicles, 12000); // 12 seconds
       }
     },
-    [props.mode, props.noc, trip, journey, props.vehicleId],
+    [props.mode, props.noc, trip, journey, props.vehicleId, filters],
   );
 
   React.useEffect(() => {
@@ -941,6 +1156,9 @@ export default function BigMap(
         </Link>
       )}
       <div className={className}>
+        {props.mode === MapMode.Slippy && (
+          <MapFilters filters={filters} setFilters={setFilters} />
+        )}
         <BusTimesMap
           initialViewState={
             initialViewState.current || { bounds, fitBoundsOptions }

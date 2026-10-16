@@ -427,3 +427,81 @@ body.dark-mode .maplibregl-ctrl-group,
     padding-right: 0.25rem;
   }
 }
+
+.map-filters {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--background-color);
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 2;
+  max-width: 250px;
+  max-height: calc(100vh - 20px);
+  overflow-y: auto;
+}
+
+.map-filters h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.map-filters .filter-group {
+  margin-bottom: 12px;
+}
+
+.map-filters label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  color: var(--text-color);
+}
+
+.map-filters select {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--background-color);
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.map-filters select:focus {
+  outline: 2px solid var(--brand-color);
+  outline-offset: -1px;
+}
+
+.map-filters .clear-filters {
+  width: 100%;
+  padding: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--brand-color);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.map-filters .clear-filters:hover:not(:disabled) {
+  background: var(--brand-color-dark, #0055aa);
+}
+
+.map-filters .clear-filters:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.map-filters.loading {
+  font-size: 13px;
+  color: var(--secondary-text-color, var(--text-color));
+}
+

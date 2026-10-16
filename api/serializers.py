@@ -3,7 +3,17 @@ from rest_framework import serializers
 from accounts.models import User
 from busstops.models import Operator, Service, StopPoint
 from bustimes.models import Garage, Note, Trip
-from vehicles.models import Livery, Vehicle, VehicleJourney, VehicleType
+from vehicles.models import Livery, Vehicle, VehicleJourney, VehicleType, VehicleFeature
+
+
+class VehicleFeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VehicleFeature
+        fields = [
+            "id",
+            "name",
+            "category",
+        ]
 
 
 class VehicleTypeSerializer(serializers.ModelSerializer):
@@ -116,7 +126,6 @@ class VehicleSerializer(serializers.ModelSerializer):
 
 class GarageSerializer(serializers.ModelSerializer):
     garage_id = serializers.IntegerField(source="id", read_only=True)
-    owner = serializers.CharField(source="operator_id", read_only=True)
 
     class Meta:
         model = Garage
@@ -125,7 +134,6 @@ class GarageSerializer(serializers.ModelSerializer):
             "external_id",
             "code",
             "name",
-            "owner",
             "region_id",
         ]
 

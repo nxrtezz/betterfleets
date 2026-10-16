@@ -157,3 +157,13 @@ class VehicleTypeFilter(FilterSet):
             "id": ["exact", "in"],
             "name": ["icontains"],
         }
+
+
+class GarageFilter(FilterSet):
+    class Meta:
+        model = Garage
+        fields = {
+            "id": ["exact", "in"],
+            "code": ["exact", "icontains"],
+            "name": ["icontains"],
+        }

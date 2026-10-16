@@ -14,7 +14,7 @@ from accounts.models import User
 from busstops.models import Operator, Service, StopPoint
 from bustimes.models import Garage, StopTime, Trip
 from bustimes.utils import contiguous_stoptimes_only
-from vehicles.models import Livery, Vehicle, VehicleJourney, VehicleType, VehicleRevision
+from vehicles.models import Livery, Vehicle, VehicleJourney, VehicleType, VehicleRevision, VehicleFeature
 from vehicles.utils import redis_client
 from fleet.models import FleetPhotoLog, FleetRideLog
 from photos.models import Photo
@@ -129,6 +129,11 @@ class VehicleTypeViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = filters.VehicleTypeFilter
 
 
+class VehicleFeatureViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = VehicleFeature.objects.order_by("id")
+    serializer_class = serializers.VehicleFeatureSerializer
+
+
 class OperatorViewSet(viewsets.ModelViewSet):
     queryset = (
         Operator.objects.order_by("noc")
@@ -166,10 +171,11 @@ class OperatorViewSet(viewsets.ModelViewSet):
 
 
 class GarageViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Garage.objects.select_related("operator").order_by("name")
+    queryset = Garage.objects.prefetch_related("operators").order_by("name")
     serializer_class = serializers.GarageSerializer
     pagination_class = CursorPagination
     filter_backends = [DjangoFilterBackend]
+    filterset_class = filters.GarageFilter
     authentication_classes = [authentication.OptionalAPIKeyAuthentication]
     permission_classes = []
 
