@@ -13,7 +13,7 @@ from django_filters.rest_framework import (
 )
 
 from busstops.models import Operator, Service, StopPoint
-from bustimes.models import Trip
+from bustimes.models import Garage, Trip
 from bustimes.utils import get_calendars
 from vehicles.models import Livery, Vehicle, VehicleType, DataSource
 
