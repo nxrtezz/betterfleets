@@ -10,7 +10,7 @@ from django.utils.html import format_html
 from fleet.exporters.xlsx import build_fleet_workbook, workbook_bytes
 from fleet.live_import import build_import_rows, commit_import_rows
 from fleet.matching import match_garage, match_operator
-from fleet.models import FleetPDFUpload, FleetRideLog, FleetVehicle
+from fleet.models import FleetPDFUpload, FleetVehicle
 from fleet.services import process_pdf_upload
 
 
@@ -251,72 +251,73 @@ class FleetVehicleAdmin(admin.ModelAdmin):
         return _xlsx_response("fleet-vehicles.xlsx", vehicles)
 
 
-@admin.register(FleetRideLog)
-class FleetRideLogAdmin(admin.ModelAdmin):
-    list_display = ("user", "vehicle", "created_at")
-    list_filter = ("user", "created_at", "vehicle__operator", "vehicle__vehicle_type")
-    raw_id_fields = ("user", "vehicle")
-    search_fields = (
-        "user__username",
-        "user__email",
-        "vehicle__code",
-        "vehicle__fleet_code",
-        "vehicle__reg",
-    )
-    actions = ("delete_logs_for_user_and_operators",)
-
-    @admin.action(description="Delete logs for user (keep selected operators)")
-    def delete_logs_for_user_and_operators(self, request, queryset):
-        if request.method == "POST" and request.POST.get("post"):
-            user_id = request.POST.get("user_id")
-            operator_ids_to_keep = request.POST.getlist("operator_ids")
-            
-            if not user_id:
-                self.message_user(request, "No user selected.", level=messages.ERROR)
-                return
-            
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            
-            try:
-                user = User.objects.get(id=user_id)
-            except User.DoesNotExist:
-                self.message_user(request, "User not found.", level=messages.ERROR)
-                return
-            
-            logs_to_delete = queryset.filter(user=user)
-            if operator_ids_to_keep:
-                logs_to_delete = logs_to_delete.exclude(vehicle__operator_id__in=operator_ids_to_keep)
-            
-            count = logs_to_delete.count()
-            logs_to_delete.delete()
-            
-            self.message_user(
-                request,
-                f"Deleted {count} ride log{'s' if count != 1 else ''} for {user.username}.",
-                level=messages.SUCCESS,
-            )
-            return
-        
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        from busstops.models import Operator
-        
-        users = User.objects.filter(fleet_ride_logs__isnull=False).distinct().order_by("username")
-        operators = Operator.objects.filter(vehicle__fleet_ride_logs__isnull=False).distinct().order_by("name")
-        
-        context = {
-            **self.admin_site.each_context(request),
-            "title": "Delete logs for user (keep selected operators)",
-            "queryset": queryset,
-            "users": users,
-            "operators": operators,
-            "action_checkbox_name": "_selected_action",
-            "media": self.media,
-        }
-        
-        return TemplateResponse(
-            request,
-            "admin/fleet/fleetridelog/delete_logs_for_user.html",
-            context,
-        )
+# TODO: FleetRideLog model doesn't exist - commented out to fix build
+# @admin.register(FleetRideLog)
+# class FleetRideLogAdmin(admin.ModelAdmin):
+#     list_display = ("user", "vehicle", "created_at")
+#     list_filter = ("user", "created_at", "vehicle__operator", "vehicle__vehicle_type")
+#     raw_id_fields = ("user", "vehicle")
+#     search_fields = (
+#         "user__username",
+#         "user__email",
+#         "vehicle__code",
+#         "vehicle__fleet_code",
+#         "vehicle__reg",
+#     )
+#     actions = ("delete_logs_for_user_and_operators",)
+#
+#     @admin.action(description="Delete logs for user (keep selected operators)")
+#     def delete_logs_for_user_and_operators(self, request, queryset):
+#         if request.method == "POST" and request.POST.get("post"):
+#             user_id = request.POST.get("user_id")
+#             operator_ids_to_keep = request.POST.getlist("operator_ids")
+#
+#             if not user_id:
+#                 self.message_user(request, "No user selected.", level=messages.ERROR)
+#                 return
+#
+#             from django.contrib.auth import get_user_model
+#             User = get_user_model()
+#
+#             try:
+#                 user = User.objects.get(id=user_id)
+#             except User.DoesNotExist:
+#                 self.message_user(request, "User not found.", level=messages.ERROR)
+#                 return
+#
+#             logs_to_delete = queryset.filter(user=user)
+#             if operator_ids_to_keep:
+#                 logs_to_delete = logs_to_delete.exclude(vehicle__operator_id__in=operator_ids_to_keep)
+#
+#             count = logs_to_delete.count()
+#             logs_to_delete.delete()
+#
+#             self.message_user(
+#                 request,
+#                 f"Deleted {count} ride log{'s' if count != 1 else ''} for {user.username}.",
+#                 level=messages.SUCCESS,
+#             )
+#             return
+#
+#         from django.contrib.auth import get_user_model
+#         User = get_user_model()
+#         from busstops.models import Operator
+#
+#         users = User.objects.filter(fleet_ride_logs__isnull=False).distinct().order_by("username")
+#         operators = Operator.objects.filter(vehicle__fleet_ride_logs__isnull=False).distinct().order_by("name")
+#
+#         context = {
+#             **self.admin_site.each_context(request),
+#             "title": "Delete logs for user (keep selected operators)",
+#             "queryset": queryset,
+#             "users": users,
+#             "operators": operators,
+#             "action_checkbox_name": "_selected_action",
+#             "media": self.media,
+#         }
+#
+#         return TemplateResponse(
+#             request,
+#             "admin/fleet/fleetridelog/delete_logs_for_user.html",
+#             context,
+#         )
