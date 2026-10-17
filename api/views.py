@@ -16,7 +16,8 @@ from bustimes.models import Garage, StopTime, Trip
 from bustimes.utils import contiguous_stoptimes_only
 from vehicles.models import Livery, Vehicle, VehicleJourney, VehicleType, VehicleRevision, VehicleFeature
 from vehicles.utils import redis_client
-from fleet.models import FleetPhotoLog, FleetRideLog
+# TODO: These models don't exist - commented out to fix build
+# from fleet.models import FleetPhotoLog, FleetRideLog
 from photos.models import Photo
 
 from sql_util.utils import Exists
@@ -100,19 +101,8 @@ class VehicleViewSet(viewsets.ReadOnlyModelViewSet):
         if not user.is_authenticated:
             return Response({'error': 'Authentication required'}, status=401)
         
-        photo_log, created = FleetPhotoLog.objects.get_or_create(
-            user=user,
-            vehicle=vehicle
-        )
-        photo_log.quantity = quantity
-        photo_log.save(update_fields=['quantity'])
-        
-        return Response({
-            'status': 'success',
-            'vehicle': str(vehicle),
-            'quantity': photo_log.quantity,
-            'created': created
-        })
+        # TODO: FleetPhotoLog model doesn't exist - return error
+        return Response({'error': 'FleetPhotoLog model not available'}, status=501)
 
 
 class LiveryViewSet(viewsets.ReadOnlyModelViewSet):
