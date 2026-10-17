@@ -56,6 +56,7 @@ type FilterState = {
 type Option = {
   id: string;
   name: string;
+  code?: string;
 };
 
 function MapFilters({ filters, setFilters }: { filters: FilterState; setFilters: (filters: FilterState) => void }) {
@@ -715,13 +716,6 @@ export default function BigMap(
     }
   }, [filters, location]);
 
-  // Reload vehicles when filters change
-  useEffect(() => {
-    if (props.mode === MapMode.Slippy) {
-      loadVehicles(true);
-    }
-  }, [filters, props.mode, loadVehicles]);
-
   const [clickedStopUrl, setClickedStopURL] = React.useState(() => {
     if (document.referrer && props.mode !== MapMode.Slippy) {
       const referrer = new URL(document.referrer).pathname;
@@ -906,6 +900,13 @@ export default function BigMap(
     },
     [props.mode, props.noc, trip, journey, props.vehicleId, filters],
   );
+
+  // Reload vehicles when filters change
+  useEffect(() => {
+    if (props.mode === MapMode.Slippy) {
+      loadVehicles(true);
+    }
+  }, [filters, props.mode, loadVehicles]);
 
   React.useEffect(() => {
     if (props.tripId) {
