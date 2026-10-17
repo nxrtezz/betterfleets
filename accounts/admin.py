@@ -4,10 +4,9 @@ from django.urls import reverse
 from django.utils.html import format_html
 from sql_util.utils import SubqueryCount
 
-from buses.admin_utils import M2MThroughMixin
 from bustimes.admin import log_change
 
-from .models import Invitation, OperatorUser, User
+from .models import OperatorUser, User
 
 
 def get_count(obj, attribute, approved):
@@ -91,8 +90,3 @@ class UserAdmin(admin.ModelAdmin):
 @admin.register(OperatorUser)
 class OperatorUserAdmin(admin.ModelAdmin):
     raw_id_fields = ("user", "operator")
-
-
-@admin.register(Invitation)
-class InvitationAdmin(M2MThroughMixin, admin.ModelAdmin):
-    raw_id_fields = ("operators",)
