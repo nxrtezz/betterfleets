@@ -1845,482 +1845,483 @@ vehicle.garage.name if vehicle.garage else "",
         )
 
 
-@admin.register(models.PreservationGroup)
-class PreservationGroupAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "website", "founded_date", "vehicle_count")
-    list_filter = ("founded_date",)
-    search_fields = ("name", "slug", "description")
-    prepopulated_fields = {"slug": ("name",)}
-    readonly_fields = ["mass_add_buses_link"]
-    fieldsets = (
-        (None, {"fields": ("name", "slug", "description", "founded_date", "mass_add_buses_link")}),
-        ("Branding", {"fields": ("logo", "banner")}),
-        (
-            "Links",
-            {
-                "fields": (
-                    "website",
-                    "social_x",
-                    "social_fb",
-                    "social_instagram",
-                    "social_linkedin",
-                    "social_youtube",
-                    "social_tiktok",
-                    "social_threads",
-                    "social_bluesky",
-                    "social_mastodon",
-                    "social_other",
-                )
-            },
-        ),
-    )
-
-    def get_queryset(self, request):
-        return super().get_queryset(request).annotate(
-            preserved_vehicle_count=Count("preserved_vehicles")
-        )
-
-    @admin.display(description="Vehicles", ordering="preserved_vehicle_count")
-    def vehicle_count(self, obj):
-        return obj.preserved_vehicle_count
-
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_urls = [
-            path(
-                "<path:object_id>/mass-add-buses/",
-                self.admin_site.admin_view(self.mass_add_buses_view),
-                name="busstops_preservationgroup_mass_add_buses",
-            ),
-            path(
-                "<path:object_id>/mass-add-buses/template.xlsx",
-                self.admin_site.admin_view(self.mass_add_buses_template_view),
-                name="busstops_preservationgroup_mass_add_buses_template",
-            ),
-            path(
-                "<path:object_id>/mass-add-buses/current-fleet.xlsx",
-                self.admin_site.admin_view(self.mass_add_buses_current_fleet_view),
-                name="busstops_preservationgroup_mass_add_buses_current_fleet",
-            ),
-        ]
-        return custom_urls + urls
-
-    @admin.display(description="Mass add buses")
-    def mass_add_buses_link(self, obj):
-        url = reverse("admin:busstops_preservationgroup_mass_add_buses", args=(obj.pk,))
-        return format_html('<a class="button" href="{}">Mass add buses</a>', url)
-
-    def _build_mass_add_template_workbook(self, rows=None):
-        workbook = Workbook()
-        worksheet = workbook.active
-        worksheet.title = "Vehicles"
-        worksheet.append(
-            (
-                "code",
-                "fleet_number",
-                "fleet_code",
-                "registration",
-                "prev_registration",
-                "vehicle_type",
-                "livery",
-                "colours",
-                "name",
-                "branding",
-                "notes",
-                "slug",
-            )
-        )
-        for row in rows or ():
-            worksheet.append(row)
-        worksheet.freeze_panes = "A2"
-
-        instructions = workbook.create_sheet("Instructions")
-        instructions.append(["Field", "Notes"])
-        instructions.append(["code", "Required unless fleet_number or registration is supplied"])
-        instructions.append(["fleet_number", "Integer fleet number"])
-        instructions.append(["fleet_code", "Optional displayed fleet code"])
-        instructions.append(["registration", "Vehicle registration"])
-        instructions.append(["prev_registration", "Previous registration"])
-        instructions.append(["vehicle_type", "Vehicle type id, external id, or exact name"])
-        instructions.append(["livery", "Livery id, external id, or exact name"])
-        instructions.append(["colours", "Optional space-separated colour values"])
-        instructions.append(["name", "Vehicle name"])
-        instructions.append(["branding", "Branding text"])
-        instructions.append(["notes", "Free-text notes"])
-        instructions.append(["slug", "URL slug for the vehicle"])
-        return workbook
-
-    def _rows_text_from_workbook(self, uploaded_file):
-        if not uploaded_file:
-            return ""
-
-        filename = (uploaded_file.name or "").lower()
-        if filename.endswith(".csv"):
-            try:
-                content = uploaded_file.read().decode("utf-8-sig")
-            except UnicodeDecodeError as exc:
-                raise ValueError("CSV upload must be UTF-8 encoded") from exc
-            return content.strip()
-        if not filename.endswith(".xlsx"):
-            raise ValueError("Upload must be a .xlsx or .csv file")
-
-        workbook = load_workbook(uploaded_file, data_only=True)
-        worksheet = workbook.active
-        rows = list(worksheet.iter_rows(values_only=True))
-        if not rows:
-            return ""
-
-        headers = [str(value).strip() if value is not None else "" for value in rows[0]]
-        if not any(headers):
-            return ""
-
-        output = StringIO()
-        writer = csv.writer(output, delimiter="\t", lineterminator="\n")
-        writer.writerow(headers)
-        for row in rows[1:]:
-            values = ["" if value is None else str(value).strip() for value in row[: len(headers)]]
-            if any(values):
-                writer.writerow(values)
-        return output.getvalue()
-
-    def _mass_rows_from_preservation_group_fleet(self, preservation_group):
-        vehicles = (
-            preservation_group.preserved_vehicles.select_related("vehicle_type", "livery")
-            .order_by("fleet_number", "fleet_code", "reg", "code")
-        )
-        rows = []
-        for vehicle in vehicles:
-            rows.append(
-                (
-                    vehicle.code or "",
-                    vehicle.fleet_number if vehicle.fleet_number is not None else "",
-                    vehicle.fleet_code or "",
-                    vehicle.reg or "",
-                    vehicle.prev_registration or "",
-                    vehicle.vehicle_type.name if vehicle.vehicle_type else "",
-                    vehicle.livery.name if vehicle.livery else "",
-                    vehicle.colours or "",
-                    vehicle.name or "",
-                    vehicle.branding or "",
-                    vehicle.notes or "",
-                    vehicle.slug or "",
-                )
-            )
-        return rows
-
-    def mass_add_buses_template_view(self, request, object_id):
-        if not request.user.is_superuser:
-            raise PermissionDenied
-
-        preservation_group = self.get_object(request, object_id)
-        if preservation_group is None:
-            raise PermissionDenied
-
-        workbook = self._build_mass_add_template_workbook()
-        stream = BytesIO()
-        workbook.save(stream)
-        stream.seek(0)
-
-        response = HttpResponse(
-            stream.getvalue(),
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-        response["Content-Disposition"] = (
-            f'attachment; filename="{preservation_group.slug}-mass-add-template.xlsx"'
-        )
-        return response
-
-    def mass_add_buses_current_fleet_view(self, request, object_id):
-        if not request.user.is_superuser:
-            raise PermissionDenied
-
-        preservation_group = self.get_object(request, object_id)
-        if preservation_group is None:
-            raise PermissionDenied
-
-        workbook = self._build_mass_add_template_workbook(
-            rows=self._mass_rows_from_preservation_group_fleet(preservation_group)
-        )
-        stream = BytesIO()
-        workbook.save(stream)
-        stream.seek(0)
-
-        response = HttpResponse(
-            stream.getvalue(),
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-        response["Content-Disposition"] = (
-            f'attachment; filename="{preservation_group.slug}-current-fleet.xlsx"'
-        )
-        return response
-
-    def _normalise_header(self, header):
-        key = header.strip().lower().replace(" ", "_")
-        header_aliases = {
-            "fleet_num": "fleet_number",
-            "fleet": "fleet_number",
-            "registration": "reg",
-            "prev_reg": "prev_registration",
-            "previous_reg": "prev_registration",
-            "vehicle_id": "vehicle_type",
-            "vehicle_type_id": "vehicle_type",
-            "livery_id": "livery",
-            "color": "colours",
-            "colors": "colours",
-        }
-        return header_aliases.get(key, key)
-
-    @staticmethod
-    def _coerce_bool(value):
-        value = value.strip().lower()
-        if value in {"", "none", "null"}:
-            return None
-        if value in {"1", "true", "yes", "y", "on"}:
-            return True
-        if value in {"0", "false", "no", "n", "off"}:
-            return False
-        raise ValueError(f"Invalid boolean value '{value}'")
-
-    def _resolve_reference(self, model, value, label):
-        if value == "":
-            return None
-        if value.isdigit():
-            try:
-                return model.objects.get(pk=int(value))
-            except model.DoesNotExist as exc:
-                raise ValueError(f"Unknown {label} id '{value}'") from exc
-
-        try:
-            return model.objects.get(external_id=value)
-        except (model.DoesNotExist, model.MultipleObjectsReturned):
-            pass
-
-        if hasattr(model, "name"):
-            item = model.objects.filter(name__iexact=value).first()
-            if item:
-                return item
-
-        if hasattr(model, "code"):
-            item = model.objects.filter(code__iexact=value).first()
-            if item:
-                return item
-
-        raise ValueError(f"Unknown {label} '{value}'")
-
-    def _parse_mass_rows(self, preservation_group, rows_text):
-        rows = []
-
-        if not rows_text.strip():
-            return rows
-
-        delimiter = "\t" if "\t" in rows_text.splitlines()[0] else ","
-        reader = csv.DictReader(StringIO(rows_text), delimiter=delimiter)
-        if not reader.fieldnames:
-            return rows
-
-        for index, original_row in enumerate(reader, start=2):
-            mapped = {}
-            for key, value in original_row.items():
-                if not key:
-                    continue
-                mapped[self._normalise_header(key)] = (value or "").strip()
-
-            if not any(mapped.values()):
-                continue
-
-            row = {
-                "row_number": index,
-                "raw": mapped,
-                "errors": [],
-                "action": "skip",
-                "vehicle": None,
-                "values": {},
-            }
-
-            provided_code = mapped.get("code", "")
-            provided_fleet_code = mapped.get("fleet_code", "")
-            code = provided_code or provided_fleet_code
-            fleet_number = None
-            if mapped.get("fleet_number"):
-                try:
-                    fleet_number = int(mapped["fleet_number"])
-                except ValueError:
-                    row["errors"].append("fleet_number must be an integer")
-            elif mapped.get("fleet_number") == "":
-                fleet_number = None
-
-            reg = mapped.get("registration", "").upper().replace(" ", "")
-            prev_registration = mapped.get("prev_registration", "").upper().replace(" ", "")
-
-            if not code:
-                if fleet_number is not None:
-                    code = str(fleet_number)
-                elif reg:
-                    code = reg
-
-            vehicle = None
-            if code:
-                vehicle = Vehicle.objects.filter(code__iexact=code).first()
-            if not vehicle and reg:
-                vehicle = Vehicle.objects.filter(reg__iexact=reg).first()
-
-            if not vehicle and not code:
-                row["errors"].append(
-                    "Could not determine vehicle identifier (code/fleet_num/registration)"
-                )
-
-            row["vehicle"] = vehicle
-            row["action"] = "update" if vehicle else "create"
-
-            if row["action"] == "create":
-                if code:
-                    row["values"]["code"] = code
-            elif provided_code:
-                row["values"]["code"] = provided_code
-            if provided_fleet_code:
-                row["values"]["fleet_code"] = provided_fleet_code
-            if reg:
-                row["values"]["reg"] = reg
-            if prev_registration:
-                row["values"]["prev_registration"] = prev_registration
-            if mapped.get("name"):
-                row["values"]["name"] = mapped["name"]
-            if mapped.get("notes"):
-                row["values"]["notes"] = mapped["notes"]
-            if mapped.get("branding"):
-                row["values"]["branding"] = mapped["branding"]
-            if mapped.get("colours"):
-                row["values"]["colours"] = mapped["colours"]
-            if mapped.get("fleet_number"):
-                row["values"]["fleet_number"] = fleet_number
-
-            for field, model, label in (
-                ("vehicle_type", VehicleType, "vehicle_type"),
-                ("livery", Livery, "livery"),
-            ):
-                if mapped.get(field):
-                    try:
-                        row["values"][field] = self._resolve_reference(
-                            model, mapped.get(field, ""), label
-                        )
-                    except ValueError as exc:
-                        row["errors"].append(str(exc))
-
-            rows.append(row)
-
-        return rows
-
-    def _commit_mass_rows(self, preservation_group, rows):
-        created = 0
-        updated = 0
-        errors = 0
-
-        for row in rows:
-            if row["errors"]:
-                errors += 1
-                continue
-
-            try:
-                with transaction.atomic():
-                    vehicle = row["vehicle"] or Vehicle()
-                    for field, value in row["values"].items():
-                        setattr(vehicle, field, value)
-
-                    vehicle.preservation_group = preservation_group
-                    vehicle.preserved = True
-                    vehicle.is_manual = True
-                    vehicle.manual_updated_at = timezone.now()
-                    vehicle.save()
-
-                    if row["action"] == "create":
-                        created += 1
-                    else:
-                        updated += 1
-            except Exception as exc:
-                row["errors"].append(str(exc))
-                errors += 1
-
-        return created, updated, errors
-
-    def mass_add_buses_view(self, request, object_id):
-        if not request.user.is_superuser:
-            raise PermissionDenied
-
-        preservation_group = self.get_object(request, object_id)
-        if preservation_group is None:
-            raise PermissionDenied
-
-        rows = []
-        created = 0
-        updated = 0
-        errors = 0
-
-        if request.method == "POST":
-            form = MassAddBusesForm(request.POST, request.FILES)
-            if form.is_valid():
-                rows_text = form.cleaned_data.get("rows_text") or ""
-                workbook = form.cleaned_data.get("workbook")
-                try:
-                    if workbook:
-                        rows_text = self._rows_text_from_workbook(workbook)
-                except ValueError as exc:
-                    form.add_error("workbook", str(exc))
-
-                if not form.errors and not rows_text.strip():
-                    form.add_error(None, "Paste rows or upload a completed workbook.")
-
-                if not form.errors:
-                    rows = self._parse_mass_rows(preservation_group, rows_text)
-                    form = MassAddBusesForm(initial={"rows_text": rows_text})
-
-                    if request.POST.get("action") == "commit":
-                        created, updated, errors = self._commit_mass_rows(preservation_group, rows)
-                        if created or updated:
-                            self.message_user(
-                                request,
-                                f"Mass add complete: created {created}, updated {updated}, errors {errors}",
-                            )
-                        elif errors:
-                            self.message_user(
-                                request,
-                                f"No rows imported. {errors} row(s) had errors.",
-                                level=messages.WARNING,
-                            )
-                    else:
-                        self.message_user(
-                            request,
-                            "Preview generated. Review rows and click Commit import when ready.",
-                        )
-        else:
-            form = MassAddBusesForm()
-
-        context = {
-            **self.admin_site.each_context(request),
-            "opts": self.model._meta,
-            "original": preservation_group,
-            "preservation_group": preservation_group,
-            "title": f"Mass add buses for {preservation_group}",
-            "form": form,
-            "rows": rows,
-            "can_commit": any(not row["errors"] for row in rows),
-            "created": created,
-            "updated": updated,
-            "errors": errors,
-            "template_download_url": reverse(
-                "admin:busstops_preservationgroup_mass_add_buses_template", args=(preservation_group.pk,)
-            ),
-            "export_download_url": reverse(
-                "admin:busstops_preservationgroup_mass_add_buses_current_fleet", args=(preservation_group.pk,)
-            ),
-            "allow_create": True,
-            "commit_label": "Commit import",
-        }
-
-        return TemplateResponse(
-            request,
-            "admin/busstops/preservationgroup/mass_buses.html",
-            context,
-        )
+# TODO: PreservationGroup model doesn't exist - commented out to fix build
+# @admin.register(models.PreservationGroup)
+# class PreservationGroupAdmin(admin.ModelAdmin):
+#     list_display = ("name", "slug", "website", "founded_date", "vehicle_count")
+#     list_filter = ("founded_date",)
+#     search_fields = ("name", "slug", "description")
+#     prepopulated_fields = {"slug": ("name",)}
+#     readonly_fields = ["mass_add_buses_link"]
+#     fieldsets = (
+#         (None, {"fields": ("name", "slug", "description", "founded_date", "mass_add_buses_link")}),
+#         ("Branding", {"fields": ("logo", "banner")}),
+#         (
+#             "Links",
+#             {
+#                 "fields": (
+#                     "website",
+#                     "social_x",
+#                     "social_fb",
+#                     "social_instagram",
+#                     "social_linkedin",
+#                     "social_youtube",
+#                     "social_tiktok",
+#                     "social_threads",
+#                     "social_bluesky",
+#                     "social_mastodon",
+#                     "social_other",
+#                 )
+#             },
+#         ),
+#     )
+#
+#     def get_queryset(self, request):
+#         return super().get_queryset(request).annotate(
+#             preserved_vehicle_count=Count("preserved_vehicles")
+#         )
+#
+#     @admin.display(description="Vehicles", ordering="preserved_vehicle_count")
+#     def vehicle_count(self, obj):
+#         return obj.preserved_vehicle_count
+#
+#     def get_urls(self):
+#         urls = super().get_urls()
+#         custom_urls = [
+#             path(
+#                 "<path:object_id>/mass-add-buses/",
+#                 self.admin_site.admin_view(self.mass_add_buses_view),
+#                 name="busstops_preservationgroup_mass_add_buses",
+#             ),
+#             path(
+#                 "<path:object_id>/mass-add-buses/template.xlsx",
+#                 self.admin_site.admin_view(self.mass_add_buses_template_view),
+#                 name="busstops_preservationgroup_mass_add_buses_template",
+#             ),
+#             path(
+#                 "<path:object_id>/mass-add-buses/current-fleet.xlsx",
+#                 self.admin_site.admin_view(self.mass_add_buses_current_fleet_view),
+#                 name="busstops_preservationgroup_mass_add_buses_current_fleet",
+#             ),
+#         ]
+#         return custom_urls + urls
+#
+#     @admin.display(description="Mass add buses")
+#     def mass_add_buses_link(self, obj):
+#         url = reverse("admin:busstops_preservationgroup_mass_add_buses", args=(obj.pk,))
+#         return format_html('<a class="button" href="{}">Mass add buses</a>', url)
+#
+#     def _build_mass_add_template_workbook(self, rows=None):
+#         workbook = Workbook()
+#         worksheet = workbook.active
+#         worksheet.title = "Vehicles"
+#         worksheet.append(
+#             (
+#                 "code",
+#                 "fleet_number",
+#                 "fleet_code",
+#                 "registration",
+#                 "prev_registration",
+#                 "vehicle_type",
+#                 "livery",
+#                 "colours",
+#                 "name",
+#                 "branding",
+#                 "notes",
+#                 "slug",
+#             )
+#         )
+#         for row in rows or ():
+#             worksheet.append(row)
+#         worksheet.freeze_panes = "A2"
+#
+#         instructions = workbook.create_sheet("Instructions")
+#         instructions.append(["Field", "Notes"])
+#         instructions.append(["code", "Required unless fleet_number or registration is supplied"])
+#         instructions.append(["fleet_number", "Integer fleet number"])
+#         instructions.append(["fleet_code", "Optional displayed fleet code"])
+#         instructions.append(["registration", "Vehicle registration"])
+#         instructions.append(["prev_registration", "Previous registration"])
+#         instructions.append(["vehicle_type", "Vehicle type id, external id, or exact name"])
+#         instructions.append(["livery", "Livery id, external id, or exact name"])
+#         instructions.append(["colours", "Optional space-separated colour values"])
+#         instructions.append(["name", "Vehicle name"])
+#         instructions.append(["branding", "Branding text"])
+#         instructions.append(["notes", "Free-text notes"])
+#         instructions.append(["slug", "URL slug for the vehicle"])
+#         return workbook
+#
+#     def _rows_text_from_workbook(self, uploaded_file):
+#         if not uploaded_file:
+#             return ""
+#
+#         filename = (uploaded_file.name or "").lower()
+#         if filename.endswith(".csv"):
+#             try:
+#                 content = uploaded_file.read().decode("utf-8-sig")
+#             except UnicodeDecodeError as exc:
+#                 raise ValueError("CSV upload must be UTF-8 encoded") from exc
+#             return content.strip()
+#         if not filename.endswith(".xlsx"):
+#             raise ValueError("Upload must be a .xlsx or .csv file")
+#
+#         workbook = load_workbook(uploaded_file, data_only=True)
+#         worksheet = workbook.active
+#         rows = list(worksheet.iter_rows(values_only=True))
+#         if not rows:
+#             return ""
+#
+#         headers = [str(value).strip() if value is not None else "" for value in rows[0]]
+#         if not any(headers):
+#             return ""
+#
+#         output = StringIO()
+#         writer = csv.writer(output, delimiter="\t", lineterminator="\n")
+#         writer.writerow(headers)
+#         for row in rows[1:]:
+#             values = ["" if value is None else str(value).strip() for value in row[: len(headers)]]
+#             if any(values):
+#                 writer.writerow(values)
+#         return output.getvalue()
+#
+#     def _mass_rows_from_preservation_group_fleet(self, preservation_group):
+#         vehicles = (
+#             preservation_group.preserved_vehicles.select_related("vehicle_type", "livery")
+#             .order_by("fleet_number", "fleet_code", "reg", "code")
+#         )
+#         rows = []
+#         for vehicle in vehicles:
+#             rows.append(
+#                 (
+#                     vehicle.code or "",
+#                     vehicle.fleet_number if vehicle.fleet_number is not None else "",
+#                     vehicle.fleet_code or "",
+#                     vehicle.reg or "",
+#                     vehicle.prev_registration or "",
+#                     vehicle.vehicle_type.name if vehicle.vehicle_type else "",
+#                     vehicle.livery.name if vehicle.livery else "",
+#                     vehicle.colours or "",
+#                     vehicle.name or "",
+#                     vehicle.branding or "",
+#                     vehicle.notes or "",
+#                     vehicle.slug or "",
+#                 )
+#             )
+#         return rows
+#
+#     def mass_add_buses_template_view(self, request, object_id):
+#         if not request.user.is_superuser:
+#             raise PermissionDenied
+#
+#         preservation_group = self.get_object(request, object_id)
+#         if preservation_group is None:
+#             raise PermissionDenied
+#
+#         workbook = self._build_mass_add_template_workbook()
+#         stream = BytesIO()
+#         workbook.save(stream)
+#         stream.seek(0)
+#
+#         response = HttpResponse(
+#             stream.getvalue(),
+#             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+#         )
+#         response["Content-Disposition"] = (
+#             f'attachment; filename="{preservation_group.slug}-mass-add-template.xlsx"'
+#         )
+#         return response
+#
+#     def mass_add_buses_current_fleet_view(self, request, object_id):
+#         if not request.user.is_superuser:
+#             raise PermissionDenied
+#
+#         preservation_group = self.get_object(request, object_id)
+#         if preservation_group is None:
+#             raise PermissionDenied
+#
+#         workbook = self._build_mass_add_template_workbook(
+#             rows=self._mass_rows_from_preservation_group_fleet(preservation_group)
+#         )
+#         stream = BytesIO()
+#         workbook.save(stream)
+#         stream.seek(0)
+#
+#         response = HttpResponse(
+#             stream.getvalue(),
+#             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+#         )
+#         response["Content-Disposition"] = (
+#             f'attachment; filename="{preservation_group.slug}-current-fleet.xlsx"'
+#         )
+#         return response
+#
+#     def _normalise_header(self, header):
+#         key = header.strip().lower().replace(" ", "_")
+#         header_aliases = {
+#             "fleet_num": "fleet_number",
+#             "fleet": "fleet_number",
+#             "registration": "reg",
+#             "prev_reg": "prev_registration",
+#             "previous_reg": "prev_registration",
+#             "vehicle_id": "vehicle_type",
+#             "vehicle_type_id": "vehicle_type",
+#             "livery_id": "livery",
+#             "color": "colours",
+#             "colors": "colours",
+#         }
+#         return header_aliases.get(key, key)
+#
+#     @staticmethod
+#     def _coerce_bool(value):
+#         value = value.strip().lower()
+#         if value in {"", "none", "null"}:
+#             return None
+#         if value in {"1", "true", "yes", "y", "on"}:
+#             return True
+#         if value in {"0", "false", "no", "n", "off"}:
+#             return False
+#         raise ValueError(f"Invalid boolean value '{value}'")
+#
+#     def _resolve_reference(self, model, value, label):
+#         if value == "":
+#             return None
+#         if value.isdigit():
+#             try:
+#                 return model.objects.get(pk=int(value))
+#             except model.DoesNotExist as exc:
+#                 raise ValueError(f"Unknown {label} id '{value}'") from exc
+#
+#         try:
+#             return model.objects.get(external_id=value)
+#         except (model.DoesNotExist, model.MultipleObjectsReturned):
+#             pass
+#
+#         if hasattr(model, "name"):
+#             item = model.objects.filter(name__iexact=value).first()
+#             if item:
+#                 return item
+#
+#         if hasattr(model, "code"):
+#             item = model.objects.filter(code__iexact=value).first()
+#             if item:
+#                 return item
+#
+#         raise ValueError(f"Unknown {label} '{value}'")
+#
+#     def _parse_mass_rows(self, preservation_group, rows_text):
+#         rows = []
+#
+#         if not rows_text.strip():
+#             return rows
+#
+#         delimiter = "\t" if "\t" in rows_text.splitlines()[0] else ","
+#         reader = csv.DictReader(StringIO(rows_text), delimiter=delimiter)
+#         if not reader.fieldnames:
+#             return rows
+#
+#         for index, original_row in enumerate(reader, start=2):
+#             mapped = {}
+#             for key, value in original_row.items():
+#                 if not key:
+#                     continue
+#                 mapped[self._normalise_header(key)] = (value or "").strip()
+#
+#             if not any(mapped.values()):
+#                 continue
+#
+#             row = {
+#                 "row_number": index,
+#                 "raw": mapped,
+#                 "errors": [],
+#                 "action": "skip",
+#                 "vehicle": None,
+#                 "values": {},
+#             }
+#
+#             provided_code = mapped.get("code", "")
+#             provided_fleet_code = mapped.get("fleet_code", "")
+#             code = provided_code or provided_fleet_code
+#             fleet_number = None
+#             if mapped.get("fleet_number"):
+#                 try:
+#                     fleet_number = int(mapped["fleet_number"])
+#                 except ValueError:
+#                     row["errors"].append("fleet_number must be an integer")
+#             elif mapped.get("fleet_number") == "":
+#                 fleet_number = None
+#
+#             reg = mapped.get("registration", "").upper().replace(" ", "")
+#             prev_registration = mapped.get("prev_registration", "").upper().replace(" ", "")
+#
+#             if not code:
+#                 if fleet_number is not None:
+#                     code = str(fleet_number)
+#                 elif reg:
+#                     code = reg
+#
+#             vehicle = None
+#             if code:
+#                 vehicle = Vehicle.objects.filter(code__iexact=code).first()
+#             if not vehicle and reg:
+#                 vehicle = Vehicle.objects.filter(reg__iexact=reg).first()
+#
+#             if not vehicle and not code:
+#                 row["errors"].append(
+#                     "Could not determine vehicle identifier (code/fleet_num/registration)"
+#                 )
+#
+#             row["vehicle"] = vehicle
+#             row["action"] = "update" if vehicle else "create"
+#
+#             if row["action"] == "create":
+#                 if code:
+#                     row["values"]["code"] = code
+#             elif provided_code:
+#                 row["values"]["code"] = provided_code
+#             if provided_fleet_code:
+#                 row["values"]["fleet_code"] = provided_fleet_code
+#             if reg:
+#                 row["values"]["reg"] = reg
+#             if prev_registration:
+#                 row["values"]["prev_registration"] = prev_registration
+#             if mapped.get("name"):
+#                 row["values"]["name"] = mapped["name"]
+#             if mapped.get("notes"):
+#                 row["values"]["notes"] = mapped["notes"]
+#             if mapped.get("branding"):
+#                 row["values"]["branding"] = mapped["branding"]
+#             if mapped.get("colours"):
+#                 row["values"]["colours"] = mapped["colours"]
+#             if mapped.get("fleet_number"):
+#                 row["values"]["fleet_number"] = fleet_number
+#
+#             for field, model, label in (
+#                 ("vehicle_type", VehicleType, "vehicle_type"),
+#                 ("livery", Livery, "livery"),
+#             ):
+#                 if mapped.get(field):
+#                     try:
+#                         row["values"][field] = self._resolve_reference(
+#                             model, mapped.get(field, ""), label
+#                         )
+#                     except ValueError as exc:
+#                         row["errors"].append(str(exc))
+#
+#             rows.append(row)
+#
+#         return rows
+#
+#     def _commit_mass_rows(self, preservation_group, rows):
+#         created = 0
+#         updated = 0
+#         errors = 0
+#
+#         for row in rows:
+#             if row["errors"]:
+#                 errors += 1
+#                 continue
+#
+#             try:
+#                 with transaction.atomic():
+#                     vehicle = row["vehicle"] or Vehicle()
+#                     for field, value in row["values"].items():
+#                         setattr(vehicle, field, value)
+#
+#                     vehicle.preservation_group = preservation_group
+#                     vehicle.preserved = True
+#                     vehicle.is_manual = True
+#                     vehicle.manual_updated_at = timezone.now()
+#                     vehicle.save()
+#
+#                     if row["action"] == "create":
+#                         created += 1
+#                     else:
+#                         updated += 1
+#             except Exception as exc:
+#                 row["errors"].append(str(exc))
+#                 errors += 1
+#
+#         return created, updated, errors
+#
+#     def mass_add_buses_view(self, request, object_id):
+#         if not request.user.is_superuser:
+#             raise PermissionDenied
+#
+#         preservation_group = self.get_object(request, object_id)
+#         if preservation_group is None:
+#             raise PermissionDenied
+#
+#         rows = []
+#         created = 0
+#         updated = 0
+#         errors = 0
+#
+#         if request.method == "POST":
+#             form = MassAddBusesForm(request.POST, request.FILES)
+#             if form.is_valid():
+#                 rows_text = form.cleaned_data.get("rows_text") or ""
+#                 workbook = form.cleaned_data.get("workbook")
+#                 try:
+#                     if workbook:
+#                         rows_text = self._rows_text_from_workbook(workbook)
+#                 except ValueError as exc:
+#                     form.add_error("workbook", str(exc))
+#
+#                 if not form.errors and not rows_text.strip():
+#                     form.add_error(None, "Paste rows or upload a completed workbook.")
+#
+#                 if not form.errors:
+#                     rows = self._parse_mass_rows(preservation_group, rows_text)
+#                     form = MassAddBusesForm(initial={"rows_text": rows_text})
+#
+#                     if request.POST.get("action") == "commit":
+#                         created, updated, errors = self._commit_mass_rows(preservation_group, rows)
+#                         if created or updated:
+#                             self.message_user(
+#                                 request,
+#                                 f"Mass add complete: created {created}, updated {updated}, errors {errors}",
+#                             )
+#                         elif errors:
+#                             self.message_user(
+#                                 request,
+#                                 f"No rows imported. {errors} row(s) had errors.",
+#                                 level=messages.WARNING,
+#                             )
+#                     else:
+#                         self.message_user(
+#                             request,
+#                             "Preview generated. Review rows and click Commit import when ready.",
+#                         )
+#         else:
+#             form = MassAddBusesForm()
+#
+#         context = {
+#             **self.admin_site.each_context(request),
+#             "opts": self.model._meta,
+#             "original": preservation_group,
+#             "preservation_group": preservation_group,
+#             "title": f"Mass add buses for {preservation_group}",
+#             "form": form,
+#             "rows": rows,
+#             "can_commit": any(not row["errors"] for row in rows),
+#             "created": created,
+#             "updated": updated,
+#             "errors": errors,
+#             "template_download_url": reverse(
+#                 "admin:busstops_preservationgroup_mass_add_buses_template", args=(preservation_group.pk,)
+#             ),
+#             "export_download_url": reverse(
+#                 "admin:busstops_preservationgroup_mass_add_buses_current_fleet", args=(preservation_group.pk,)
+#             ),
+#             "allow_create": True,
+#             "commit_label": "Commit import",
+#         }
+#
+#         return TemplateResponse(
+#             request,
+#             "admin/busstops/preservationgroup/mass_buses.html",
+#             context,
+#         )
 
 
 class ManufacturerSiteInline(admin.TabularInline):
