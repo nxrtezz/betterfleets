@@ -610,7 +610,8 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
             "edited_revisions", filter=Q(edited_revisions__pending=True)
         ),
         photo_count=Count("photo", distinct=True),
-        ride_count=Count("fleet_ride_logs", distinct=True),
+        # TODO: fleet_ride_logs doesn't exist - commented out
+        # ride_count=Count("fleet_ride_logs", distinct=True),
     )
     serializer_class = serializers.UserSerializer
     pagination_class = CursorPagination

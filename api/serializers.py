@@ -409,7 +409,8 @@ class UserSerializer(serializers.ModelSerializer):
     pending_edit_count = serializers.IntegerField()
     badges = serializers.SerializerMethodField()
     photo_count = serializers.IntegerField()
-    ride_count = serializers.IntegerField()
+    # TODO: ride_count doesn't exist - using SerializerMethodField to return 0
+    ride_count = serializers.SerializerMethodField()
     profile_url = serializers.SerializerMethodField()
 
     def get_profile_picture(self, obj):
@@ -417,6 +418,10 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_badges(self, obj):
         return [{"name": tag.name, "slug": tag.slug} for tag in obj.get_profile_tags()]
+
+    def get_ride_count(self, obj):
+        # TODO: fleet_ride_logs doesn't exist - return 0
+        return 0
 
     def get_profile_url(self, obj):
         return obj.get_absolute_url()
