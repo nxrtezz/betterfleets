@@ -251,3 +251,8 @@ def get_user_photo_stats(user) -> dict:
 def get_personal_photo_operator_rankings(user, limit=20):
     # TODO: FleetPhotoLog model doesn't exist - return empty list
     return []
+
+
+def get_personal_photo_type_rankings(user, limit=20):
+    # TODO: FleetPhotoLog model doesn't exist - return empty list
+    return []
