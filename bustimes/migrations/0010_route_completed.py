@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('bustimes', '0009_remove_sirilink_vehicle_and_more'),
+        ('bustimes', '0009_alter_trip_block_alter_trip_headsign_and_more'),
     ]
 
     operations = [
