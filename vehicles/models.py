@@ -1602,10 +1602,6 @@ class VehicleJourney(models.Model):
         Vehicle, models.CASCADE, null=True, blank=True, db_index=False,
         related_name="journeys"
     )
-    vehicles = models.ManyToManyField(
-        Vehicle, blank=True,
-        related_name="additional_journeys"
-    )
     code = models.CharField(max_length=255, blank=True)
     destination = models.CharField(max_length=255, blank=True)
     direction = models.CharField(max_length=13, blank=True)

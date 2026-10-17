@@ -72,6 +72,7 @@ CSRF_FAILURE_VIEW = "busstops.views.csrf_failure"
 
 TEST = "test" in sys.argv or "pytest" in sys.argv[0]
 DEBUG = bool(os.environ.get("DEBUG", False))
+MAINTENANCE_MODE = bool(os.environ.get("MAINTENANCE_MODE", False))
 
 DEFAULT_FROM_EMAIL = '"bustimes.org" <bustimes.org@bustimes.org>'
 
@@ -144,6 +145,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "accounts.clerk_auth.ClerkAuthenticationMiddleware",
     "busstops.request_context.CurrentRequestMiddleware",
+    "busstops.middleware.MaintenanceModeMiddleware",
     "busstops.middleware.SiteUsageTrackingMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "allauth.account.middleware.AccountMiddleware",

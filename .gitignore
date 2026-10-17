@@ -97,6 +97,7 @@ credentials.sh
 # Misc
 # =========================
 slim-bustimes.sql
+model_fields.txt
 
 reference_code/
 

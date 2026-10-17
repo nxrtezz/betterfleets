@@ -123,6 +123,26 @@ class WhiteNoiseWithFallbackMiddleware(WhiteNoiseMiddleware):
         return response
 
 
+class MaintenanceModeMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from django.conf import settings
+
+        # Allow admin pages and health check
+        if getattr(settings, 'MAINTENANCE_MODE', False):
+            if request.path.startswith('/admin/') or request.path == '/up':
+                return self.get_response(request)
+
+            # Redirect all other pages to root with maintenance message
+            if request.path != '/':
+                from django.shortcuts import redirect
+                return redirect('/')
+
+        return self.get_response(request)
+
+
 def pin_db_middleware(get_response):
     from multidb.pinning import pin_this_thread, unpin_this_thread
 

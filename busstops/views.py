@@ -959,9 +959,15 @@ def index(request):
     """
     Homepage view displaying site statistics, organisations, manufacturers,
     preservation groups, government authorities, and user-specific content.
-    
+
     For authenticated users, includes pinned operators and favourites.
     """
+    from django.conf import settings
+
+    # Show maintenance page if in maintenance mode
+    if getattr(settings, 'MAINTENANCE_MODE', False):
+        return render(request, "maintenance.html", {})
+
     today = timezone.localdate()
     notices = HomepageNotice.objects.filter(is_active=True).filter(
         Q(from_date__isnull=True) | Q(from_date__lte=today),
@@ -1009,7 +1015,7 @@ def index(request):
             )
         except Exception:
             context["pinned_operators"] = []
-        
+
         # Add user favourites
         from favourites.models import Favourite, FavouriteType
         try:
