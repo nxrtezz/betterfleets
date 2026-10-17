@@ -3267,18 +3267,6 @@ class ManufacturerDetailView(DetailView):
         return context
 
 
-def preservation_group_list(request):
-    groups = PreservationGroup.objects.annotate(
-        vehicle_count=Count("preserved_vehicles")
-    ).order_by("name")
-    paginator = Paginator(groups, 24)
-    return render(
-        request,
-        "busstops/preservation_group_list.html",
-        {"groups": paginator.get_page(request.GET.get("page"))},
-    )
-
-
 def operator_list(request):
     operators = Operator.objects.annotate(
         vehicle_count=Count("vehicle")
@@ -3386,65 +3374,6 @@ def government_authority_operators(request, slug):
         request,
         "busstops/government_authority_operators.html",
         {"object": authority, "active_tab": "operators", "operators": operators},
-    )
-
-
-def preservation_group_detail(request, slug):
-    group = get_object_or_404(
-        PreservationGroup.objects.annotate(vehicle_count=Count("preserved_vehicles")),
-        slug=slug,
-    )
-    vehicles = apply_vehicle_schema_compat(
-        group.preserved_vehicles.select_related(
-            "operator", "vehicle_type", "livery", "garage", "preserved_by_user"
-        )
-        .annotate(
-            livery_name=Case(When(livery__show_name=True, then=F("livery__name"))),
-            vehicle_type_name=Coalesce(F("vehicle_type__name"), Value("")),
-            garage_name=Case(
-                When(garage__name="", then=F("garage__code")),
-                default=Coalesce(F("garage__name"), Value("")),
-            ),
-        )
-        .order_by("operator__name", "fleet_number", "fleet_code", "reg", "code")
-    )
-    vehicles = Paginator(vehicles, 100).get_page(request.GET.get("page"))
-    
-    # Get liveries and generate CSS styles
-    livery_rows = list(
-        group.preserved_vehicles.filter(livery__isnull=False)
-        .values("livery_id")
-        .distinct()
-    )
-    liveries = []
-    if livery_rows:
-        livery_ids = [row["livery_id"] for row in livery_rows]
-        liveries = list(Livery.objects.filter(id__in=livery_ids))
-    livery_styles = "".join(style for livery in liveries for style in livery.get_styles())
-    
-    social_links = [
-        ("Website", group.website),
-        ("X", group.social_x),
-        ("Facebook", group.social_fb),
-        ("Instagram", group.social_instagram),
-        ("LinkedIn", group.social_linkedin),
-        ("YouTube", group.social_youtube),
-        ("TikTok", group.social_tiktok),
-        ("Threads", group.social_threads),
-        ("Bluesky", group.social_bluesky),
-        ("Mastodon", group.social_mastodon),
-        ("More", group.social_other),
-    ]
-    return render(
-        request,
-        "busstops/preservation_group_detail.html",
-        {
-            "object": group,
-            "vehicles": vehicles,
-            "social_links": social_links,
-            "breadcrumb": [group],
-            "livery_styles": livery_styles,
-        },
     )
 
 
@@ -4775,15 +4704,6 @@ def search(request):
                     .prefetch_related("manual_tags")
                     .order_by("-trusted", "-total_count", "-review_count", "display_name", "username", "id")[:20]
                 )
-            context["preservation_groups"] = (
-                PreservationGroup.objects.filter(
-                    Q(name__icontains=query_text)
-                    | Q(description__icontains=query_text)
-                    | Q(slug__icontains=compact)
-                )
-                .annotate(vehicle_count=Count("preserved_vehicles"))
-                .order_by("name")[:20]
-            )
 
     return render(request, "search.html", context)
 

@@ -113,19 +113,9 @@ urlpatterns = [
         name="major_operator_map",
     ),
     path(
-        "preservation-groups/",
-        views.preservation_group_list,
-        name="preservation_group_list",
-    ),
-    path(
         "operators/",
         views.operator_list,
         name="operator_list",
-    ),
-    path(
-        "preservation-groups/<slug:slug>/",
-        views.preservation_group_detail,
-        name="preservation_group_detail",
     ),
     path(
         "government-authorities/",

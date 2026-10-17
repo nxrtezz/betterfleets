@@ -23,7 +23,7 @@ from simple_history.models import HistoricalRecords
 from webcolors import HTML5SimpleColor, html5_parse_legacy_color
 
 from busstops.fields import AutoSlugField
-from busstops.models import DataSource, Operator, PreservationGroup, Service
+from busstops.models import DataSource, Operator, Service
 from bustimes.utils import get_trip
 from .fields import ColourField, ColoursField, CSSField
 
@@ -737,14 +737,6 @@ class Vehicle(models.Model):
         blank=True,
         related_name="preserved_vehicles",
         help_text="Individual user who preserves this vehicle.",
-    )
-    preservation_group = models.ForeignKey(
-        PreservationGroup,
-        models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="preserved_vehicles",
-        help_text="Preservation group that owns this vehicle.",
     )
     fleet_support_vehicle = models.BooleanField(
         default=False,

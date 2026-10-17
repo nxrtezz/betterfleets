@@ -835,47 +835,6 @@ class GovernmentAuthority(models.Model):
         return reverse("government_authority_operators", args=(self.slug,))
 
 
-
-class PreservationGroup(models.Model):
-    slug = models.SlugField(max_length=48, unique=True)
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True)
-    website = models.URLField(blank=True)
-    social_x = models.URLField(blank=True)
-    social_fb = models.URLField(blank=True)
-    social_instagram = models.URLField(blank=True)
-    social_linkedin = models.URLField(blank=True)
-    social_youtube = models.URLField(blank=True)
-    social_tiktok = models.URLField(blank=True)
-    social_threads = models.URLField(blank=True)
-    social_bluesky = models.URLField(blank=True)
-    social_mastodon = models.URLField(blank=True)
-    social_other = models.URLField(blank=True)
-    founded_date = models.DateField(null=True, blank=True)
-    logo = models.FileField(
-        upload_to="preservation-groups/logos",
-        blank=True,
-        null=True,
-        validators=logo_file_validators,
-        help_text="Upload an SVG, PNG, JPG, JPEG, or WebP logo up to 256 KB.",
-    )
-    banner = models.ImageField(
-        upload_to="preservation-groups/banners", blank=True, null=True
-    )
-
-    class Meta:
-        app_label = "busstops"
-        ordering = ("name",)
-        verbose_name = "preservation group"
-        verbose_name_plural = "preservation groups"
-
-    def __str__(self):
-        return self.name
-
-    def get_absolute_url(self):
-        return reverse("preservation_group_detail", args=(self.slug,))
-
-
 class Manufacturer(models.Model):
     slug = models.SlugField(max_length=48, unique=True)
     name = models.CharField(max_length=100)
@@ -1387,17 +1346,6 @@ class Service(models.Model):
     public_use = models.BooleanField(null=True)
 
     colour = models.CharField(max_length=7, blank=True, null=True, help_text="Hex colour code e.g. #0055aa")
-
-    is_rail_replacement = models.BooleanField(
-        default=False,
-        db_index=True,
-        help_text="This service is a rail replacement service.",
-    )
-    train_operator = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text="The train operator this service is covering for.",
-    )
 
     primary_logo = models.FileField(
         upload_to="services/primary-logos",
