@@ -1,8 +1,11 @@
 from django.core.management.base import BaseCommand
 from tqdm import tqdm
 
-from busstops.bustimes_sync import BustimesApiClient, compact_text
+from busstops.bustimes_sync import BustimesApiClient, compact_text, apply_sync_fields, api_id
 from busstops.models import Operator
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class Command(BaseCommand):
@@ -11,6 +14,12 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         client = BustimesApiClient()
         self.stdout.write("Importing operators from bustimes.org/api/operator...")
+
+        # Get admin user for data change logs
+        admin_user = User.objects.filter(is_superuser=True).first()
+        if not admin_user:
+            self.stdout.write(self.style.WARNING("No admin user found, data changes will not be attributed"))
+            admin_user = None
 
         created = updated = 0
 
@@ -35,7 +44,7 @@ class Command(BaseCommand):
                 # Get ALL fields from the API item
                 noc = compact_text(item.get("noc") or item.get("id") or item.get("code"))
                 name = compact_text(item.get("name"))
-                external_id = compact_text(item.get("id")) or None
+                external_id = api_id(item)
                 qualifier_name = compact_text(item.get("qualifier_name"))
                 aka = compact_text(item.get("aka"))
                 slogan = compact_text(item.get("slogan"))
@@ -65,62 +74,61 @@ class Command(BaseCommand):
                 # Try to find existing operator by noc
                 operator = Operator.objects.filter(noc=noc).first()
 
+                # Build values dict
+                values = {
+                    "name": name or noc,
+                    "qualifier_name": qualifier_name,
+                    "aka": aka,
+                    "slogan": slogan,
+                    "vehicle_mode": vehicle_mode,
+                    "social_x": social_x,
+                    "social_fb": social_fb,
+                    "social_instagram": social_instagram,
+                    "social_linkedin": social_linkedin,
+                    "social_youtube": social_youtube,
+                    "social_tiktok": social_tiktok,
+                    "social_threads": social_threads,
+                    "social_bluesky": social_bluesky,
+                    "social_mastodon": social_mastodon,
+                    "social_other": social_other,
+                    "header_background": header_background,
+                    "header_foreground": header_foreground,
+                    "accent_colour": accent_colour,
+                    "card_background": card_background,
+                    "button_background": button_background,
+                    "button_foreground": button_foreground,
+                    "custom_css": custom_css,
+                }
+
+                if external_id:
+                    values["external_id"] = external_id
+
+                # Remove None values
+                values = {k: v for k, v in values.items() if v is not None}
+
                 if operator:
-                    # Update ALL fields
-                    operator.name = name or operator.name
-                    operator.qualifier_name = qualifier_name
-                    operator.aka = aka
-                    operator.slogan = slogan
-                    operator.vehicle_mode = vehicle_mode
-                    operator.social_x = social_x
-                    operator.social_fb = social_fb
-                    operator.social_instagram = social_instagram
-                    operator.social_linkedin = social_linkedin
-                    operator.social_youtube = social_youtube
-                    operator.social_tiktok = social_tiktok
-                    operator.social_threads = social_threads
-                    operator.social_bluesky = social_bluesky
-                    operator.social_mastodon = social_mastodon
-                    operator.social_other = social_other
-                    operator.header_background = header_background
-                    operator.header_foreground = header_foreground
-                    operator.accent_colour = accent_colour
-                    operator.card_background = card_background
-                    operator.button_background = button_background
-                    operator.button_foreground = button_foreground
-                    operator.custom_css = custom_css
-                    if external_id:
-                        operator.external_id = external_id
-                    operator.save()
-                    updated += 1
-                else:
-                    # Create new operator with ALL fields
-                    operator = Operator.objects.create(
-                        noc=noc,
-                        name=name or noc,
-                        external_id=external_id,
-                        qualifier_name=qualifier_name,
-                        aka=aka,
-                        slogan=slogan,
-                        vehicle_mode=vehicle_mode,
-                        social_x=social_x,
-                        social_fb=social_fb,
-                        social_instagram=social_instagram,
-                        social_linkedin=social_linkedin,
-                        social_youtube=social_youtube,
-                        social_tiktok=social_tiktok,
-                        social_threads=social_threads,
-                        social_bluesky=social_bluesky,
-                        social_mastodon=social_mastodon,
-                        social_other=social_other,
-                        header_background=header_background,
-                        header_foreground=header_foreground,
-                        accent_colour=accent_colour,
-                        card_background=card_background,
-                        button_background=button_background,
-                        button_foreground=button_foreground,
-                        custom_css=custom_css,
+                    # Update using apply_sync_fields with admin user
+                    result = apply_sync_fields(
+                        instance=operator,
+                        object_type="operator",
+                        external_id=external_id or noc,
+                        values=values,
+                        payload=item,
+                        dry_run=False,
+                        force=True,
+                        source="bustimes_sync:operator",
+                        user=admin_user,
                     )
+                    if result.created:
+                        created += 1
+                    if result.updated:
+                        updated += 1
+                else:
+                    # Create new operator
+                    operator = Operator()
+                    for field, value in values.items():
+                        setattr(operator, field, value)
+                    operator.save()
                     created += 1
 
             except Exception as e:

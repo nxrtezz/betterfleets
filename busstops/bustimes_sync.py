@@ -179,6 +179,7 @@ def apply_sync_fields(
     dry_run: bool = False,
     force: bool = False,
     source: str | None = None,
+    user: Any = None,
 ) -> SyncResult:
     if dry_run:
         state = BustimesSyncState.objects.filter(
@@ -243,6 +244,7 @@ def apply_sync_fields(
                     operation="create" if created else "update",
                     changes=applied_changes,
                     payload=payload,
+                    user=user,
                 )
         if pending_changes and instance.pk:
             record_pending_change(

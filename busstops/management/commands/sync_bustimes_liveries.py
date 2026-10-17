@@ -1,8 +1,11 @@
 from django.core.management.base import BaseCommand
 from tqdm import tqdm
 
-from busstops.bustimes_sync import BustimesApiClient, compact_text
+from busstops.bustimes_sync import BustimesApiClient, compact_text, apply_sync_fields, api_id
 from vehicles.models import Livery
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class Command(BaseCommand):
@@ -11,6 +14,12 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         client = BustimesApiClient()
         self.stdout.write("Importing liveries from bustimes.org/api/livery...")
+
+        # Get admin user for data change logs
+        admin_user = User.objects.filter(is_superuser=True).first()
+        if not admin_user:
+            self.stdout.write(self.style.WARNING("No admin user found, data changes will not be attributed"))
+            admin_user = None
 
         created = updated = 0
 
@@ -33,7 +42,7 @@ class Command(BaseCommand):
         for item in progress:
             try:
                 # Get external_id
-                external_id = compact_text(item.get("id")) or None
+                external_id = api_id(item)
 
                 # Get ALL fields from the API item
                 name = compact_text(item.get("name"))
@@ -80,16 +89,32 @@ class Command(BaseCommand):
                 if slug:
                     values["slug"] = slug
 
+                # Remove None values
+                values = {k: v for k, v in values.items() if v is not None}
+
                 if livery:
-                    # Update ALL fields
-                    for field, value in values.items():
-                        if value is not None:
-                            setattr(livery, field, value)
-                    livery.save()
-                    updated += 1
+                    # Update using apply_sync_fields with admin user
+                    result = apply_sync_fields(
+                        instance=livery,
+                        object_type="livery",
+                        external_id=external_id or name,
+                        values=values,
+                        payload=item,
+                        dry_run=False,
+                        force=True,
+                        source="bustimes_sync:livery",
+                        user=admin_user,
+                    )
+                    if result.created:
+                        created += 1
+                    if result.updated:
+                        updated += 1
                 else:
-                    # Create new livery with ALL fields
-                    livery = Livery.objects.create(**values)
+                    # Create new livery
+                    livery = Livery()
+                    for field, value in values.items():
+                        setattr(livery, field, value)
+                    livery.save()
                     created += 1
 
             except Exception as e:

@@ -93,6 +93,7 @@ def record_applied_change(
     operation: str,
     changes: dict[str, dict[str, Any]],
     payload: dict[str, Any] | None = None,
+    user: Any = None,
 ) -> DataChangeLog:
     return DataChangeLog.objects.create(
         source=source,
@@ -104,6 +105,7 @@ def record_applied_change(
         payload=_json_safe_value(payload or {}),
         status=DataChangeLog.STATUS_APPLIED,
         applied_at=timezone.now(),
+        approved_by=user,
     )
 
 
