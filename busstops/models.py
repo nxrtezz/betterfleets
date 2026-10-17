@@ -574,7 +574,7 @@ class OperatorGroup(models.Model):
     name = models.CharField(max_length=100)
     group_fleet_numbering = models.BooleanField(default=True)
     allow_transfers = models.BooleanField(default=True)
-    organisation = models.ForeignKey(Organisation, models.SET_NULL, null=True, blank=True)
+    organisation = models.ForeignKey(Organisation, models.DB_SET_NULL, null=True, blank=True)
     logo = models.ImageField(upload_to="operator_group_logos/", blank=True, null=True)
 
     def __str__(self):

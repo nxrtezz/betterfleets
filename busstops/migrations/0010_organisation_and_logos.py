@@ -25,7 +25,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='operatorgroup',
             name='organisation',
-            field=models.ForeignKey(null=True, blank=True, on_delete=django.db.models.deletion.SET_NULL, to='busstops.organisation'),
+            field=models.ForeignKey(null=True, blank=True, on_delete=django.db.models.deletion.DB_SET_NULL, to='busstops.organisation'),
         ),
         migrations.AddField(
             model_name='operatorgroup',
