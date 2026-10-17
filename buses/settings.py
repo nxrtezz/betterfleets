@@ -583,7 +583,7 @@ MAP_DEFAULT_STYLE = os.environ.get("MAP_DEFAULT_STYLE", "")
 MAP_STYLE_URL = os.environ.get("MAP_STYLE_URL", "")
 MAP_STYLE_DARK_URL = os.environ.get("MAP_STYLE_DARK_URL", "")
 
-BUSTIMES_API_BASE_URL = os.environ.get("BUSTIMES_API_BASE_URL", "https://betterfleets.org")
+BUSTIMES_API_BASE_URL = os.environ.get("BUSTIMES_API_BASE_URL", "https://bustimes.org")
 BUSTIMES_API_TOKEN = os.environ.get("BUSTIMES_API_TOKEN", "")
 BUSTIMES_VEHICLES_JSON_URL = os.environ.get(
     "BUSTIMES_VEHICLES_JSON_URL", "https://bustimes.org/vehicles.json"
