@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from tqdm import tqdm
 
-from busstops.bustimes_sync import BustimesApiClient, compact_text, apply_sync_fields, api_id
+from busstops.bustimes_sync import BustimesApiClient, compact_text, apply_sync_fields
 from vehicles.models import VehicleType
 from django.contrib.auth import get_user_model
 
@@ -41,37 +41,34 @@ class Command(BaseCommand):
 
         for item in progress:
             try:
-                # Get external_id
-                external_id = api_id(item)
-
-                # Get ALL fields from the API item
+                # Get fields from ACTUAL API response
+                external_id = item.get("id")
                 name = compact_text(item.get("name"))
                 style = compact_text(item.get("style"))
                 fuel = compact_text(item.get("fuel"))
-                company = compact_text(item.get("company"))
-                active_production = bool(item.get("active_production", False))
-                slug = compact_text(item.get("slug"))
+                double_decker = bool(item.get("double_decker", False))
+                coach = bool(item.get("coach", False))
+                electric = bool(item.get("electric", False))
 
                 # Try to find existing vehicle type by external_id or name
                 vehicle_type = None
                 if external_id:
-                    vehicle_type = VehicleType.objects.filter(external_id=external_id).first()
+                    vehicle_type = VehicleType.objects.filter(external_id=str(external_id)).first()
                 if not vehicle_type and name:
                     vehicle_type = VehicleType.objects.filter(name__iexact=name).first()
 
-                # Build values dict
+                # Build values dict based on ACTUAL API fields
                 values = {
                     "name": name,
                     "style": style,
                     "fuel": fuel,
-                    "company": company,
-                    "active_production": active_production,
                 }
 
+                # Note: API provides double_decker, coach, electric but our model doesn't have these fields
+                # We'll just import the fields that match our model
+
                 if external_id:
-                    values["external_id"] = external_id
-                if slug:
-                    values["slug"] = slug
+                    values["external_id"] = str(external_id)
 
                 # Remove None values
                 values = {k: v for k, v in values.items() if v is not None}
@@ -81,7 +78,7 @@ class Command(BaseCommand):
                     result = apply_sync_fields(
                         instance=vehicle_type,
                         object_type="vehicletype",
-                        external_id=external_id or name,
+                        external_id=str(external_id) if external_id else name,
                         values=values,
                         payload=item,
                         dry_run=False,

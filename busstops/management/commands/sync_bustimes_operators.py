@@ -41,31 +41,15 @@ class Command(BaseCommand):
 
         for item in progress:
             try:
-                # Get ALL fields from the API item
-                noc = compact_text(item.get("noc") or item.get("id") or item.get("code"))
+                # Get fields from ACTUAL API response
+                noc = compact_text(item.get("noc"))
+                slug = compact_text(item.get("slug"))
                 name = compact_text(item.get("name"))
-                external_id = api_id(item)
-                qualifier_name = compact_text(item.get("qualifier_name"))
                 aka = compact_text(item.get("aka"))
-                slogan = compact_text(item.get("slogan"))
                 vehicle_mode = compact_text(item.get("vehicle_mode"))
-                social_x = compact_text(item.get("social_x"))
-                social_fb = compact_text(item.get("social_fb"))
-                social_instagram = compact_text(item.get("social_instagram"))
-                social_linkedin = compact_text(item.get("social_linkedin"))
-                social_youtube = compact_text(item.get("social_youtube"))
-                social_tiktok = compact_text(item.get("social_tiktok"))
-                social_threads = compact_text(item.get("social_threads"))
-                social_bluesky = compact_text(item.get("social_bluesky"))
-                social_mastodon = compact_text(item.get("social_mastodon"))
-                social_other = compact_text(item.get("social_other"))
-                header_background = compact_text(item.get("header_background"))
-                header_foreground = compact_text(item.get("header_foreground"))
-                accent_colour = compact_text(item.get("accent_colour"))
-                card_background = compact_text(item.get("card_background"))
-                button_background = compact_text(item.get("button_background"))
-                button_foreground = compact_text(item.get("button_foreground"))
-                custom_css = compact_text(item.get("custom_css"))
+                region_id = item.get("region_id")
+                url = compact_text(item.get("url"))
+                twitter = compact_text(item.get("twitter"))
 
                 if not noc:
                     self.stdout.write(f"Skipping item with no noc: {item}")
@@ -74,34 +58,20 @@ class Command(BaseCommand):
                 # Try to find existing operator by noc
                 operator = Operator.objects.filter(noc=noc).first()
 
-                # Build values dict
+                # Build values dict based on ACTUAL API fields
                 values = {
                     "name": name or noc,
-                    "qualifier_name": qualifier_name,
+                    "slug": slug,
                     "aka": aka,
-                    "slogan": slogan,
                     "vehicle_mode": vehicle_mode,
-                    "social_x": social_x,
-                    "social_fb": social_fb,
-                    "social_instagram": social_instagram,
-                    "social_linkedin": social_linkedin,
-                    "social_youtube": social_youtube,
-                    "social_tiktok": social_tiktok,
-                    "social_threads": social_threads,
-                    "social_bluesky": social_bluesky,
-                    "social_mastodon": social_mastodon,
-                    "social_other": social_other,
-                    "header_background": header_background,
-                    "header_foreground": header_foreground,
-                    "accent_colour": accent_colour,
-                    "card_background": card_background,
-                    "button_background": button_background,
-                    "button_foreground": button_foreground,
-                    "custom_css": custom_css,
                 }
 
-                if external_id:
-                    values["external_id"] = external_id
+                if region_id:
+                    values["region_id"] = region_id
+                if url:
+                    values["url"] = url
+                if twitter:
+                    values["twitter"] = twitter
 
                 # Remove None values
                 values = {k: v for k, v in values.items() if v is not None}
@@ -111,7 +81,7 @@ class Command(BaseCommand):
                     result = apply_sync_fields(
                         instance=operator,
                         object_type="operator",
-                        external_id=external_id or noc,
+                        external_id=noc,
                         values=values,
                         payload=item,
                         dry_run=False,

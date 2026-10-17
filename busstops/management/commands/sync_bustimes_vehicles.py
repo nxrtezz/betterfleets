@@ -42,74 +42,65 @@ class Command(BaseCommand):
 
         for item in progress:
             try:
-                # Get external_id
-                external_id = api_id(item)
+                # Get fields from ACTUAL API response
+                external_id = item.get("id")
+                slug = compact_text(item.get("slug"))
+                fleet_number = item.get("fleet_number")
+                fleet_code = compact_text(item.get("fleet_code"))
+                reg = compact_registration(item.get("reg"))
+                previous_reg = compact_registration(item.get("previous_reg"))
+                branding = compact_text(item.get("branding"))
+                name = compact_text(item.get("name"))
+                notes = compact_text(item.get("notes"))
+                withdrawn = bool(item.get("withdrawn", False))
+                special_features = item.get("special_features")
 
-                # Get operator
-                operator_noc = compact_text(item.get("operator"))
+                # Handle nested objects
+                operator_data = item.get("operator")
                 operator = None
-                if operator_noc:
-                    operator = Operator.objects.filter(noc=operator_noc).first()
+                if operator_data:
+                    operator_noc = operator_data.get("id")
+                    if operator_noc:
+                        operator = Operator.objects.filter(noc=operator_noc).first()
 
-                # Get vehicle type
-                vehicle_type_name = compact_text(item.get("vehicle_type") or item.get("type"))
+                vehicle_type_data = item.get("vehicle_type")
                 vehicle_type = None
-                if vehicle_type_name:
-                    vehicle_type = VehicleType.objects.filter(name__iexact=vehicle_type_name).first()
+                if vehicle_type_data:
+                    vehicle_type_name = vehicle_type_data.get("name")
+                    if vehicle_type_name:
+                        vehicle_type = VehicleType.objects.filter(name__iexact=vehicle_type_name).first()
 
-                # Get livery
-                livery_name = compact_text(item.get("livery"))
+                livery_data = item.get("livery")
                 livery = None
-                if livery_name:
-                    livery = Livery.objects.filter(name__iexact=livery_name).first()
+                if livery_data:
+                    livery_id = livery_data.get("id")
+                    if livery_id:
+                        livery = Livery.objects.filter(external_id=str(livery_id)).first()
 
-                # Get code
-                code = compact_text(item.get("code"))
-                if not code:
-                    code = external_id or "unknown"
-
-                # Try to find existing vehicle by external_id or code+operator
+                # Try to find existing vehicle by external_id
                 vehicle = None
                 if external_id:
-                    vehicle = Vehicle.objects.filter(external_id=external_id).first()
-                if not vehicle and operator and code:
-                    vehicle = Vehicle.objects.filter(operator=operator, code=code).first()
+                    vehicle = Vehicle.objects.filter(external_id=str(external_id)).first()
 
-                # Get ALL fields from the API item
-                fleet_code = compact_text(item.get("fleet_code") or item.get("fleet_number"))
-                reg = compact_registration(item.get("reg") or item.get("registration"))
-                prev_registration = compact_registration(item.get("prev_registration") or item.get("previous_reg"))
-                name = compact_text(item.get("name"))
-                branding = compact_text(item.get("branding"))
-                notes = compact_text(item.get("notes"))
-                colours = compact_text(item.get("colours"))
-                withdrawn = bool(item.get("withdrawn", False))
-                preserved = bool(item.get("preserved", False))
-                fleet_support_vehicle = bool(item.get("fleet_support_vehicle", False))
-                vor = bool(item.get("vor", False))
-                awaiting_delivery = bool(item.get("awaiting_delivery", False))
-                trainer_vehicle = bool(item.get("trainer_vehicle", False))
-                demonstrator = bool(item.get("demonstrator", False))
-                slug = compact_text(item.get("slug"))
+                # Build values dict based on ACTUAL API fields
+                values = {}
 
-                # Build values dict
-                values = {
-                    "code": code,
-                    "fleet_code": fleet_code,
-                    "reg": reg,
-                    "prev_registration": prev_registration,
-                    "name": name,
-                    "branding": branding,
-                    "notes": notes,
-                    "colours": colours,
-                    "withdrawn": withdrawn,
-                    "preserved": preserved,
-                    "fleet_support_vehicle": fleet_support_vehicle,
-                    "vor": vor,
-                    "awaiting_delivery": awaiting_delivery,
-                    "trainer_vehicle": trainer_vehicle,
-                    "demonstrator": demonstrator,
-                }
+                if fleet_number:
+                    values["fleet_number"] = fleet_number
+                if fleet_code:
+                    values["fleet_code"] = fleet_code
+                if reg:
+                    values["reg"] = reg
+                if previous_reg:
+                    values["prev_registration"] = previous_reg
+                if branding:
+                    values["branding"] = branding
+                if name:
+                    values["name"] = name
+                if notes:
+                    values["notes"] = notes
+                if withdrawn is not None:
+                    values["withdrawn"] = withdrawn
 
                 if operator:
                     values["operator"] = operator
@@ -118,12 +109,9 @@ class Command(BaseCommand):
                 if livery:
                     values["livery"] = livery
                 if external_id:
-                    values["external_id"] = external_id
+                    values["external_id"] = str(external_id)
                 if slug:
                     values["slug"] = slug
-
-                if fleet_code and fleet_code.isdigit():
-                    values["fleet_number"] = int(fleet_code)
 
                 # Remove None values
                 values = {k: v for k, v in values.items() if v is not None}
@@ -133,7 +121,7 @@ class Command(BaseCommand):
                     result = apply_sync_fields(
                         instance=vehicle,
                         object_type="vehicle",
-                        external_id=external_id or code,
+                        external_id=str(external_id) if external_id else "",
                         values=values,
                         payload=item,
                         dry_run=False,
