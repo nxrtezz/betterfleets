@@ -124,7 +124,6 @@ from .models import (
     Operator,
     OperatorGroup,
     PaymentMethod,
-    PreservationGroup,
     Region,
     RouteNotice,
     Service,
@@ -997,9 +996,6 @@ def index(request):
         "homepage_notices": notices,
         "organisations": Organisation.objects.order_by("name"),
         "manufacturers": Manufacturer.objects.order_by("name"),
-        "preservation_groups": PreservationGroup.objects.annotate(
-            vehicle_count=Count("preserved_vehicles")
-        ).order_by("name"),
         "government_authorities": GovernmentAuthority.objects.order_by("name"),
     }
 
