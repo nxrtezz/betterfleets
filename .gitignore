@@ -19,3 +19,6 @@
 .env.sentry-build-plugin
 
 /.parcel-cache/
+
+# Development tracking
+agents.md

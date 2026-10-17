@@ -13,13 +13,13 @@ ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split()
 
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     "CSRF_TRUSTED_ORIGINS",
-    "https://bustimes.org",
+    "https://betterfleets.org",
 ).split()
 
 TEST = "test" in sys.argv or "pytest" in sys.argv[0]
 DEBUG = bool(os.environ.get("DEBUG"))
 
-DEFAULT_FROM_EMAIL = '"bustimes.org" <bustimes.org@bustimes.org>'
+DEFAULT_FROM_EMAIL = '"BetterFleets" <contact@eeveeit.uk>'
 
 MAILERS = {
     "default": {
@@ -183,7 +183,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 2000
 REDIS_URL = os.environ.get("REDIS_URL")
 
 HUEY = {
-    "name": "bustimes",
+    "name": "betterfleets",
     "immediate": DEBUG or TEST,
     "connection": {
         "url": REDIS_URL,
@@ -214,41 +214,16 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 STORAGES = {
     "default": {
-        "BACKEND": "django.core.files.storage.InMemoryStorage",
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
     }
     if TEST
     else {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
-    }
-    if DEBUG
-    else {
-        "BACKEND": "storages.backends.s3.S3Storage",
-        "OPTIONS": {
-            "region_name": "lon1",
-            "endpoint_url": "https://lon1.digitaloceanspaces.com",
-            "bucket_name": "bus-photos",
-            "default_acl": "public-read",
-            "querystring_auth": False,
-            "custom_domain": "bus-photos.lon1.digitaloceanspaces.com",
-        },
     },
     "archive": {
-        "BACKEND": "django.core.files.storage.InMemoryStorage",
-    }
-    if TEST
-    else {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
         "OPTIONS": {
             "location": BASE_DIR / "archive",
-        },
-    }
-    if DEBUG or "AWS_ACCESS_KEY_ID" not in os.environ
-    else {
-        "BACKEND": "storages.backends.s3.S3Storage",
-        "OPTIONS": {
-            "region_name": "ams3",
-            "endpoint_url": "https://ams3.digitaloceanspaces.com",
-            "bucket_name": "bustimes-data",
         },
     },
     "staticfiles": {

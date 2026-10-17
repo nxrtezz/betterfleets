@@ -2,7 +2,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, PasswordResetForm
 from django.contrib.auth.models import Permission
 from django.contrib.auth.validators import UnicodeUsernameValidator
-from django.core.exceptions import ValidationError
 from django.db.models.functions import Now
 from django.forms import (
     BooleanField,
@@ -12,30 +11,12 @@ from django.forms import (
     EmailInput,
     Form,
     ModelMultipleChoiceField,
-    UUIDField,
 )
-
-from .models import Invitation
 
 User = get_user_model()
 
 
-def invite_code_is_valid(code):
-    return Invitation.objects.filter(uuid=code, expires_at__gt=Now()).exists()
-
-
-class InviteCodeField(UUIDField):
-    def validate(self, value):
-        super().validate(value)
-        if not invite_code_is_valid(value):
-            raise ValidationError("That invite code is not valid or has expired")
-
-
 class RegistrationForm(PasswordResetForm):
-    invite_code = InviteCodeField()
-
-    field_order = ("invite_code",)
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

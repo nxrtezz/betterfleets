@@ -1,5 +1,3 @@
-from uuid import uuid4
-
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 from django.urls import reverse
@@ -8,33 +6,6 @@ from django.urls import reverse
 class CustomUserManager(UserManager):
     def get_by_natural_key(self, username):
         return self.get(email__iexact=username)
-
-
-class Invitation(models.Model):
-    uuid = models.UUIDField(default=uuid4)
-    expires_at = models.DateTimeField()
-    operators = models.ManyToManyField(
-        "busstops.Operator", blank=True, through="InvitationOperator"
-    )
-
-    def get_absolute_url(self):
-        return reverse("register") + f"?invite_code={self.uuid}"
-
-    def __str__(self):
-        return str(self.uuid)
-
-
-class InvitationOperator(models.Model):
-    invitation = models.ForeignKey(
-        Invitation, models.DB_CASCADE, related_name="invitationoperator+"
-    )
-    operator = models.ForeignKey(
-        "busstops.Operator", models.DB_CASCADE, related_name="invitationoperator+"
-    )
-
-    class Meta:
-        db_table = "accounts_invitation_operators"
-        unique_together = ("invitation", "operator")
 
 
 class OperatorUser(models.Model):

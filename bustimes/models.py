@@ -215,6 +215,7 @@ class Route(models.Model):
     public_use = models.BooleanField(null=True)
     file_hash = models.CharField(max_length=40, null=True, blank=True, db_index=True)
     timezone = TimeZoneField(null=True, blank=True)
+    completed = models.BooleanField(default=False, help_text="User has ridden this route")
 
     objects = RouteQuerySet.as_manager()
 

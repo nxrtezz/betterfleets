@@ -17,13 +17,7 @@ def register(request):
         if form.is_valid():
             form.save(request=request)
     else:
-        form = None
-
-        if (
-            invite_code := request.GET.get("invite_code")
-        ) and forms.invite_code_is_valid(invite_code):
-            form = forms.RegistrationForm()
-            form.fields["invite_code"].initial = invite_code
+        form = forms.RegistrationForm()
 
     return render(
         request,

@@ -285,6 +285,7 @@ class Vehicle(models.Model):
         "bustimes.Garage", models.DB_SET_NULL, null=True, blank=True
     )
     locked = models.BooleanField(default=False)
+    completed = models.BooleanField(default=False, help_text="User has ridden this vehicle")
 
     def is_spare_ticket_machine(self) -> bool:
         return self.notes == "Spare ticket machine"

@@ -555,11 +555,27 @@ class StopPoint(models.Model):
         return sorted(filter(None, self.line_names), key=Service.get_line_name_order)
 
 
+class Organisation(models.Model):
+    slug = models.SlugField(max_length=48, unique=True)
+    name = models.CharField(max_length=100)
+    logo = models.ImageField(upload_to="organisation_logos/", blank=True, null=True)
+    url = models.URLField(blank=True)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse("organisation_detail", args=(self.slug,))
+
+
 class OperatorGroup(models.Model):
     slug = models.SlugField(max_length=48)
     name = models.CharField(max_length=100)
     group_fleet_numbering = models.BooleanField(default=True)
     allow_transfers = models.BooleanField(default=True)
+    organisation = models.ForeignKey(Organisation, models.SET_NULL, null=True, blank=True)
+    logo = models.ImageField(upload_to="operator_group_logos/", blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -607,6 +623,7 @@ class Operator(SearchMixin, models.Model):
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=128, blank=True)
     twitter = models.CharField(max_length=255, blank=True)
+    logo = models.ImageField(upload_to="operator_logos/", blank=True, null=True)
 
     timezone = TimeZoneField(null=True, blank=True)
 
@@ -837,6 +854,7 @@ class Service(models.Model):
     public_use = models.BooleanField(null=True)
 
     colour = models.ForeignKey(ServiceColour, models.SET_NULL, null=True, blank=True)
+    hex_colour = models.CharField(max_length=7, blank=True, help_text="Hex colour code for single route (e.g. #FF0000)")
 
     trip_chaining = models.CharField(
         max_length=5,

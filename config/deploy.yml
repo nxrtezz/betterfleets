@@ -4,10 +4,10 @@
 # (yes, DHH is a bellend. I'm sorry)
 
 # Name of your application. Used to uniquely configure containers.
-service: bustimes
+service: betterfleets
 
 # Name of the container image.
-image: jclgoodwin/bustimes-org
+image: nxrtezz/betterfleets
 
 # Deploy to these servers.
 servers:
@@ -23,7 +23,7 @@ servers:
         GRANIAN_BLOCKING_THREADS: 8
         GRANIAN_BACKPRESSURE: 8
         EMAIL_HOST: email-smtp.eu-west-1.amazonaws.com
-        ALLOWED_HOSTS: bustimes.org
+        ALLOWED_HOSTS: betterfleets.org
       secret:
         - SECRET_KEY
         - DATABASE_URL
@@ -35,8 +35,6 @@ servers:
         - TFL_APP_ID
         - TFL_APP_KEY
         - NTA_API_KEY
-        - AWS_ACCESS_KEY_ID
-        - AWS_SECRET_ACCESS_KEY
         - FLICKR_API_KEY
 
 accessories:
