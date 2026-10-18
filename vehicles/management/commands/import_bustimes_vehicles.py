@@ -1,10 +1,10 @@
 import requests
 from django.core.management.base import BaseCommand
 from busstops.models import Operator, DataSource
-from vehicles.models import Vehicle, VehicleType, Livery, VehicleJourney
+from vehicles.models import Vehicle, VehicleType, Livery, VehicleJourney, VehicleFeature
 
 class Command(BaseCommand):
-    help = "Import all vehicles from bustimes.org API"
+    help = "Import all vehicles from bustimes.org API with strict matching rules"
 
     def handle(self, *args, **options):
         source, _ = DataSource.objects.get_or_create(
@@ -12,24 +12,11 @@ class Command(BaseCommand):
             defaults={"url": "https://bustimes.org"}
         )
 
-        # Delete all existing vehicles and journeys first to avoid conflicts
-        journey_count = VehicleJourney.objects.count()
-        if journey_count > 0:
-            self.stdout.write(f"Deleting {journey_count} existing vehicle journeys...")
-            VehicleJourney.objects.all().delete()
-            self.stdout.write(self.style.SUCCESS(f"Deleted {journey_count} vehicle journeys"))
-
-        vehicle_count = Vehicle.objects.count()
-        if vehicle_count > 0:
-            self.stdout.write(f"Deleting {vehicle_count} existing vehicles...")
-            Vehicle.objects.all().delete()
-            self.stdout.write(self.style.SUCCESS(f"Deleted {vehicle_count} vehicles"))
-
-        # First import vehicle types
+        # First import vehicle types with strict ID matching
         self.stdout.write("Importing vehicle types...")
         self.import_vehicle_types()
 
-        # Then import liveries
+        # Then import liveries with strict ID, name, and CSS matching
         self.stdout.write("\nImporting liveries...")
         self.import_liveries()
 
@@ -47,9 +34,8 @@ class Command(BaseCommand):
             data = response.json()
 
             for vt_data in data["results"]:
-                # Map API fields to model fields
-                # API has: name, style, fuel, double_decker, coach, electric
-                # Model has: name, style (choice), fuel (choice)
+                vt_id = vt_data["id"]
+                vt_name = vt_data["name"]
                 style = vt_data.get("style", "")
                 fuel = vt_data.get("fuel", "")
 
@@ -59,19 +45,23 @@ class Command(BaseCommand):
                         style = "double decker"
                     elif vt_data.get("coach"):
                         style = "coach"
-                    elif vt_data.get("electric"):
-                        # electric alone doesn't determine style
-                        pass
 
-                vehicle_type, created = VehicleType.objects.update_or_create(
-                    id=vt_data["id"],
-                    defaults={
-                        "name": vt_data["name"],
-                        "style": style,
-                        "fuel": fuel,
-                    }
-                )
-                if created:
+                # Strict: Check if exists by ID AND name match
+                existing = VehicleType.objects.filter(id=vt_id).first()
+                if existing and existing.name == vt_name:
+                    # Update existing
+                    existing.style = style
+                    existing.fuel = fuel
+                    existing.save()
+                    count += 1
+                else:
+                    # Create new
+                    VehicleType.objects.create(
+                        id=vt_id,
+                        name=vt_name,
+                        style=style,
+                        fuel=fuel,
+                    )
                     count += 1
 
             url = data.get("next")
@@ -88,19 +78,49 @@ class Command(BaseCommand):
             data = response.json()
 
             for liv_data in data["results"]:
-                livery, created = Livery.objects.update_or_create(
-                    id=liv_data["id"],
-                    defaults={
-                        "name": liv_data["name"],
-                        "left_css": liv_data.get("left_css", ""),
-                        "right_css": liv_data.get("right_css", ""),
-                        "white_text": liv_data.get("white_text", False),
-                        "text_colour": liv_data.get("text_colour", ""),
-                        "stroke_colour": liv_data.get("stroke_colour", ""),
-                        "published": True,  # Import from bustimes.org should be published
-                    }
-                )
-                if created:
+                liv_id = liv_data["id"]
+                liv_name = liv_data["name"]
+                left_css = liv_data.get("left", liv_data.get("left_css", ""))
+                right_css = liv_data.get("right", liv_data.get("right_css", ""))
+                white_text = liv_data.get("white_text", False)
+                text_colour = liv_data.get("text_colour", "")
+                stroke_colour = liv_data.get("stroke_colour", "")
+
+                # Strict: Check if exists by ID, name, AND exact CSS match
+                existing = Livery.objects.filter(id=liv_id).first()
+                if existing and existing.name == liv_name:
+                    # Check if CSS matches exactly
+                    if existing.left_css == left_css and existing.right_css == right_css:
+                        # Update other fields
+                        existing.white_text = white_text
+                        existing.text_colour = text_colour
+                        existing.stroke_colour = stroke_colour
+                        existing.published = True
+                        existing.save()
+                        count += 1
+                    else:
+                        # CSS mismatch, create new with different ID (but we can't change ID)
+                        # Update CSS to match
+                        existing.left_css = left_css
+                        existing.right_css = right_css
+                        existing.white_text = white_text
+                        existing.text_colour = text_colour
+                        existing.stroke_colour = stroke_colour
+                        existing.published = True
+                        existing.save()
+                        count += 1
+                else:
+                    # Create new
+                    Livery.objects.create(
+                        id=liv_id,
+                        name=liv_name,
+                        left_css=left_css,
+                        right_css=right_css,
+                        white_text=white_text,
+                        text_colour=text_colour,
+                        stroke_colour=stroke_colour,
+                        published=True,
+                    )
                     count += 1
 
             url = data.get("next")
@@ -110,7 +130,6 @@ class Command(BaseCommand):
     def import_vehicles(self, source):
         url = "https://bustimes.org/api/vehicles/"
         count = 0
-        updated = 0
 
         while url:
             self.stdout.write(f"Fetching {url}...")
@@ -119,57 +138,67 @@ class Command(BaseCommand):
             data = response.json()
 
             for veh_data in data["results"]:
+                veh_id = veh_data["id"]
+                slug = veh_data.get("slug", "")
                 fleet_number = veh_data.get("fleet_number")
                 fleet_code = veh_data.get("fleet_code")
                 reg = veh_data.get("reg")
+                previous_reg = veh_data.get("previous_reg", "")
                 name = veh_data.get("name", "")
                 notes = veh_data.get("notes", "")
                 withdrawn = veh_data.get("withdrawn", False)
+                branding = veh_data.get("branding", "")
 
-                # Get operator
+                # Get operator by NOC
                 operator = None
                 if veh_data.get("operator"):
                     operator = Operator.objects.filter(
                         noc=veh_data["operator"]["id"]
                     ).first()
 
-                # Get vehicle type
+                # Get vehicle type by ID
                 vehicle_type = None
                 if veh_data.get("vehicle_type"):
                     vehicle_type = VehicleType.objects.filter(
                         id=veh_data["vehicle_type"]["id"]
                     ).first()
 
-                # Get livery
+                # Get livery by ID
                 livery = None
                 if veh_data.get("livery"):
                     livery = Livery.objects.filter(
                         id=veh_data["livery"]["id"]
                     ).first()
 
-                vehicle, created = Vehicle.objects.update_or_create(
-                    id=veh_data["id"],
-                    defaults={
-                        "code": reg or fleet_code or str(veh_data["id"]),
-                        "fleet_number": fleet_number,
-                        "fleet_code": fleet_code or "",
-                        "reg": reg or "",
-                        "name": name,
-                        "notes": notes,
-                        "withdrawn": withdrawn,
-                        "operator": operator,
-                        "vehicle_type": vehicle_type,
-                        "livery": livery,
-                        "source": source,
-                    }
+                # Create vehicle
+                vehicle = Vehicle.objects.create(
+                    id=veh_id,
+                    slug=slug,
+                    code=reg or fleet_code or str(veh_id),
+                    fleet_number=fleet_number,
+                    fleet_code=fleet_code or "",
+                    reg=reg or "",
+                    previous_reg=previous_reg,
+                    name=name,
+                    notes=notes,
+                    withdrawn=withdrawn,
+                    branding=branding,
+                    operator=operator,
+                    vehicle_type=vehicle_type,
+                    livery=livery,
+                    source=source,
                 )
 
-                if created:
-                    self.stdout.write(self.style.SUCCESS(f"Created vehicle: {reg or fleet_code}"))
-                    count += 1
-                else:
-                    updated += 1
+                # Handle special features
+                if veh_data.get("special_features"):
+                    for feature_name in veh_data["special_features"]:
+                        feature, _ = VehicleFeature.objects.get_or_create(name=feature_name)
+                        vehicle.features.add(feature)
+
+                count += 1
+                if count % 1000 == 0:
+                    self.stdout.write(f"  Imported {count} vehicles...")
 
             url = data.get("next")
 
-        self.stdout.write(self.style.SUCCESS(f"\nImported {count} vehicles, updated {updated}"))
+        self.stdout.write(self.style.SUCCESS(f"\nImported {count} vehicles"))

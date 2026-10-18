@@ -17,8 +17,12 @@ class Command(BaseCommand):
         self.stdout.write("\n2. Deleting all services...")
         call_command("delete_all_services")
 
-        # 3. Import vehicles (includes vehicle types and liveries)
-        self.stdout.write("\n3. Importing vehicles...")
+        # 3. Drop all vehicles, types, liveries
+        self.stdout.write("\n3. Dropping all vehicles, types, and liveries...")
+        call_command("drop_all_vehicles")
+
+        # 4. Import vehicles (includes vehicle types and liveries)
+        self.stdout.write("\n4. Importing vehicles...")
         call_command("import_bustimes_vehicles")
 
         self.stdout.write("\n" + "=" * 60)
