@@ -79,9 +79,16 @@ gtag('config', 'G-X2Z0KM7Z5C');
 {% block header %}
 <header class="site-header">
     <div>
-        <a href="/" class="site-name">bustimes.org</a>
+        <a href="/" class="site-name">BetterFleets</a>
         <ul>
-            <li><a href="/map{% if object.latlong %}#16/{{ object.latlong.y|floatformat:4 }}/{{ object.latlong.x|floatformat:4 }}{% endif %}">Map</a></li>
+            <li><a href="/map{% if object.latlong %}#16/{{ object.latlong.y|floatformat:4 }}/{{ object.latlong.x|floatformat:4 }}{% endif %}">{% load static %}<img src="{% static 'svg/map.svg' %}" alt="Map" width="20" height="20"></a></li>
+            <li>
+                {% if user.is_authenticated %}
+                    <a href="{% url 'user_detail' user.id %}">{% load static %}<img src="{% static 'svg/user.svg' %}" alt="Profile" width="20" height="20"></a>
+                {% else %}
+                    <a href="/accounts/login/?next={{ request.path }}">{% load static %}<img src="{% static 'svg/user.svg' %}" alt="Sign in" width="20" height="20"></a>
+                {% endif %}
+            </li>
         </ul>
         <form method="GET" action="/search" class="search">
             <label>
