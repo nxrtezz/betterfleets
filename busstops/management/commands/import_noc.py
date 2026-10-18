@@ -25,7 +25,8 @@ def get_region_id(region_id):
     # Truncate to 2 characters if needed (Region.id max_length=2)
     if len(region_id) > 2:
         return region_id[:2]
-    return region_id
+    # Return None if region doesn't exist in our predefined list
+    return None
 
 
 def get_mode(mode):
@@ -188,12 +189,15 @@ class Command(BaseCommand):
                     name = override_data["name"]
 
             if noc not in operators:
-                operators[noc] = Operator(
-                    noc=noc,
-                    name=name,
-                    region_id=get_region_id(noc_line.findtext("TLRegOwn")),
-                    vehicle_mode=vehicle_mode,
-                )
+                region_id = get_region_id(noc_line.findtext("TLRegOwn"))
+                operator_data = {
+                    "noc": noc,
+                    "name": name,
+                    "vehicle_mode": vehicle_mode,
+                }
+                if region_id:
+                    operator_data["region_id"] = region_id
+                operators[noc] = Operator(**operator_data)
                 operator = operators[noc]
 
                 slug = slugify(operator.name)
