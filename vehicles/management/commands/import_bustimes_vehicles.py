@@ -34,15 +34,28 @@ class Command(BaseCommand):
             data = response.json()
 
             for vt_data in data["results"]:
+                # Map API fields to model fields
+                # API has: name, style, fuel, double_decker, coach, electric
+                # Model has: name, style (choice), fuel (choice)
+                style = vt_data.get("style", "")
+                fuel = vt_data.get("fuel", "")
+
+                # Convert boolean fields to style choices if needed
+                if not style:
+                    if vt_data.get("double_decker"):
+                        style = "double decker"
+                    elif vt_data.get("coach"):
+                        style = "coach"
+                    elif vt_data.get("electric"):
+                        # electric alone doesn't determine style
+                        pass
+
                 vehicle_type, created = VehicleType.objects.update_or_create(
                     id=vt_data["id"],
                     defaults={
                         "name": vt_data["name"],
-                        "style": vt_data.get("style", ""),
-                        "fuel": vt_data.get("fuel", ""),
-                        "double_decker": vt_data.get("double_decker", False),
-                        "coach": vt_data.get("coach", False),
-                        "electric": vt_data.get("electric", False),
+                        "style": style,
+                        "fuel": fuel,
                     }
                 )
                 if created:
@@ -71,6 +84,7 @@ class Command(BaseCommand):
                         "white_text": liv_data.get("white_text", False),
                         "text_colour": liv_data.get("text_colour", ""),
                         "stroke_colour": liv_data.get("stroke_colour", ""),
+                        "published": True,  # Import from bustimes.org should be published
                     }
                 )
                 if created:
@@ -125,10 +139,9 @@ class Command(BaseCommand):
                     id=veh_data["id"],
                     defaults={
                         "code": reg or fleet_code or str(veh_data["id"]),
-                        "fleet_number": str(fleet_number) if fleet_number else "",
+                        "fleet_number": fleet_number,
                         "fleet_code": fleet_code or "",
                         "reg": reg or "",
-                        "previous_reg": previous_reg,
                         "name": name,
                         "notes": notes,
                         "withdrawn": withdrawn,
