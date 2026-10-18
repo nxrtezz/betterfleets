@@ -28,41 +28,103 @@ class Command(BaseCommand):
 
         self.stdout.write("Finding duplicate vehicles...")
 
-        # Find all (code, operator) pairs that have multiple vehicles
-        duplicate_pairs = (
-            Vehicle.objects.values("code", "operator_id")
-            .annotate(count=Count("id"))
-            .filter(count__gt=1)
-            .exclude(code="")
-        )
+        # Get all vehicles that have a latest journey with VehicleRef data
+        vehicles = Vehicle.objects.exclude(latest_journey_data=None)
 
         if operator_filter:
-            duplicate_pairs = duplicate_pairs.filter(operator_id=operator_filter)
+            vehicles = vehicles.filter(operator_id=operator_filter)
 
         total_merged = 0
 
-        for duplicate in duplicate_pairs:
-            code = duplicate["code"]
-            operator_id = duplicate["operator_id"]
-
-            if not code:
+        for vehicle in vehicles:
+            if not vehicle.latest_journey_data:
                 continue
 
-            # Get all vehicles with this code and operator, ordered by ID (oldest first)
+            try:
+                monitored_vehicle_journey = vehicle.latest_journey_data.get("MonitoredVehicleJourney", {})
+                vehicle_ref = monitored_vehicle_journey.get("VehicleRef", "")
+                operator_ref = monitored_vehicle_journey.get("OperatorRef", "")
+            except (AttributeError, TypeError):
+                continue
+
+            if not vehicle_ref:
+                continue
+
+            # Remove operator prefix if present
+            vehicle_ref = vehicle_ref.removeprefix(f"{operator_ref}-")
+
+            # The expected slug format is {operator}-{code}
+            expected_slug = f"{vehicle.operator_id.lower()}-{vehicle_ref.lower()}" if vehicle.operator_id else vehicle_ref.lower()
+
+            # If the current vehicle's slug doesn't match the expected slug from VehicleRef
+            if vehicle.slug.lower() != expected_slug:
+                # Try to find a vehicle with the expected slug in the same operator
+                try:
+                    target_vehicle = Vehicle.objects.get(
+                        slug__iexact=expected_slug,
+                        operator_id=vehicle.operator_id,
+                    )
+
+                    if target_vehicle.id != vehicle.id:
+                        # Found a match - merge this vehicle into the target
+                        self.stdout.write(
+                            f"\nFound mismatch: {vehicle.slug} (id={vehicle.id}) "
+                            f"should be {expected_slug} (id={target_vehicle.id})"
+                        )
+
+                        if dry_run:
+                            self.stdout.write(
+                                f"[DRY RUN] Would merge {vehicle.slug} into {target_vehicle.slug}"
+                            )
+                            total_merged += 1
+                        else:
+                            self.merge_vehicle(vehicle, target_vehicle)
+                            self.stdout.write(
+                                self.style.SUCCESS(
+                                    f"Merged {vehicle.slug} (id={vehicle.id}) into {target_vehicle.slug}"
+                                )
+                            )
+                            total_merged += 1
+                except Vehicle.DoesNotExist:
+                    # No matching vehicle found - skip
+                    pass
+                except Vehicle.MultipleObjectsReturned:
+                    # Multiple matches - skip to be safe
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"Multiple vehicles found with slug {expected_slug}, skipping"
+                        )
+                    )
+
+        # Also handle duplicates by reg
+        from django.db.models import Count
+
+        reg_duplicates = (
+            Vehicle.objects.values("reg", "operator_id")
+            .annotate(count=Count("id"))
+            .filter(count__gt=1)
+            .exclude(reg="")
+        )
+
+        if operator_filter:
+            reg_duplicates = reg_duplicates.filter(operator_id=operator_filter)
+
+        for duplicate in reg_duplicates:
+            reg = duplicate["reg"]
+            operator_id = duplicate["operator_id"]
+
+            # Get all vehicles with this reg and operator
             vehicles = Vehicle.objects.filter(
-                code__iexact=code,
+                reg__iexact=reg,
                 operator_id=operator_id,
             ).order_by("id")
 
             if vehicles.count() < 2:
                 continue
 
-            # Keep the vehicle with the most data (prioritize vehicles with reg, livery, etc.)
-            # This ensures we keep the detailed vehicle (from bustimes import) over the tracking-only one
+            # Keep the vehicle with the most data
             def score_vehicle(v):
                 score = 0
-                if v.reg:
-                    score += 10
                 if v.livery_id:
                     score += 5
                 if v.vehicle_type_id:
@@ -82,87 +144,23 @@ class Command(BaseCommand):
             vehicles_to_merge = [v for v in vehicles_list if v != vehicle_to_keep]
 
             self.stdout.write(
-                f"\nFound {vehicles.count()} vehicles with code '{code}' "
+                f"\nFound {vehicles.count()} vehicles with reg '{reg}' "
                 f"and operator {operator_id}:"
             )
             for v in vehicles:
-                self.stdout.write(f"  - {v.slug} (id={v.id}, reg={v.reg}, withdrawn={v.withdrawn})")
+                self.stdout.write(f"  - {v.slug} (id={v.id}, code={v.code})")
 
             for duplicate_vehicle in vehicles_to_merge:
-                # Merge logic (same as admin merge_all_selected)
                 if dry_run:
                     self.stdout.write(
                         f"[DRY RUN] Would merge {duplicate_vehicle.slug} into {vehicle_to_keep.slug}"
                     )
                     total_merged += 1
                 else:
-                    # Move related objects
-                    duplicate_vehicle.vehiclejourney_set.update(vehicle=vehicle_to_keep)
-                    duplicate_vehicle.vehiclecode_set.update(vehicle=vehicle_to_keep)
-                    duplicate_vehicle.vehiclerevision_set.update(vehicle=vehicle_to_keep)
-
-                    # Ensure the slug is preserved as a vehicle code
-                    with contextlib.suppress(IntegrityError):
-                        VehicleCode.objects.create(
-                            vehicle=vehicle_to_keep, scheme="slug", code=vehicle_to_keep.slug
-                        )
-
-                    # Copy fields from duplicate if they're better
-                    if not vehicle_to_keep.slug or duplicate_vehicle.slug:
-                        vehicle_to_keep.slug = duplicate_vehicle.slug
-                    if not vehicle_to_keep.code or duplicate_vehicle.code:
-                        vehicle_to_keep.code = duplicate_vehicle.code
-
-                    # Keep the most recent journey
-                    if not vehicle_to_keep.latest_journey_id or (
-                        duplicate_vehicle.latest_journey_id
-                        and duplicate_vehicle.latest_journey_id > vehicle_to_keep.latest_journey_id
-                    ):
-                        vehicle_to_keep.latest_journey = duplicate_vehicle.latest_journey
-
-                    # If the kept vehicle is withdrawn but the duplicate isn't, restore it
-                    if vehicle_to_keep.withdrawn and not duplicate_vehicle.withdrawn:
-                        vehicle_to_keep.fleet_code = duplicate_vehicle.fleet_code
-                        vehicle_to_keep.fleet_number = duplicate_vehicle.fleet_number
-                        vehicle_to_keep.withdrawn = False
-
-                    # Copy other fields if the kept vehicle doesn't have them
-                    if not vehicle_to_keep.reg and duplicate_vehicle.reg:
-                        vehicle_to_keep.reg = duplicate_vehicle.reg
-                    if not vehicle_to_keep.livery_id and duplicate_vehicle.livery_id:
-                        vehicle_to_keep.livery = duplicate_vehicle.livery
-                    if not vehicle_to_keep.vehicle_type_id and duplicate_vehicle.vehicle_type_id:
-                        vehicle_to_keep.vehicle_type = duplicate_vehicle.vehicle_type
-                    if not vehicle_to_keep.colours and duplicate_vehicle.colours:
-                        vehicle_to_keep.colours = duplicate_vehicle.colours
-                    if not vehicle_to_keep.branding and duplicate_vehicle.branding:
-                        vehicle_to_keep.branding = duplicate_vehicle.branding
-
-                    # Delete the duplicate
-                    duplicate_id = duplicate_vehicle.id
-                    duplicate_slug = duplicate_vehicle.slug
-                    duplicate_vehicle.delete()
-
-                    # Save the kept vehicle with all updates
-                    vehicle_to_keep.save(
-                        update_fields=[
-                            "slug",
-                            "code",
-                            "reg",
-                            "fleet_code",
-                            "fleet_number",
-                            "withdrawn",
-                            "latest_journey",
-                            "livery",
-                            "vehicle_type",
-                            "colours",
-                            "branding",
-                        ]
-                    )
-
+                    self.merge_vehicle(duplicate_vehicle, vehicle_to_keep)
                     self.stdout.write(
                         self.style.SUCCESS(
-                            f"Merged {duplicate_slug} (id={duplicate_id}) into {vehicle_to_keep.slug}"
+                            f"Merged {duplicate_vehicle.slug} (id={duplicate_vehicle.id}) into {vehicle_to_keep.slug}"
                         )
                     )
                     total_merged += 1
@@ -175,3 +173,68 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.SUCCESS(f"\nComplete - merged {total_merged} vehicles")
             )
+
+    def merge_vehicle(self, vehicle_to_delete, vehicle_to_keep):
+        """Merge one vehicle into another"""
+        # Move related objects
+        vehicle_to_delete.vehiclejourney_set.update(vehicle=vehicle_to_keep)
+        vehicle_to_delete.vehiclecode_set.update(vehicle=vehicle_to_keep)
+        vehicle_to_delete.vehiclerevision_set.update(vehicle=vehicle_to_keep)
+
+        # Ensure the slug is preserved as a vehicle code
+        with contextlib.suppress(IntegrityError):
+            VehicleCode.objects.create(
+                vehicle=vehicle_to_keep, scheme="slug", code=vehicle_to_keep.slug
+            )
+
+        # Copy fields from duplicate if they're better
+        if not vehicle_to_keep.slug or vehicle_to_delete.slug:
+            vehicle_to_keep.slug = vehicle_to_delete.slug
+        if not vehicle_to_keep.code or vehicle_to_delete.code:
+            vehicle_to_keep.code = vehicle_to_delete.code
+
+        # Keep the most recent journey
+        if not vehicle_to_keep.latest_journey_id or (
+            vehicle_to_delete.latest_journey_id
+            and vehicle_to_delete.latest_journey_id > vehicle_to_keep.latest_journey_id
+        ):
+            vehicle_to_keep.latest_journey = vehicle_to_delete.latest_journey
+
+        # If the kept vehicle is withdrawn but the duplicate isn't, restore it
+        if vehicle_to_keep.withdrawn and not vehicle_to_delete.withdrawn:
+            vehicle_to_keep.fleet_code = vehicle_to_delete.fleet_code
+            vehicle_to_keep.fleet_number = vehicle_to_delete.fleet_number
+            vehicle_to_keep.withdrawn = False
+
+        # Copy other fields if the kept vehicle doesn't have them
+        if not vehicle_to_keep.reg and vehicle_to_delete.reg:
+            vehicle_to_keep.reg = vehicle_to_delete.reg
+        if not vehicle_to_keep.livery_id and vehicle_to_delete.livery_id:
+            vehicle_to_keep.livery = vehicle_to_delete.livery
+        if not vehicle_to_keep.vehicle_type_id and vehicle_to_delete.vehicle_type_id:
+            vehicle_to_keep.vehicle_type = vehicle_to_delete.vehicle_type
+        if not vehicle_to_keep.colours and vehicle_to_delete.colours:
+            vehicle_to_keep.colours = vehicle_to_delete.colours
+        if not vehicle_to_keep.branding and vehicle_to_delete.branding:
+            vehicle_to_keep.branding = vehicle_to_delete.branding
+
+        # Delete the duplicate
+        duplicate_slug = vehicle_to_delete.slug
+        vehicle_to_delete.delete()
+
+        # Save the kept vehicle with all updates
+        vehicle_to_keep.save(
+            update_fields=[
+                "slug",
+                "code",
+                "reg",
+                "fleet_code",
+                "fleet_number",
+                "withdrawn",
+                "latest_journey",
+                "livery",
+                "vehicle_type",
+                "colours",
+                "branding",
+            ]
+        )
