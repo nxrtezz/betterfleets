@@ -162,7 +162,7 @@ def get_line_name_query(line_ref: str) -> Q:
 
 
 class Command(ImportLiveVehiclesCommand):
-    source_name = "Bus Open Data"
+    source_name = "BODS AVL"
     vehicle_code_scheme = "BODS"
     services = (
         Service.objects.using(settings.READ_DATABASE)
