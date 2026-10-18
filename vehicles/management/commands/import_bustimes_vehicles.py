@@ -178,7 +178,6 @@ class Command(BaseCommand):
                     fleet_number=fleet_number,
                     fleet_code=fleet_code or "",
                     reg=reg or "",
-                    previous_reg=previous_reg,
                     name=name,
                     notes=notes,
                     withdrawn=withdrawn,
