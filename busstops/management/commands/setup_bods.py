@@ -33,6 +33,14 @@ class Command(BaseCommand):
         if created:
             self.stdout.write(self.style.SUCCESS("Created BODS DataSource"))
 
+        # Create DataSource for BODS AVL
+        avl_ds, avl_created = DataSource.objects.get_or_create(
+            name="BODS AVL",
+            defaults={"url": "https://data.bus-data.dft.gov.uk/avl/download/"}
+        )
+        if avl_created:
+            self.stdout.write(self.style.SUCCESS("Created BODS AVL DataSource"))
+
         # Create TimetableDataSources for common operators
         for noc, name in self.BODS_OPERATORS:
             # Try to get or create the operator
