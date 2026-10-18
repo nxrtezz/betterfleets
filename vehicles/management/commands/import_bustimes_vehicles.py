@@ -1,5 +1,6 @@
 import requests
 from django.core.management.base import BaseCommand
+from django.db import IntegrityError
 from busstops.models import Operator, DataSource
 from vehicles.models import Vehicle, VehicleType, Livery, VehicleJourney, VehicleFeature
 
@@ -170,26 +171,35 @@ class Command(BaseCommand):
                         id=veh_data["livery"]["id"]
                     ).first()
 
-                # Create vehicle
-                vehicle = Vehicle.objects.create(
-                    id=veh_id,
-                    slug=slug,
-                    code=reg or fleet_code or str(veh_id),
-                    fleet_number=fleet_number,
-                    fleet_code=fleet_code or "",
-                    reg=reg or "",
-                    name=name,
-                    notes=notes,
-                    withdrawn=withdrawn,
-                    branding=branding,
-                    operator=operator,
-                    vehicle_type=vehicle_type,
-                    livery=livery,
-                    source=source,
-                )
+                # Get or create vehicle by ID
+                code = reg or fleet_code or str(veh_id)
+                try:
+                    vehicle, created = Vehicle.objects.update_or_create(
+                        id=veh_id,
+                        defaults={
+                            "slug": slug,
+                            "code": code,
+                            "fleet_number": fleet_number,
+                            "fleet_code": fleet_code or "",
+                            "reg": reg or "",
+                            "name": name,
+                            "notes": notes,
+                            "withdrawn": withdrawn,
+                            "branding": branding,
+                            "operator": operator,
+                            "vehicle_type": vehicle_type,
+                            "livery": livery,
+                            "source": source,
+                        }
+                    )
+                except IntegrityError:
+                    # Skip vehicles with unique constraint violations
+                    self.stdout.write(self.style.WARNING(f"Skipping duplicate vehicle: {code}"))
+                    continue
 
                 # Handle special features
                 if veh_data.get("special_features"):
+                    vehicle.features.clear()
                     for feature_name in veh_data["special_features"]:
                         feature, _ = VehicleFeature.objects.get_or_create(name=feature_name)
                         vehicle.features.add(feature)
