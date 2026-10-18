@@ -1,8 +1,10 @@
 import logging
+import os
 from datetime import UTC, datetime
 from http import HTTPStatus
 
 import requests
+from django.conf import settings
 from django.utils.http import http_date, parse_http_date
 
 
@@ -11,8 +13,27 @@ def write_file(path, response):
         open_file.writelines(response.iter_content(chunk_size=102400))
 
 
+def get_bods_headers():
+    """Get headers for BODS API requests including API key if configured"""
+    headers = {}
+    api_key = os.environ.get("BODS_API_KEY")
+    auth_mode = os.environ.get("BODS_API_AUTH_MODE", "query")
+    user_agent = os.environ.get("BODS_API_USER_AGENT", "betterfleet/1.0 (+https://eeveeit.uk)")
+
+    headers["User-Agent"] = user_agent
+
+    if api_key:
+        if auth_mode == "header":
+            headers["x-api-key"] = api_key
+        else:  # query mode (default)
+            headers["api_key"] = api_key
+
+    return headers
+
+
 def download(path, url, session=None):
-    response = (session or requests).get(url, stream=True, timeout=61)
+    headers = get_bods_headers() if "data.bus-data.dft.gov.uk" in url else {}
+    response = (session or requests).get(url, headers=headers, stream=True, timeout=61)
     response.raise_for_status()
     write_file(path, response)
 
@@ -23,6 +44,11 @@ def download_if_modified(path, source, session=None):
         headers["if-modified-since"] = http_date(source.last_modified.timestamp())
     if source.etag:
         headers["if-none-match"] = source.etag
+
+    # Add BODS headers if this is a BODS URL
+    if "data.bus-data.dft.gov.uk" in source.url:
+        bods_headers = get_bods_headers()
+        headers.update(bods_headers)
 
     response = (session or requests).get(
         source.url, headers=headers, stream=True, timeout=61

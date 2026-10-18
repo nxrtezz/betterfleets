@@ -1,6 +1,7 @@
 """Import timetable data "fresh from the cow" """
 
 import logging
+import os
 import xml.etree.ElementTree as ET
 import zipfile
 from datetime import datetime
@@ -186,7 +187,17 @@ def bus_open_data(api_key, specific_operator):
             request_params = params.copy()
             url += f"{request_params.pop('datasetID')[0]}/"
         while url:
-            response = session.get(url, params=request_params, timeout=61)
+            # Remove api_key from params if using header auth
+            headers = {}
+            if os.environ.get("BODS_API_AUTH_MODE") == "header":
+                headers["x-api-key"] = os.environ.get("BODS_API_KEY")
+                headers["User-Agent"] = os.environ.get("BODS_API_USER_AGENT", "betterfleet/1.0 (+https://eeveeit.uk)")
+                if "api_key" in request_params:
+                    del request_params["api_key"]
+            else:
+                headers["User-Agent"] = os.environ.get("BODS_API_USER_AGENT", "betterfleet/1.0 (+https://eeveeit.uk)")
+
+            response = session.get(url, params=request_params, headers=headers, timeout=61)
             response.raise_for_status()
             json = response.json()
             if "datasetID" in params:
@@ -463,10 +474,17 @@ def stagecoach(specific_operator=None):
 class Command(BaseCommand):
     @staticmethod
     def add_arguments(parser):
-        parser.add_argument("api_key", type=str)
+        parser.add_argument("api_key", type=str, nargs="?", default=None)
         parser.add_argument("operator", type=str, nargs="?")
 
-    def handle(self, api_key, operator, **options):
+    def handle(self, api_key=None, operator=None, **options):
+        # Use API key from environment if not provided
+        if api_key is None:
+            api_key = os.environ.get("BODS_API_KEY")
+            if not api_key:
+                self.stdout.write(self.style.ERROR("BODS_API_KEY not set in environment or provided as argument"))
+                return
+
         if api_key == "stagecoach":
             stagecoach(operator)
         elif api_key == "ticketer":
