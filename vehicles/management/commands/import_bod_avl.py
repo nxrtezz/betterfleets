@@ -180,6 +180,7 @@ class Command(ImportLiveVehiclesCommand):
         self.reply_key = f"bod_avl_done:{uuid.uuid4()}"
         self.cycle = 0
         self.pending = 0
+        self.errors = 0
 
     @staticmethod
     def add_arguments(parser):
