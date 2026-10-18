@@ -848,10 +848,7 @@ class Command(ImportLiveVehiclesCommand):
             if auth_mode == "header" and api_key:
                 headers["x-api-key"] = api_key
             elif auth_mode == "query" and api_key:
-                # Append API key to URL for query mode
-                separator = "&" if "?" in url else "?"
-                url = f"{url}{separator}api_key={api_key}"
-                logger.info(f"Using BODS URL: {url}")
+                headers["api_key"] = api_key
 
         response = self.session.get(url, headers=headers, timeout=(11, 31))
         self.fetched_at = timezone.now()
