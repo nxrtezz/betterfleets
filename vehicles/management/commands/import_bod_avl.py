@@ -234,7 +234,7 @@ class Command(ImportLiveVehiclesCommand):
                     f"bod_avl.{shard}",
                     {
                         "type": "bod_avl.items",
-                        "datetime": self.source.datetime.isoformat(),
+                        "datetime": self.source.datetime.isoformat() if self.source.datetime else None,
                         "items": [item for item, _ in chunk],
                         "identities": [identity for _, identity in chunk],
                         "duplicates": [
@@ -264,7 +264,7 @@ class Command(ImportLiveVehiclesCommand):
 
     def handle_message(self, message):
         started = timezone.now()
-        self.source.datetime = datetime.fromisoformat(message["datetime"])
+        self.source.datetime = datetime.fromisoformat(message["datetime"]) if message["datetime"] else None
         self.duplicate_vehicles = set(message["duplicates"])
         queries = QueryCounter()
         stop_times_cache_stats.clear()
@@ -276,7 +276,7 @@ class Command(ImportLiveVehiclesCommand):
             WorkerStatus(
                 self.shard,
                 started,
-                started - self.source.datetime,
+                started - self.source.datetime if self.source.datetime else timedelta(0),
                 len(message["items"]),
                 (timezone.now() - started).total_seconds(),
                 queries.count,
