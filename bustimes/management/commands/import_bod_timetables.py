@@ -15,7 +15,7 @@ from django.core.management.base import BaseCommand
 from django.db import DataError
 from django.db.models import Exists, OuterRef, Q
 
-from busstops.models import DataSource, Service
+from busstops.models import DataSource, Operator, Service
 
 from ...download_utils import download, download_if_modified
 from ...models import Route, TimetableDataSource, Trip, is_noc
@@ -156,7 +156,7 @@ def get_bus_open_data_paramses(sources, api_key):
         yield base_params | {"noc": ",".join(nocs)}
 
 
-def bus_open_data(api_key, specific_operator):
+def bus_open_data(api_key, specific_operator, auto_discover=False):
     assert len(api_key) == 40
 
     command = get_command()
@@ -170,79 +170,131 @@ def bus_open_data(api_key, specific_operator):
 
     datasets = []
 
-    timetable_data_sources = TimetableDataSource.objects.filter(
-        ~Q(search=""), url="", active=True
-    )
-    if specific_operator:
-        timetable_data_sources = timetable_data_sources.filter(name=specific_operator)
-        if not timetable_data_sources:
-            logger.info(f"no timetable data sources named {specific_operator}")
-            return
-        logger.info(timetable_data_sources)
+    if auto_discover:
+        # Auto-discover mode: query BODS for all NOCs in the database
+        all_nocs = list(Operator.objects.values_list("noc", flat=True).distinct())
+        if specific_operator:
+            all_nocs = [noc for noc in all_nocs if noc == specific_operator]
+            if not all_nocs:
+                logger.info(f"operator {specific_operator} not found in database")
+                return
 
-    for params in get_bus_open_data_paramses(timetable_data_sources, api_key):
-        url = f"{url_prefix}/api/v1/dataset/"
-        request_params = params
-        if "datasetID" in params:
-            request_params = params.copy()
-            url += f"{request_params.pop('datasetID')[0]}/"
-        while url:
-            # Remove api_key from params if using header auth
-            headers = {}
-            if os.environ.get("BODS_API_AUTH_MODE") == "header":
-                headers["x-api-key"] = os.environ.get("BODS_API_KEY")
-                headers["User-Agent"] = os.environ.get("BODS_API_USER_AGENT", "betterfleet/1.0 (+https://eeveeit.uk)")
-                if "api_key" in request_params:
-                    del request_params["api_key"]
-            else:
-                headers["User-Agent"] = os.environ.get("BODS_API_USER_AGENT", "betterfleet/1.0 (+https://eeveeit.uk)")
+        # Chunk NOCs into groups of 20 (BODS API limit)
+        noc_chunks = [all_nocs[i : i + 20] for i in range(0, len(all_nocs), 20)]
 
-            response = session.get(url, params=request_params, headers=headers, timeout=61)
-            response.raise_for_status()
-            json = response.json()
+        base_params = {
+            "api_key": api_key,
+            "status": "published",
+            "limit": 100,
+        }
+
+        for nocs in noc_chunks:
+            params = base_params.copy()
+            params["noc"] = ",".join(nocs)
+
+            url = f"{url_prefix}/api/v1/dataset/"
+            while url:
+                headers = {}
+                if os.environ.get("BODS_API_AUTH_MODE") == "header":
+                    headers["x-api-key"] = os.environ.get("BODS_API_KEY")
+                    headers["User-Agent"] = os.environ.get("BODS_API_USER_AGENT", "betterfleet/1.0 (+https://eeveeit.uk)")
+                    if "api_key" in params:
+                        del params["api_key"]
+                else:
+                    headers["User-Agent"] = os.environ.get("BODS_API_USER_AGENT", "betterfleet/1.0 (+https://eeveeit.uk)")
+
+                response = session.get(url, params=params, headers=headers, timeout=61)
+                response.raise_for_status()
+                json = response.json()
+                results = json["results"]
+                if not results:
+                    logger.warning(f"no results for NOCs: {nocs}")
+                for dataset in results:
+                    dataset["modified"] = datetime.fromisoformat(dataset["modified"])
+                    dataset["params"] = params
+                    datasets.append(dataset)
+                url = json["next"]
+
+        logger.info(f"Found {len(datasets)} datasets for {len(all_nocs)} operators")
+    else:
+        # Original mode: use TimetableDataSource objects
+        timetable_data_sources = TimetableDataSource.objects.filter(
+            ~Q(search=""), url="", active=True
+        )
+        if specific_operator:
+            timetable_data_sources = timetable_data_sources.filter(name=specific_operator)
+            if not timetable_data_sources:
+                logger.info(f"no timetable data sources named {specific_operator}")
+                return
+            logger.info(timetable_data_sources)
+
+        for params in get_bus_open_data_paramses(timetable_data_sources, api_key):
+            url = f"{url_prefix}/api/v1/dataset/"
+            request_params = params
             if "datasetID" in params:
-                json = {"results": [json], "next": None}
-            results = json["results"]
-            if not results:
-                logger.warning(f"no results: {response.url}")
-            for dataset in results:
-                dataset["modified"] = datetime.fromisoformat(dataset["modified"])
-                dataset["params"] = params
-                datasets.append(dataset)
-            url = json["next"]
+                request_params = params.copy()
+                url += f"{request_params.pop('datasetID')[0]}/"
+            while url:
+                # Remove api_key from params if using header auth
+                headers = {}
+                if os.environ.get("BODS_API_AUTH_MODE") == "header":
+                    headers["x-api-key"] = os.environ.get("BODS_API_KEY")
+                    headers["User-Agent"] = os.environ.get("BODS_API_USER_AGENT", "betterfleet/1.0 (+https://eeveeit.uk)")
+                    if "api_key" in request_params:
+                        del request_params["api_key"]
+                else:
+                    headers["User-Agent"] = os.environ.get("BODS_API_USER_AGENT", "betterfleet/1.0 (+https://eeveeit.uk)")
+
+                response = session.get(url, params=request_params, headers=headers, timeout=61)
+                response.raise_for_status()
+                json = response.json()
+                if "datasetID" in params:
+                    json = {"results": [json], "next": None}
+                results = json["results"]
+                if not results:
+                    logger.warning(f"no results: {response.url}")
+                for dataset in results:
+                    dataset["modified"] = datetime.fromisoformat(dataset["modified"])
+                    dataset["params"] = params
+                    datasets.append(dataset)
+                url = json["next"]
 
     all_source_ids = []
 
-    for source in timetable_data_sources:
-        if not is_noc(source.search):
-            params = parse_qs(source.search)
-            operator_datasets = [
-                item for item in datasets if (item["params"] | params) == item["params"]
-            ]
-        else:
-            operator_datasets = [
-                item for item in datasets if source.search in item["noc"]
-            ]
+    if auto_discover:
+        # In auto-discover mode, create TimetableDataSource objects on the fly
+        for dataset in datasets:
+            # Get NOCs from the dataset
+            dataset_nocs = dataset.get("noc", "").split(",")
+            if not dataset_nocs or dataset_nocs == [""]:
+                continue
 
-        command.region_id = source.region_id
+            # Find matching operators in database
+            operators = Operator.objects.filter(noc__in=dataset_nocs)
+            if not operators:
+                logger.info(f"No operators found for dataset {dataset['name']} with NOCs {dataset_nocs}")
+                continue
 
-        sources = []
-        service_ids = set()
+            # Create or get TimetableDataSource
+            source, created = TimetableDataSource.objects.get_or_create(
+                name=dataset["name"],
+                defaults={
+                    "search": operators.first().noc,
+                    "url": "",
+                    "active": True,
+                }
+            )
+            if created:
+                source.operators.set(operators)
+                logger.info(f"Created TimetableDataSource for {dataset['name']}")
 
-        operators = source.operators.values_list("noc", flat=True)
+            # Process the dataset
+            command.region_id = source.region_id
+            sources = []
+            service_ids = set()
+            operators_nocs = list(operators.values_list("noc", flat=True))
 
-        for dataset in operator_datasets:
             command.source = DataSource.objects.filter(url=dataset["url"]).first()
-            if (
-                not command.source
-                and is_noc(source.search)
-                and len(operator_datasets) == 1
-            ):
-                name_prefix = dataset["name"].split("_", 1)[0]
-                # if old dataset was made inactive, reuse id
-                command.source = DataSource.objects.filter(
-                    name__startswith=f"{name_prefix}_"
-                ).first()
             if not command.source:
                 command.source = DataSource.objects.create(
                     name=dataset["name"], url=dataset["url"]
@@ -281,18 +333,100 @@ def bus_open_data(api_key, specific_operator):
 
                 operator_ids = get_operator_ids(command.source)
                 logger.info(f"  {operator_ids}")
-                unexpected = [o for o in operator_ids if o not in operators]
+                unexpected = [o for o in operator_ids if o not in operators_nocs]
                 if unexpected:
-                    logger.info(f"  {unexpected=} (not in {operators})")
+                    logger.info(f"  {unexpected=} (not in {operators_nocs})")
 
                 service_ids |= command.service_ids
 
-        clean_up(source, sources, not source.complete)
+            clean_up(source, sources, not source.complete)
 
-        command.source = None  # finish_services is for all this source's sources
-        command.service_ids = service_ids
-        command.finish_services()
-        all_source_ids += [source.id for source in sources]
+            command.source = None
+            command.service_ids = service_ids
+            command.finish_services()
+            all_source_ids += [source.id for source in sources]
+    else:
+        # Original mode: use existing TimetableDataSource objects
+        for source in timetable_data_sources:
+            if not is_noc(source.search):
+                params = parse_qs(source.search)
+                operator_datasets = [
+                    item for item in datasets if (item["params"] | params) == item["params"]
+                ]
+            else:
+                operator_datasets = [
+                    item for item in datasets if source.search in item["noc"]
+                ]
+
+            command.region_id = source.region_id
+
+            sources = []
+            service_ids = set()
+
+            operators = source.operators.values_list("noc", flat=True)
+
+            for dataset in operator_datasets:
+                command.source = DataSource.objects.filter(url=dataset["url"]).first()
+                if (
+                    not command.source
+                    and is_noc(source.search)
+                    and len(operator_datasets) == 1
+                ):
+                    name_prefix = dataset["name"].split("_", 1)[0]
+                    # if old dataset was made inactive, reuse id
+                    command.source = DataSource.objects.filter(
+                        name__startswith=f"{name_prefix}_"
+                    ).first()
+                if not command.source:
+                    command.source = DataSource.objects.create(
+                        name=dataset["name"], url=dataset["url"]
+                    )
+                command.source.name = dataset["name"]
+                command.source.description = dataset["description"]
+                command.source.url = dataset["url"]
+                if command.source.source_id != source.id:
+                    command.source.source = source
+                    if command.source.id:
+                        command.source.save(update_fields=["source"])
+
+                sources.append(command.source)
+
+                if specific_operator or command.source.datetime != dataset["modified"]:
+                    logger.info(dataset["name"])
+
+                    filename = str(command.source.id)
+                    path = path_prefix / filename
+
+                    command.service_ids = set()
+                    command.route_ids = set()
+                    command.garages = {}
+
+                    command.source.datetime = dataset["modified"]
+
+                    with log_time_taken(logger):
+                        download(path, url=command.source.url, session=session)
+
+                        handle_file(command, path)
+
+                        command.mark_old_services_as_not_current()
+
+                        command.source.sha1 = get_sha1(path)
+                        command.source.save()
+
+                    operator_ids = get_operator_ids(command.source)
+                    logger.info(f"  {operator_ids}")
+                    unexpected = [o for o in operator_ids if o not in operators]
+                    if unexpected:
+                        logger.info(f"  {unexpected=} (not in {operators})")
+
+                    service_ids |= command.service_ids
+
+            clean_up(source, sources, not source.complete)
+
+            command.source = None  # finish_services is for all this source's sources
+            command.service_ids = service_ids
+            command.finish_services()
+            all_source_ids += [source.id for source in sources]
 
     if not specific_operator:
         to_delete = DataSource.objects.filter(
@@ -476,8 +610,13 @@ class Command(BaseCommand):
     def add_arguments(parser):
         parser.add_argument("api_key", type=str, nargs="?", default=None)
         parser.add_argument("operator", type=str, nargs="?")
+        parser.add_argument(
+            "--auto-discover",
+            action="store_true",
+            help="Auto-discover timetables for all NOCs in the database (no TimetableDataSource needed)",
+        )
 
-    def handle(self, api_key=None, operator=None, **options):
+    def handle(self, api_key=None, operator=None, auto_discover=False, **options):
         # Use API key from environment if not provided
         if api_key is None:
             api_key = os.environ.get("BODS_API_KEY")
@@ -490,4 +629,4 @@ class Command(BaseCommand):
         elif api_key == "ticketer":
             ticketer(operator)
         else:
-            bus_open_data(api_key, operator)
+            bus_open_data(api_key, operator, auto_discover=auto_discover)
