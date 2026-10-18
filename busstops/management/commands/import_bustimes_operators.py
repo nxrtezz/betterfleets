@@ -13,6 +13,7 @@ class Command(BaseCommand):
 
         url = "https://bustimes.org/api/operators/"
         count = 0
+        updated = 0
 
         while url:
             self.stdout.write(f"Fetching {url}...")
@@ -33,25 +34,43 @@ class Command(BaseCommand):
                 if region_id and not Region.objects.filter(id=region_id).exists():
                     region_id = None
 
-                operator, created = Operator.objects.update_or_create(
-                    noc=noc,
-                    defaults={
-                        "name": name,
-                        "slug": slug,
-                        "vehicle_mode": vehicle_mode,
-                        "region_id": region_id,
-                        "url": op_url,
-                        "twitter": twitter,
-                        "source": source,
-                    }
-                )
+                # Handle slug conflicts
+                operator = Operator.objects.filter(noc=noc).first()
+                if operator:
+                    # Update existing operator, keep existing slug to avoid conflicts
+                    operator.name = name
+                    operator.vehicle_mode = vehicle_mode
+                    if region_id:
+                        operator.region_id = region_id
+                    operator.url = op_url
+                    operator.twitter = twitter
+                    operator.source = source
+                    operator.save()
+                    self.stdout.write(self.style.WARNING(f"Updated operator: {name} ({noc})"))
+                    updated += 1
+                else:
+                    # Create new operator
+                    # Handle slug conflict if needed
+                    final_slug = slug
+                    if Operator.objects.filter(slug=slug).exists():
+                        suffix = 1
+                        while Operator.objects.filter(slug=f"{slug}-{suffix}").exists():
+                            suffix += 1
+                        final_slug = f"{slug}-{suffix}"
 
-                if created:
+                    operator = Operator.objects.create(
+                        noc=noc,
+                        name=name,
+                        slug=final_slug,
+                        vehicle_mode=vehicle_mode,
+                        region_id=region_id,
+                        url=op_url,
+                        twitter=twitter,
+                        source=source,
+                    )
                     self.stdout.write(self.style.SUCCESS(f"Created operator: {name} ({noc})"))
                     count += 1
-                else:
-                    self.stdout.write(self.style.WARNING(f"Updated operator: {name} ({noc})"))
 
             url = data.get("next")
 
-        self.stdout.write(self.style.SUCCESS(f"\nImported/updated {count} operators from bustimes.org"))
+        self.stdout.write(self.style.SUCCESS(f"\nImported {count} operators, updated {updated} from bustimes.org"))
