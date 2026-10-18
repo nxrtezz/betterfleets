@@ -27,9 +27,9 @@ class Command(BaseCommand):
             ("IM", "Isle of Man"),
         ]
 
-        for slug, name in regions:
+        for region_id, name in regions:
             region, created = Region.objects.get_or_create(
-                slug=slug,
+                id=region_id,
                 defaults={"name": name}
             )
             if created:
