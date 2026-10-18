@@ -36,10 +36,25 @@ class Command(BaseCommand):
         # Create DataSource for BODS AVL
         avl_ds, avl_created = DataSource.objects.get_or_create(
             name="BODS AVL",
-            defaults={"url": "https://data.bus-data.dft.gov.uk/avl/download/bulk_archive"}
+            defaults={
+                "url": "https://data.bus-data.dft.gov.uk/api/v1/datafeed",
+                "description": "BODS SIRI-VM AVL datafeed",
+                "settings": {"bounding_box": "-6.5,50.0,2.0,55.8"}  # England bounding box
+            }
         )
         if avl_created:
             self.stdout.write(self.style.SUCCESS("Created BODS AVL DataSource"))
+        else:
+            # Update URL if it was the old incorrect one
+            if avl_ds.url != "https://data.bus-data.dft.gov.uk/api/v1/datafeed":
+                avl_ds.url = "https://data.bus-data.dft.gov.uk/api/v1/datafeed"
+                avl_ds.description = "BODS SIRI-VM AVL datafeed"
+                if not avl_ds.settings:
+                    avl_ds.settings = {"bounding_box": "-6.5,50.0,2.0,55.8"}
+                elif "bounding_box" not in avl_ds.settings:
+                    avl_ds.settings["bounding_box"] = "-6.5,50.0,2.0,55.8"
+                avl_ds.save()
+                self.stdout.write(self.style.SUCCESS("Updated BODS AVL DataSource URL"))
 
         # Create TimetableDataSources for common operators
         for noc, name in self.BODS_OPERATORS:

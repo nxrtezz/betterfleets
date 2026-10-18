@@ -835,16 +835,32 @@ class Command(ImportLiveVehiclesCommand):
 
     def get_items(self):
         headers = {}
+        params = {}
         if self.last_modified:
             headers["if-modified-since"] = http_date(self.last_modified.timestamp())
 
-        # Add BODS API key for bulk archive endpoint
+        # Add BODS API key and parameters for datafeed endpoint
         if "data.bus-data.dft.gov.uk" in self.source.url:
             api_key = os.environ.get("BODS_API_KEY")
-            if api_key:
-                headers["x-api-key"] = api_key
+            auth_mode = os.environ.get("BODS_API_AUTH_MODE", "query")
+            user_agent = os.environ.get("BODS_API_USER_AGENT", "betterfleet/1.0 (+https://eeveeit.uk)")
 
-        response = self.session.get(self.source.url, headers=headers, timeout=(30, 60))
+            headers["User-Agent"] = user_agent
+
+            if api_key:
+                if auth_mode == "header":
+                    headers["x-api-key"] = api_key
+                else:  # query mode (default)
+                    params["api_key"] = api_key
+
+            # Add bounding box parameter for England if configured
+            # Can be overridden in DataSource.settings
+            bounding_box = "-6.5,50.0,2.0,55.8"  # England bounding box
+            if self.source.settings and "bounding_box" in self.source.settings:
+                bounding_box = self.source.settings["bounding_box"]
+            params["boundingBox"] = bounding_box
+
+        response = self.session.get(self.source.url, headers=headers, params=params, timeout=(30, 60))
         self.fetched_at = timezone.now()
 
         self.not_modified = response.status_code == HTTPStatus.NOT_MODIFIED
@@ -863,7 +879,8 @@ class Command(ImportLiveVehiclesCommand):
         ):
             self.last_modified = datetime.fromtimestamp(last_modified, UTC)
 
-        if response.headers["content-type"] == "application/zip":
+        # Handle both ZIP archives (old bulk endpoint) and direct XML (new datafeed endpoint)
+        if response.headers.get("content-type") == "application/zip":
             with (
                 sentry_sdk.start_span(name="unzip"),
                 zipfile.ZipFile(io.BytesIO(response.content)) as archive,
