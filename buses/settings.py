@@ -234,7 +234,7 @@ STORAGES = {
 }
 IMAGEKIT_DEFAULT_CACHEFILE_STRATEGY = "imagekit.cachefiles.strategies.Optimistic"
 
-WHITENOISE_ROOT = STATIC_ROOT
+WHITENOISE_ROOT = BASE_DIR / "busstops" / "static"
 WHITENOISE_MIMETYPES = {
     ".webmanifest": "application/manifest+json",
 }
