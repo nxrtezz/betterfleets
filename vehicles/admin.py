@@ -250,6 +250,23 @@ class VehicleAdmin(M2MThroughMixin, admin.ModelAdmin):
 
     def deduplicate(self, request, queryset):
         for vehicle in queryset.order_by("id"):
+            # Try to find duplicates by code/fleet_number first (AVL tracking)
+            if vehicle.code:
+                try:
+                    duplicate = models.Vehicle.objects.get(
+                        id__gt=vehicle.id,
+                        code__iexact=vehicle.code,
+                        operator=vehicle.operator_id,
+                    )  # newer record
+                    self.merge_all_selected(request, (vehicle, duplicate))
+                    continue
+                except (
+                    models.Vehicle.DoesNotExist,
+                    models.Vehicle.MultipleObjectsReturned,
+                ):
+                    pass
+
+            # Fallback to registration-based deduplication
             if not vehicle.reg:
                 self.message_user(request, f"{vehicle} has no reg")
                 continue
