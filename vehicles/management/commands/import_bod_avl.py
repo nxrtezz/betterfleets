@@ -834,23 +834,10 @@ class Command(ImportLiveVehiclesCommand):
 
     def get_items(self):
         headers = {}
-        url = self.source.url
         if self.last_modified:
             headers["if-modified-since"] = http_date(self.last_modified.timestamp())
 
-        # Add BODS API headers if this is a BODS URL
-        if "data.bus-data.dft.gov.uk" in self.source.url:
-            auth_mode = os.environ.get("BODS_API_AUTH_MODE", "query")
-            user_agent = os.environ.get("BODS_API_USER_AGENT", "betterfleet/1.0 (+https://eeveeit.uk)")
-            api_key = os.environ.get("BODS_API_KEY")
-
-            headers["User-Agent"] = user_agent
-            if auth_mode == "header" and api_key:
-                headers["x-api-key"] = api_key
-            elif auth_mode == "query" and api_key:
-                headers["api_key"] = api_key
-
-        response = self.session.get(url, headers=headers, timeout=(11, 31))
+        response = self.session.get(self.source.url, headers=headers, timeout=(11, 20))
         self.fetched_at = timezone.now()
 
         self.not_modified = response.status_code == HTTPStatus.NOT_MODIFIED
