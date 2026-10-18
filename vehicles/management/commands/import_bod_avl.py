@@ -834,6 +834,7 @@ class Command(ImportLiveVehiclesCommand):
 
     def get_items(self):
         headers = {}
+        url = self.source.url
         if self.last_modified:
             headers["if-modified-since"] = http_date(self.last_modified.timestamp())
 
@@ -847,10 +848,12 @@ class Command(ImportLiveVehiclesCommand):
             if auth_mode == "header" and api_key:
                 headers["x-api-key"] = api_key
             elif auth_mode == "query" and api_key:
-                # The API key should already be in the URL for query mode
-                pass
+                # Append API key to URL for query mode
+                separator = "&" if "?" in url else "?"
+                url = f"{url}{separator}api_key={api_key}"
+                logger.info(f"Using BODS URL: {url}")
 
-        response = self.session.get(self.source.url, headers=headers, timeout=(11, 31))
+        response = self.session.get(url, headers=headers, timeout=(11, 31))
         self.fetched_at = timezone.now()
 
         self.not_modified = response.status_code == HTTPStatus.NOT_MODIFIED
@@ -999,7 +1002,7 @@ class Command(ImportLiveVehiclesCommand):
                     return 0.5
                 return 10 - (since % 10) + 0.5
 
-            age = int((self.fetched_at - self.source.datetime).total_seconds())
+            age = int((self.fetched_at - self.source.datetime).total_seconds()) if self.source.datetime else 0
             if age > 0:
                 logger.info(
                     f"{total_items=}	{len(changed_items)=}	{len(changed_journey_items)=}"
@@ -1042,44 +1045,47 @@ class Command(ImportLiveVehiclesCommand):
                 f"{dict(queries.tables.most_common(6))}"
             )
 
-            status = Status(
-                self.fetched_at,
-                self.source.datetime,
-                self.fetched_at - self.source.datetime,
-                total_items,
-                len(changed_items) + len(changed_journey_items),
-                time_taken,
-                self.last_modified,
-            )
-            append_status("bod_avl_status", status)
-
-            attributes = {"source": self.source_name}
-
-            sentry_sdk.metrics.count(
-                "vehicle_locations", status.changed_items, attributes=attributes
-            )
-
-            # how stale the data was when we got it - the number that matters
-            sentry_sdk.metrics.gauge(
-                "avl_age",
-                status.age.total_seconds(),
-                unit="second",
-                attributes=attributes,
-            )
-
-            # BODS `create_siri_zip` runs every 10 seconds
-            # - aim for just after the next run
-            if self.last_modified:
-                since = (timezone.now() - self.last_modified).total_seconds()
-                wait = (10.5 - since) % 10
-                if wait > 5:
-                    wait = 0
-                logger.info(
-                    f"last-modified={self.last_modified:%H:%M:%S}	"
-                    f"ResponseTimestamp={self.source.datetime:%H:%M:%S}	"
-                    f"age={status.age.total_seconds():.1f}	"
-                    f"{since=:.1f} {wait=:.1f}\n	"
+            if self.source.datetime:
+                status = Status(
+                    self.fetched_at,
+                    self.source.datetime,
+                    self.fetched_at - self.source.datetime,
+                    total_items,
+                    len(changed_items) + len(changed_journey_items),
+                    time_taken,
+                    self.last_modified,
                 )
+                append_status("bod_avl_status", status)
+
+                attributes = {"source": self.source_name}
+
+                sentry_sdk.metrics.count(
+                    "vehicle_locations", status.changed_items, attributes=attributes
+                )
+
+                # how stale the data was when we got it - the number that matters
+                sentry_sdk.metrics.gauge(
+                    "avl_age",
+                    status.age.total_seconds(),
+                    unit="second",
+                    attributes=attributes,
+                )
+
+                # BODS `create_siri_zip` runs every 10 seconds
+                # - aim for just after the next run
+                if self.last_modified:
+                    since = (timezone.now() - self.last_modified).total_seconds()
+                    wait = (10.5 - since) % 10
+                    if wait > 5:
+                        wait = 0
+                    logger.info(
+                        f"last-modified={self.last_modified:%H:%M:%S}	"
+                        f"ResponseTimestamp={self.source.datetime:%H:%M:%S}	"
+                        f"age={status.age.total_seconds():.1f}	"
+                        f"{since=:.1f} {wait=:.1f}\n	"
+                    )
+                else:
+                    wait = 11 - (timezone.now() - now).total_seconds()
             else:
                 wait = 11 - (timezone.now() - now).total_seconds()
 
