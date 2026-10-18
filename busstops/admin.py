@@ -574,6 +574,13 @@ class ServiceCodeAdmin(admin.ModelAdmin):
     autocomplete_fields = ("service",)
 
 
+@admin.register(models.Organisation)
+class OrganisationAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "url")
+    search_fields = ("name", "slug")
+    prepopulated_fields = {"slug": ("name",)}
+
+
 @admin.register(models.ServiceColour)
 class ServiceColourAdmin(admin.ModelAdmin):
     list_display = ("preview", "foreground", "background", "services")

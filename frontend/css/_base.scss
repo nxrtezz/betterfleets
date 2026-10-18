@@ -878,6 +878,11 @@ table {
     .last-seen {
         max-width: 5em;
     }
+
+    // Zebra striping for better visibility
+    tbody tr:nth-child(even) {
+        background-color: rgba(0, 0, 0, 0.03);
+    }
 }
 
 .revisions-list li + li {
