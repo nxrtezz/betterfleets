@@ -36,7 +36,7 @@ class Command(BaseCommand):
         # Create DataSource for BODS AVL
         avl_ds, avl_created = DataSource.objects.get_or_create(
             name="BODS AVL",
-            defaults={"url": "https://data.bus-data.dft.gov.uk/avl/download/"}
+            defaults={"url": "https://data.bus-data.dft.gov.uk/avl/download/bulk_archive"}
         )
         if avl_created:
             self.stdout.write(self.style.SUCCESS("Created BODS AVL DataSource"))
