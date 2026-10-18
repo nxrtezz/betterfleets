@@ -423,6 +423,21 @@ class Command(ImportLiveVehiclesCommand):
 
         vehicles = vehicles.filter(condition)
 
+        # Before creating a new vehicle, check if there's a vehicle with the expected slug
+        # This handles the case where AVL sends VehicleRef like "FHAM-63601" which becomes "63601"
+        # but there's already a vehicle with slug "fham-63601"
+        if operators and len(operators) == 1:
+            operator = operators[0]
+            expected_slug = f"{operator.noc.lower()}-{vehicle_ref.lower()}"
+            try:
+                existing_vehicle = self.vehicles.get(
+                    slug__iexact=expected_slug,
+                    operator=operator,
+                )
+                return existing_vehicle, False
+            except (Vehicle.DoesNotExist, Vehicle.MultipleObjectsReturned):
+                pass
+
         try:
             vehicle, created = vehicles.get_or_create(defaults)
         except (Vehicle.MultipleObjectsReturned, IntegrityError) as e:
