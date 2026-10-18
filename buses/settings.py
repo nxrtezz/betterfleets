@@ -234,7 +234,7 @@ STORAGES = {
 }
 IMAGEKIT_DEFAULT_CACHEFILE_STRATEGY = "imagekit.cachefiles.strategies.Optimistic"
 
-WHITENOISE_ROOT = BASE_DIR / "busstops" / "static" / "root"
+WHITENOISE_ROOT = STATIC_ROOT
 WHITENOISE_MIMETYPES = {
     ".webmanifest": "application/manifest+json",
 }
@@ -392,11 +392,11 @@ TFL = {  # London
 
 NTA_API_KEY = os.environ.get("NTA_API_KEY")  # Ireland
 ALLOW_VEHICLE_NOTES_OPERATORS = (
-    "NATX",  # National Express
-    "SCLK",  # Scottish Citylink
-    "FLIX",  # Flixbus
-    "ie-526",  # Irish Citylink
-    "ie-1178",  # Dublin Express
+#    "NATX",  # National Express
+#    "SCLK",  # Scottish Citylink
+#    "FLIX",  # Flixbus
+#    "ie-526",  # Irish Citylink
+#    "ie-1178",  # Dublin Express
 )
 
 NEW_VEHICLE_WEBHOOK_URL = os.environ.get("NEW_VEHICLE_WEBHOOK_URL")
