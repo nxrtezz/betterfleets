@@ -1,7 +1,7 @@
 import requests
 from django.core.management.base import BaseCommand
 from busstops.models import Operator, DataSource
-from vehicles.models import Vehicle, VehicleType, Livery
+from vehicles.models import Vehicle, VehicleType, Livery, VehicleJourney
 
 class Command(BaseCommand):
     help = "Import all vehicles from bustimes.org API"
@@ -11,6 +11,19 @@ class Command(BaseCommand):
             name="bustimes.org",
             defaults={"url": "https://bustimes.org"}
         )
+
+        # Delete all existing vehicles and journeys first to avoid conflicts
+        journey_count = VehicleJourney.objects.count()
+        if journey_count > 0:
+            self.stdout.write(f"Deleting {journey_count} existing vehicle journeys...")
+            VehicleJourney.objects.all().delete()
+            self.stdout.write(self.style.SUCCESS(f"Deleted {journey_count} vehicle journeys"))
+
+        vehicle_count = Vehicle.objects.count()
+        if vehicle_count > 0:
+            self.stdout.write(f"Deleting {vehicle_count} existing vehicles...")
+            Vehicle.objects.all().delete()
+            self.stdout.write(self.style.SUCCESS(f"Deleted {vehicle_count} vehicles"))
 
         # First import vehicle types
         self.stdout.write("Importing vehicle types...")
@@ -109,7 +122,6 @@ class Command(BaseCommand):
                 fleet_number = veh_data.get("fleet_number")
                 fleet_code = veh_data.get("fleet_code")
                 reg = veh_data.get("reg")
-                previous_reg = veh_data.get("previous_reg", "")
                 name = veh_data.get("name", "")
                 notes = veh_data.get("notes", "")
                 withdrawn = veh_data.get("withdrawn", False)
