@@ -42,6 +42,24 @@ services:
   redis:
     image: redis
 
+  bod_avl:
+    build: .
+    entrypoint: sh -c "uv sync --group dev --group test; ./manage.py import_bod_avl --immediate"
+    container_name: django_bod_avl
+    environment:
+      - SECRET_KEY=${SECRET_KEY-}
+      - DATABASE_URL=${DATABASE_URL-postgis://postgres:postgres@postgres/postgres}
+      - REDIS_URL=${REDIS_URL-redis://redis:6379}
+      - BODS_API_KEY=${BODS_API_KEY-}
+      - BODS_API_AUTH_MODE=${BODS_API_AUTH_MODE-query}
+      - BODS_API_USER_AGENT=${BODS_API_USER_AGENT-betterfleet/1.0 (+https://eeveeit.uk)}
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+      - redis
+    restart: always
+
 volumes:
   postgres_data:
   staticfiles:
