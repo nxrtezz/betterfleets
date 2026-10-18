@@ -264,8 +264,12 @@ def bus_open_data(api_key, specific_operator, auto_discover=False):
     if auto_discover:
         # In auto-discover mode, create TimetableDataSource objects on the fly
         for dataset in datasets:
-            # Get NOCs from the dataset
-            dataset_nocs = dataset.get("noc", "").split(",")
+            # Get NOCs from the dataset (might be a string or list)
+            noc_field = dataset.get("noc", "")
+            if isinstance(noc_field, list):
+                dataset_nocs = noc_field
+            else:
+                dataset_nocs = noc_field.split(",") if noc_field else []
             if not dataset_nocs or dataset_nocs == [""]:
                 continue
 
