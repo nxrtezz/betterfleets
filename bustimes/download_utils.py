@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from datetime import UTC, datetime
 from http import HTTPStatus
 
@@ -31,14 +32,32 @@ def get_bods_headers():
     return headers
 
 
-def download(path, url, session=None):
+def download(path, url, session=None, max_retries=3):
     headers = get_bods_headers() if "data.bus-data.dft.gov.uk" in url else {}
-    response = (session or requests).get(url, headers=headers, stream=True, timeout=61)
-    response.raise_for_status()
-    write_file(path, response)
+
+    for attempt in range(max_retries):
+        try:
+            # Increase timeout for each retry
+            timeout = 61 + (attempt * 30)
+            response = (session or requests).get(url, headers=headers, stream=True, timeout=timeout)
+            response.raise_for_status()
+            write_file(path, response)
+            return
+        except requests.exceptions.ReadTimeout as e:
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                logging.getLogger(__name__).warning(
+                    f"Download timeout for {url}, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})"
+                )
+                time.sleep(wait_time)
+            else:
+                raise
+        except requests.exceptions.RequestException as e:
+            # For other errors, don't retry
+            raise
 
 
-def download_if_modified(path, source, session=None):
+def download_if_modified(path, source, session=None, max_retries=3):
     headers = {"User-Agent": "bustimes.org"}
     if source.last_modified:
         headers["if-modified-since"] = http_date(source.last_modified.timestamp())
@@ -50,23 +69,39 @@ def download_if_modified(path, source, session=None):
         bods_headers = get_bods_headers()
         headers.update(bods_headers)
 
-    response = (session or requests).get(
-        source.url, headers=headers, stream=True, timeout=61
-    )
+    for attempt in range(max_retries):
+        try:
+            # Increase timeout for each retry
+            timeout = 61 + (attempt * 30)
+            response = (session or requests).get(
+                source.url, headers=headers, stream=True, timeout=timeout
+            )
 
-    modified = response.status_code != HTTPStatus.NOT_MODIFIED
+            modified = response.status_code != HTTPStatus.NOT_MODIFIED
 
-    if last_modified := response.headers.get("last-modified"):
-        last_modified = datetime.fromtimestamp(parse_http_date(last_modified), UTC)
+            if last_modified := response.headers.get("last-modified"):
+                last_modified = datetime.fromtimestamp(parse_http_date(last_modified), UTC)
 
-    if not response.ok:
-        logger = logging.getLogger(__name__)
-        logger.error(f"{response} {response.url}")
-    elif modified:
-        write_file(path, response)
+            if not response.ok:
+                logger = logging.getLogger(__name__)
+                logger.error(f"{response} {response.url}")
+            elif modified:
+                write_file(path, response)
 
-        source.last_modified = last_modified
-        source.etag = response.headers.get("etag", "")
-        source.save(update_fields=["last_modified", "etag"])
+                source.last_modified = last_modified
+                source.etag = response.headers.get("etag", "")
+                source.save(update_fields=["last_modified", "etag"])
 
-    return modified, last_modified
+            return modified, last_modified
+        except requests.exceptions.ReadTimeout as e:
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                logging.getLogger(__name__).warning(
+                    f"Download timeout for {source.url}, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})"
+                )
+                time.sleep(wait_time)
+            else:
+                raise
+        except requests.exceptions.RequestException as e:
+            # For other errors, don't retry
+            raise
