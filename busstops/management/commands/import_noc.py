@@ -22,6 +22,9 @@ def get_region_id(region_id):
         return "GB"
     if region_id.upper() in {"SC", "YO", "WA", "LO"}:
         return region_id[0]
+    # Truncate to 2 characters if needed (Region.id max_length=2)
+    if len(region_id) > 2:
+        return region_id[:2]
     return region_id
 
 
