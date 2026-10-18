@@ -10,8 +10,10 @@ services:
       - REDIS_URL=${REDIS_URL-redis://redis:6379}
       - NTA_API_KEY
       - PYTHONWARNINGS=all
+      - STATIC_ROOT=/staticfiles
     volumes:
       - .:/app
+      - staticfiles:/staticfiles
     ports:
       - "8000:8000"
       - "35729:35729"
@@ -39,3 +41,4 @@ services:
 
 volumes:
   postgres_data:
+  staticfiles:
