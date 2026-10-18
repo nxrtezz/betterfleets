@@ -838,6 +838,12 @@ class Command(ImportLiveVehiclesCommand):
         if self.last_modified:
             headers["if-modified-since"] = http_date(self.last_modified.timestamp())
 
+        # Add BODS API key for bulk archive endpoint
+        if "data.bus-data.dft.gov.uk" in self.source.url:
+            api_key = os.environ.get("BODS_API_KEY")
+            if api_key:
+                headers["x-api-key"] = api_key
+
         response = self.session.get(self.source.url, headers=headers, timeout=(30, 60))
         self.fetched_at = timezone.now()
 
