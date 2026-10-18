@@ -64,7 +64,7 @@ class Command(BaseCommand):
                 tds.operators.add(operator)
             else:
                 # Add operator if not already linked
-                if not tds.operators.filter(id=operator.id).exists():
+                if not tds.operators.filter(pk=operator.pk).exists():
                     tds.operators.add(operator)
                     self.stdout.write(self.style.SUCCESS(f"Linked operator to TimetableDataSource: {name}"))
 
