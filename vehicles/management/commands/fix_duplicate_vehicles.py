@@ -109,6 +109,17 @@ class Command(BaseCommand):
         if operator_filter:
             reg_duplicates = reg_duplicates.filter(operator_id=operator_filter)
 
+        # Also handle duplicates by fleet code
+        fleet_code_duplicates = (
+            Vehicle.objects.values("fleet_code", "operator_id")
+            .annotate(count=Count("id"))
+            .filter(count__gt=1)
+            .exclude(fleet_code="")
+        )
+
+        if operator_filter:
+            fleet_code_duplicates = fleet_code_duplicates.filter(operator_id=operator_filter)
+
         for duplicate in reg_duplicates:
             reg = duplicate["reg"]
             operator_id = duplicate["operator_id"]
@@ -149,6 +160,65 @@ class Command(BaseCommand):
             )
             for v in vehicles:
                 self.stdout.write(f"  - {v.slug} (id={v.id}, code={v.code})")
+
+            for duplicate_vehicle in vehicles_to_merge:
+                if dry_run:
+                    self.stdout.write(
+                        f"[DRY RUN] Would merge {duplicate_vehicle.slug} into {vehicle_to_keep.slug}"
+                    )
+                    total_merged += 1
+                else:
+                    self.merge_vehicle(duplicate_vehicle, vehicle_to_keep)
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Merged {duplicate_vehicle.slug} (id={duplicate_vehicle.id}) into {vehicle_to_keep.slug}"
+                        )
+                    )
+                    total_merged += 1
+
+        # Process fleet code duplicates
+        for duplicate in fleet_code_duplicates:
+            fleet_code = duplicate["fleet_code"]
+            operator_id = duplicate["operator_id"]
+
+            # Get all vehicles with this fleet code and operator
+            vehicles = Vehicle.objects.filter(
+                fleet_code__iexact=fleet_code,
+                operator_id=operator_id,
+            ).order_by("id")
+
+            if vehicles.count() < 2:
+                continue
+
+            # Keep the vehicle with the most data
+            def score_vehicle(v):
+                score = 0
+                if v.livery_id:
+                    score += 5
+                if v.vehicle_type_id:
+                    score += 3
+                if v.colours:
+                    score += 2
+                if v.branding:
+                    score += 2
+                if v.name:
+                    score += 1
+                if v.reg:
+                    score += 1
+                # Prefer older vehicles if scores are equal
+                score -= v.id / 1000000
+                return score
+
+            vehicles_list = list(vehicles)
+            vehicle_to_keep = max(vehicles_list, key=score_vehicle)
+            vehicles_to_merge = [v for v in vehicles_list if v != vehicle_to_keep]
+
+            self.stdout.write(
+                f"\nFound {vehicles.count()} vehicles with fleet code '{fleet_code}' "
+                f"and operator {operator_id}:"
+            )
+            for v in vehicles:
+                self.stdout.write(f"  - {v.slug} (id={v.id}, reg={v.reg})")
 
             for duplicate_vehicle in vehicles_to_merge:
                 if dry_run:
