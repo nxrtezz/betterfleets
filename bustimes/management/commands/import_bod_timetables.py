@@ -169,6 +169,7 @@ def bus_open_data(api_key, specific_operator, auto_discover=False):
         path_prefix.mkdir()
 
     datasets = []
+    unexpected_operators = set()  # Track operators not in scope
 
     if auto_discover:
         # Auto-discover mode: query BODS for all NOCs in the database
@@ -340,6 +341,7 @@ def bus_open_data(api_key, specific_operator, auto_discover=False):
                 unexpected = [o for o in operator_ids if o not in operators_nocs]
                 if unexpected:
                     logger.info(f"  {unexpected=} (not in {operators_nocs})")
+                    unexpected_operators.update(unexpected)
 
                 service_ids |= command.service_ids
 
@@ -422,6 +424,7 @@ def bus_open_data(api_key, specific_operator, auto_discover=False):
                     unexpected = [o for o in operator_ids if o not in operators]
                     if unexpected:
                         logger.info(f"  {unexpected=} (not in {operators})")
+                        unexpected_operators.update(unexpected)
 
                     service_ids |= command.service_ids
 
@@ -444,6 +447,19 @@ def bus_open_data(api_key, specific_operator, auto_discover=False):
                 logger.info(source.calendar_set.exclude(trip=None).update(source=None))
                 logger.info(source.stoppoint_set.all().delete())
                 logger.info(source.delete())
+
+    # Print list of operators not in scope with their NOCs and names
+    if unexpected_operators:
+        logger.info("\n" + "=" * 80)
+        logger.info("Operators not in scope (included in data but not in Operators field):")
+        logger.info("=" * 80)
+        for noc in sorted(unexpected_operators):
+            operator = Operator.objects.filter(noc=noc).first()
+            if operator:
+                logger.info(f"  {noc}: {operator.name}")
+            else:
+                logger.info(f"  {noc}: (not found in database)")
+        logger.info("=" * 80 + "\n")
 
 
 def ticketer(specific_operator=None):
