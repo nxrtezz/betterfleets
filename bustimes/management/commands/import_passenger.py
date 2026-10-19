@@ -225,8 +225,8 @@ def get_mobile_products_url(session, source_url):
 
     soup = bs4.BeautifulSoup(response.text, "lxml")
 
-    # Find the "Mobile Products" section
-    for heading in soup.find_all("h2"):
+    # Find the "Mobile Products" section - look for any heading containing "Mobile Products"
+    for heading in soup.find_all(["h2", "h3"]):
         if "Mobile Products" in heading.text:
             for element in heading.next_siblings:
                 if type(element) is not bs4.element.Tag:
