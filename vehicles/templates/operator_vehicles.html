@@ -25,8 +25,18 @@
         <li>{{ vehicles|length }} vehicle{{ vehicles|length|pluralize }}</li>
     </ul>
 
-    <form method="get" class="filters">
-        <div class="filter-group">
+    <ul class="horizontal">
+        <li><a href="/vehicles/edits?operator={{ object.noc }}&status=approved">Recent changes</a></li>
+        {% if request.user.trusted %}
+            <li><a href="/vehicles/edits?operator={{ object.noc }}&status=pending">Pending vehicle edits</a></li>
+        {% endif %}
+        {% if request.user.is_superuser %}
+            <li><a href="{% url 'admin:vehicles_vehicle_changelist' %}?operator={{ object.noc }}">✎</a></li>
+        {% endif %}
+    </ul>
+
+    <form method="get" class="filters" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0;">
+        <div class="filter-group" style="display: inline-block;">
             <label>Sort by:</label>
             <select name="sort_by">
                 <option value="fleet_number"{% if request.GET.sort_by != 'reg' %} selected{% endif %}>Fleet number</option>
@@ -34,7 +44,7 @@
             </select>
         </div>
         {% if vehicle_types %}
-        <div class="filter-group">
+        <div class="filter-group" style="display: inline-block;">
             <label>Vehicle types:</label>
             <select name="vehicle_type">
                 <option value="">All</option>
@@ -45,7 +55,7 @@
         </div>
         {% endif %}
         {% if liveries %}
-        <div class="filter-group">
+        <div class="filter-group" style="display: inline-block;">
             <label>Liveries:</label>
             <select name="livery">
                 <option value="">All</option>
@@ -56,7 +66,7 @@
         </div>
         {% endif %}
         {% if garages %}
-        <div class="filter-group">
+        <div class="filter-group" style="display: inline-block;">
             <label>Garage:</label>
             <select name="garage">
                 <option value="">All</option>
@@ -71,7 +81,7 @@
     </form>
 {% endif %}
 
-<p>This is <strong>not intended to be a complete fleet list</strong>. It’s really a list of
+<p>This is <strong>not intended to be a complete fleet list</strong>. It's really a list of
 {% firstof parent object %}
 {% if parent and operators and operators|length < 10 %}
     ({% for operator in operators %}{% if not forloop.first and not forloop.last %}, {% elif forloop.last and not forloop.first %} and {% endif %}{{ operator }}{% endfor %})
@@ -81,27 +91,15 @@ ticket machines, a byproduct of the live bus tracking.</p>
 <p>Remember:</p>
 
 <ul class="bulleted">
-    <li>Ticket machines IDs sometimes don’t correspond with the actual vehicles they’re attached to. (Equipment gets swapped between vehicles, etc.)</li>
-    <li>Vehicles don’t always track all the time. If a journey isn’t listed, it doesn’t necessarily mean it didn’t operate.</li>
+    <li>Ticket machines IDs sometimes don't correspond with the actual vehicles they're attached to. (Equipment gets swapped between vehicles, etc.)</li>
+    <li>Vehicles don't always track all the time. If a journey isn't listed, it doesn't necessarily mean it didn't operate.</li>
     {% if garage_column %}
-        <li>“Garage” information is worked out automatically, using the Garage field in the operator’s timetable data and the last trip a vehicle worked.</li>
+        <li>"Garage" information is worked out automatically, using the Garage field in the operator's timetable data and the last trip a vehicle worked.</li>
     {% endif %}
 </ul>
 
 {% if object.group %}
-    <p>There’s also <a href="{{ object.group.get_absolute_url }}">a list of all {{ object.group }} vehicles</a>.</p>
-{% endif %}
-
-{% if not parent %}
-    <ul class="horizontal">
-        <li><a href="/vehicles/edits?operator={{ object.noc }}&status=approved">Recent changes</a></li>
-        {% if request.user.trusted %}
-            <li><a href="/vehicles/edits?operator={{ object.noc }}&status=pending">Pending vehicle edits</a></li>
-        {% endif %}
-        {% if request.user.is_superuser %}
-            <li><a href="{% url 'admin:vehicles_vehicle_changelist' %}?operator={{ object.noc }}">✎</a></li>
-        {% endif %}
-    </ul>
+    <p>There's also <a href="{{ object.group.get_absolute_url }}">a list of all {{ object.group }} vehicles</a>.</p>
 {% endif %}
 
 {% load tz %}

@@ -36,8 +36,8 @@
 </ul>
 
 {% if services %}
-<form method="get" class="filters">
-    <div class="filter-group">
+<form method="get" class="filters" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0;">
+    <div class="filter-group" style="display: inline-block;">
         <label>Public Use:</label>
         <select name="public_use">
             <option value="">All</option>
@@ -46,7 +46,7 @@
             <option value="null"{% if request.GET.public_use == 'null' %} selected{% endif %}>?</option>
         </select>
     </div>
-    <div class="filter-group">
+    <div class="filter-group" style="display: inline-block;">
         <label>Special Service:</label>
         <select name="special_service">
             <option value="">All</option>
@@ -56,7 +56,7 @@
         </select>
     </div>
     {% if garages %}
-    <div class="filter-group">
+    <div class="filter-group" style="display: inline-block;">
         <label>Garage:</label>
         <select name="garage">
             <option value="">All</option>
