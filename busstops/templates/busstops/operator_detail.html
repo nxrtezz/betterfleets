@@ -35,6 +35,42 @@
     {% endif %}
 </ul>
 
+{% if services %}
+<form method="get" class="filters">
+    <div class="filter-group">
+        <label>Public Use:</label>
+        <select name="public_use">
+            <option value="">All</option>
+            <option value="true"{% if request.GET.public_use == 'true' %} selected{% endif %}>Yes</option>
+            <option value="false"{% if request.GET.public_use == 'false' %} selected{% endif %}>No</option>
+            <option value="null"{% if request.GET.public_use == 'null' %} selected{% endif %}>?</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>Special Service:</label>
+        <select name="special_service">
+            <option value="">All</option>
+            <option value="true"{% if request.GET.special_service == 'true' %} selected{% endif %}>Yes</option>
+            <option value="false"{% if request.GET.special_service == 'false' %} selected{% endif %}>No</option>
+            <option value="null"{% if request.GET.special_service == 'null' %} selected{% endif %}>?</option>
+        </select>
+    </div>
+    {% if garages %}
+    <div class="filter-group">
+        <label>Garage:</label>
+        <select name="garage">
+            <option value="">All</option>
+            {% for garage in garages %}
+            <option value="{{ garage.id }}"{% if request.GET.garage == garage.id|stringformat:"s" %} selected{% endif %}>{{ garage }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endif %}
+    <button type="submit">Filter</button>
+    <a href="{{ object.get_absolute_url }}" class="button">Clear</a>
+</form>
+{% endif %}
+
 {% include 'services.html' with services=services %}
 
 {% if ad_hoc_services %}

@@ -1060,6 +1060,23 @@ class OperatorDetailView(DetailView):
         )
         services = services.annotate(start_date=SubqueryMin("route__start_date"))
 
+        # Apply filters
+        public_use_filter = self.request.GET.get("public_use")
+        if public_use_filter in ["true", "false"]:
+            services = services.filter(public_use=(public_use_filter == "true"))
+        elif public_use_filter == "null":
+            services = services.filter(public_use__isnull=True)
+
+        special_service_filter = self.request.GET.get("special_service")
+        if special_service_filter in ["true", "false"]:
+            services = services.filter(special_service=(special_service_filter == "true"))
+        elif special_service_filter == "null":
+            services = services.filter(special_service__isnull=True)
+
+        garage_filter = self.request.GET.get("garage")
+        if garage_filter:
+            services = services.filter(garage_id=garage_filter)
+
         if self.object.name == "National Express":
             services = services.annotate(
                 group=Case(
@@ -1072,6 +1089,13 @@ class OperatorDetailView(DetailView):
             )
 
         context["services"] = sorted(services, key=Service.get_order)
+
+        # Get garages for this operator for the filter dropdown
+        from bustimes.models import Garage
+        garages = Garage.objects.filter(
+            Q(operator=self.object) | Q(id__in=services.values_list("garage_id", flat=True))
+        ).distinct()
+        context["garages"] = garages
 
         if context["services"]:
             # for 'from {date}' for future services:

@@ -24,6 +24,51 @@
         {% endif %}
         <li>{{ vehicles|length }} vehicle{{ vehicles|length|pluralize }}</li>
     </ul>
+
+    <form method="get" class="filters">
+        <div class="filter-group">
+            <label>Sort by:</label>
+            <select name="sort_by">
+                <option value="fleet_number"{% if request.GET.sort_by != 'reg' %} selected{% endif %}>Fleet number</option>
+                <option value="reg"{% if request.GET.sort_by == 'reg' %} selected{% endif %}>Reg</option>
+            </select>
+        </div>
+        {% if vehicle_types %}
+        <div class="filter-group">
+            <label>Vehicle types:</label>
+            <select name="vehicle_type">
+                <option value="">All</option>
+                {% for vehicle_type in vehicle_types %}
+                <option value="{{ vehicle_type.id }}"{% if request.GET.vehicle_type == vehicle_type.id|stringformat:"s" %} selected{% endif %}>{{ vehicle_type.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        {% if liveries %}
+        <div class="filter-group">
+            <label>Liveries:</label>
+            <select name="livery">
+                <option value="">All</option>
+                {% for livery in liveries %}
+                <option value="{{ livery.id }}"{% if request.GET.livery == livery.id|stringformat:"s" %} selected{% endif %}>{{ livery.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        {% if garages %}
+        <div class="filter-group">
+            <label>Garage:</label>
+            <select name="garage">
+                <option value="">All</option>
+                {% for garage in garages %}
+                <option value="{{ garage.id }}"{% if request.GET.garage == garage.id|stringformat:"s" %} selected{% endif %}>{{ garage }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <button type="submit">Filter</button>
+        <a href="{{ object.get_vehicles_url }}" class="button">Clear</a>
+    </form>
 {% endif %}
 
 <p>This is <strong>not intended to be a complete fleet list</strong>. It’s really a list of

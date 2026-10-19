@@ -852,9 +852,13 @@ class Service(models.Model):
     modified_at = models.DateTimeField(auto_now=True)
 
     public_use = models.BooleanField(null=True)
+    special_service = models.BooleanField(null=True)
 
     colour = models.ForeignKey(ServiceColour, models.SET_NULL, null=True, blank=True)
     hex_colour = models.CharField(max_length=7, blank=True, help_text="Hex colour code for single route (e.g. #FF0000)")
+    garage = models.ForeignKey(
+        "bustimes.Garage", models.DO_NOTHING, null=True, blank=True
+    )
 
     trip_chaining = models.CharField(
         max_length=5,

@@ -221,7 +221,24 @@ def operator_vehicles(request, slug=None, group_slug=None):
     if "withdrawn" not in request.GET:
         vehicles = vehicles.filter(withdrawn=False)
 
-    vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+    # Apply filters
+    sort_by = request.GET.get("sort_by")
+    if sort_by == "reg":
+        vehicles = vehicles.order_by("reg", "fleet_number", "fleet_code", "code")
+    else:
+        vehicles = vehicles.order_by("fleet_number", "fleet_code", "reg", "code")
+
+    vehicle_type_filter = request.GET.get("vehicle_type")
+    if vehicle_type_filter:
+        vehicles = vehicles.filter(vehicle_type_id=vehicle_type_filter)
+
+    livery_filter = request.GET.get("livery")
+    if livery_filter:
+        vehicles = vehicles.filter(livery_id=livery_filter)
+
+    garage_filter = request.GET.get("garage")
+    if garage_filter:
+        vehicles = vehicles.filter(garage_id=garage_filter)
 
     if group_slug:
         context = {"object": group}
@@ -302,6 +319,29 @@ def operator_vehicles(request, slug=None, group_slug=None):
         )
 
     garage_names = {vehicle.garage_name for vehicle in vehicles if vehicle.garage_name}
+
+    # Get filter options
+    if not group:
+        from .models import VehicleType, Livery
+        from bustimes.models import Garage
+
+        # Get vehicle types for this operator (excluding withdrawn)
+        vehicle_types = VehicleType.objects.filter(
+            vehicle__operator=operator, vehicle__withdrawn=False
+        ).distinct().order_by("name")
+        context["vehicle_types"] = vehicle_types
+
+        # Get liveries for this operator (excluding withdrawn)
+        liveries = Livery.objects.filter(
+            vehicle__operator=operator, vehicle__withdrawn=False
+        ).distinct().order_by("name")
+        context["liveries"] = liveries
+
+        # Get garages for this operator
+        garages = Garage.objects.filter(
+            Q(operator=operator) | Q(id__in=vehicles.values_list("garage_id", flat=True))
+        ).distinct()
+        context["garages"] = garages
 
     context = {
         **context,
