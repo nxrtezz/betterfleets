@@ -453,7 +453,8 @@ def bus_open_data(api_key, specific_operator, auto_discover=False):
         logger.info("\n" + "=" * 80)
         logger.info("Operators not in scope (included in data but not in Operators field):")
         logger.info("=" * 80)
-        for noc in sorted(unexpected_operators):
+        # Filter out None values before sorting
+        for noc in sorted(noc for noc in unexpected_operators if noc is not None):
             operator = Operator.objects.filter(noc=noc).first()
             if operator:
                 logger.info(f"  {noc}: {operator.name}")
