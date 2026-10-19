@@ -431,6 +431,9 @@ class Command(BaseCommand):
                             # Handle GTFS
                             gtfs_command = GTFSImportCommand()
                             gtfs_command.source = command.source
+                            # Passenger sources should only match by service_code, not line_name
+                            # to avoid incorrectly adding operators to existing services
+                            gtfs_command.strict_matching = True
                             gtfs_command.handle_zipfile(
                                 os.path.join(settings.DATA_DIR, version.name)
                             )
