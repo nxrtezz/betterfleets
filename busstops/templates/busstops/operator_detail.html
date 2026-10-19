@@ -37,34 +37,28 @@
 
 {% if services %}
 <form method="get" class="filters" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0;">
-    <div class="filter-group" style="display: inline-block;">
-        <label>Public Use:</label>
-        <select name="public_use">
-            <option value="">All</option>
-            <option value="true"{% if request.GET.public_use == 'true' %} selected{% endif %}>Yes</option>
-            <option value="false"{% if request.GET.public_use == 'false' %} selected{% endif %}>No</option>
-            <option value="null"{% if request.GET.public_use == 'null' %} selected{% endif %}>?</option>
-        </select>
-    </div>
-    <div class="filter-group" style="display: inline-block;">
-        <label>Special Service:</label>
-        <select name="special_service">
-            <option value="">All</option>
-            <option value="true"{% if request.GET.special_service == 'true' %} selected{% endif %}>Yes</option>
-            <option value="false"{% if request.GET.special_service == 'false' %} selected{% endif %}>No</option>
-            <option value="null"{% if request.GET.special_service == 'null' %} selected{% endif %}>?</option>
-        </select>
-    </div>
+    <label>Public Use:</label>
+    <select name="public_use">
+        <option value="">All</option>
+        <option value="true"{% if request.GET.public_use == 'true' %} selected{% endif %}>Yes</option>
+        <option value="false"{% if request.GET.public_use == 'false' %} selected{% endif %}>No</option>
+        <option value="null"{% if request.GET.public_use == 'null' %} selected{% endif %}>?</option>
+    </select>
+    <label>Special Service:</label>
+    <select name="special_service">
+        <option value="">All</option>
+        <option value="true"{% if request.GET.special_service == 'true' %} selected{% endif %}>Yes</option>
+        <option value="false"{% if request.GET.special_service == 'false' %} selected{% endif %}>No</option>
+        <option value="null"{% if request.GET.special_service == 'null' %} selected{% endif %}>?</option>
+    </select>
     {% if garages %}
-    <div class="filter-group" style="display: inline-block;">
-        <label>Garage:</label>
-        <select name="garage">
-            <option value="">All</option>
-            {% for garage in garages %}
-            <option value="{{ garage.id }}"{% if request.GET.garage == garage.id|stringformat:"s" %} selected{% endif %}>{{ garage }}</option>
-            {% endfor %}
-        </select>
-    </div>
+    <label>Garage:</label>
+    <select name="garage">
+        <option value="">All</option>
+        {% for garage in garages %}
+        <option value="{{ garage.id }}"{% if request.GET.garage == garage.id|stringformat:"s" %} selected{% endif %}>{{ garage }}</option>
+        {% endfor %}
+    </select>
     {% endif %}
     <button type="submit">Filter</button>
     <a href="{{ object.get_absolute_url }}" class="button">Clear</a>
