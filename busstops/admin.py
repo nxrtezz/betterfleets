@@ -352,7 +352,7 @@ class ServiceAdmin(M2MThroughMixin, GISModelAdmin):
     readonly_fields = ("search_vector", "modified_at")
     list_editable = ("colour", "line_brand")
     list_select_related = ("colour",)
-    actions = ("current_false", "public_use_true", "merge", "unmerge")
+    actions = ("current_false", "public_use_true", "merge", "unmerge", "assign_garage")
 
     def lookup_allowed(self, lookup, value, request):
         if lookup == "route__source__source":
@@ -514,6 +514,20 @@ class ServiceAdmin(M2MThroughMixin, GISModelAdmin):
                         service_codes.filter(
                             code__istartswith=f"{service.line_name}-"
                         ).update(service=service)
+
+    def assign_garage(self, request, queryset):
+        from bustimes.models import Garage
+
+        count = 0
+        for service in queryset:
+            operators = service.operator.all()
+            if operators:
+                garage = Garage.objects.filter(operator=operators.first()).first()
+                if garage:
+                    service.garage = garage
+                    service.save(update_fields=["garage"])
+                    count += 1
+        self.message_user(request, f"Assigned garage to {count} services.")
 
 
 @admin.register(models.ServiceLink)

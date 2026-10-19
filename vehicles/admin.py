@@ -171,6 +171,7 @@ class VehicleAdmin(M2MThroughMixin, admin.ModelAdmin):
         "spare_ticket_machine",
         "lock",
         "unlock",
+        "assign_garage",
     )
     inlines = (VehicleCodeInline,)
     readonly_fields = ("latest_journey_data",)
@@ -304,6 +305,19 @@ class VehicleAdmin(M2MThroughMixin, admin.ModelAdmin):
     def unlock(self, request, queryset):
         queryset.update(locked=False)
         log_change(request, queryset, ["locked"])
+
+    def assign_garage(self, request, queryset):
+        from bustimes.models import Garage
+
+        count = 0
+        for vehicle in queryset:
+            if vehicle.operator:
+                garage = Garage.objects.filter(operator=vehicle.operator).first()
+                if garage:
+                    vehicle.garage = garage
+                    vehicle.save(update_fields=["garage"])
+                    count += 1
+        self.message_user(request, f"Assigned garage to {count} vehicles.")
 
     @admin.display(ordering="latest_journey__datetime")
     def last_seen(self, obj):

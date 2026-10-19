@@ -266,6 +266,11 @@ def operator_vehicles(request, slug=None, group_slug=None):
     if not vehicles:
         raise Http404
 
+    # Get garage IDs before sorting (for filter dropdown)
+    vehicle_garage_ids = []
+    if not group:
+        vehicle_garage_ids = list(vehicles.values_list("garage_id", flat=True))
+
     vehicles = sorted(vehicles, key=get_vehicle_order)
     if not group and operator.noc in settings.ALLOW_VEHICLE_NOTES_OPERATORS:
         vehicles = sorted(vehicles, key=lambda v: v.notes)
@@ -339,7 +344,7 @@ def operator_vehicles(request, slug=None, group_slug=None):
 
         # Get garages for this operator
         garages = Garage.objects.filter(
-            Q(operator=operator) | Q(id__in=vehicles.values_list("garage_id", flat=True))
+            Q(operator=operator) | Q(id__in=vehicle_garage_ids)
         ).distinct()
         context["garages"] = garages
 
