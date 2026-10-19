@@ -29,6 +29,112 @@ from .import_bod_timetables import (
 from .import_gtfs import Command as GTFSImportCommand
 
 
+PASSENGER_OPERATORS = {
+    "unitedminibuses": "UNTM",
+    "a2b": "A2BV",
+    "argtravel": "ARGT",
+    "asdtransport": None,
+    "baytravel": "SBAY",
+    "bts": "BLAC",  # Blackpool Transport
+    "bluestar": "BLUS",
+    "bordersbuses": "BBUS",
+    "brightonhove": "BHBC",
+    "brooklinecoaches": None,
+    "buslink": None,
+    "canavantravel": None,
+    "ccts": "CBUS",  # Cardiff Bus
+    "carloneltd": None,
+    "carouselbuses": "CSLB",
+    "centralconnect": "TMSB",
+    "chalkwellcoach": "CHLK",
+    "chaserider": "CRDR",
+    "coachservices": "CSVC",
+    "commminibus": None,
+    "communityconnexions": None,
+    "communityfirst": None,
+    "connexionsbuses": None,
+    "ctfourn": "CT4N",
+    "dgbuses": "DGCB",
+    "delaine": "DELA",
+    "dewscoaches": "DEWS",
+    "eyms": "EYMS",
+    "edwardscoaches": "EDWC",
+    "falconbuses": "FALC",
+    "faresaverbuses": "FSRV",
+    "farleighcoaches": None,
+    "garelochead": None,
+    "globe": None,
+    "goaheadlondon": "GAHL",
+    "gobus": "GOCH",
+    "gonortheast": "GNEL",
+    "greenline": "GRNL",
+    "gwentvale": "GVTL",
+    "gwynfor": None,
+    "highlandcouncilbuses": None,
+    "hornsbystravel": None,
+    "hotspur": "HOTS",
+    "houstonscoaches": None,
+    "intalink": None,
+    "islaycoaches": None,
+    "jmbtravel": None,
+    "kentcountybus": None,
+    "konectbus": "KCBM",
+    "hedinghamandchambers": "HEDG",  # Konectbuses
+    "msot": None,
+    "mccolls": None,
+    "mcgills": "MCGL",
+    "metrobus": "METR",
+    "mcgillsse": "MCGL",  # McGill's South East
+    "moffatwilliamson": None,
+    "morebus": "WDBC",
+    "kennections": "KNBT",  # Newbury & District
+    "newportbus": "NWPT",
+    "nibs": None,
+    "nctx": "NCTX",
+    "nuventure": None,
+    "omegabus": None,
+    "oxfordbus": "OXBC",
+    "plymouthbus": "PLYC",
+    "prentice": None,
+    "pvttransfer": None,
+    "readingbuses": "RBUS",
+    "redeaglebuses": None,
+    "redgroup": None,
+    "redrose": "RRTR",
+    "redline": "RLNE",
+    "redroutebuses": None,
+    "reliance": None,
+    "safeguard": "SFGC",
+    "salisburyreds": "SWWD",
+    "sanderscoaches": "SNDR",
+    "sargeantsbros": None,
+    "selectbusservices": None,
+    "shielbuses": None,
+    "shuttlebuses": None,
+    "southernvectis": "SVCT",
+    "stanleytravel": None,
+    "stephensons": None,
+    "stuartscoaches": None,
+    "swindonbus": "TDTR",
+    "courtney": "TVBC",  # Thames Valley Buses
+    "tlctravel": None,
+    "transdevblazefield": "TRBD",
+    "coastliner": "COAS",
+    "gocornwallbus": "TFCN",
+    "unibus": "UNIB",
+    "unilink": "UNIL",
+    "warrington": "WARR",
+    "rswaterson": None,
+    "weardale": None,
+    "westcoastmotors": "WCM",
+    "whippet": "WHIP",
+    "wilsonsofrhu": None,
+    "xploredundee": "XPDU",
+    "yorkpullman": "KJTR",
+    "yorkshirebuses": None,
+}
+
+
 def get_version(source, dates, url):
     filename = os.path.basename(urlparse(url).path)
     path = os.path.join(settings.DATA_DIR, filename)
@@ -228,7 +334,9 @@ def discover_passenger_operators(session):
         href = link.attrs["href"]
         if href.startswith("/operator/"):
             operator_slug = href.removeprefix("/operator/")
-            operators.append(operator_slug)
+            noc = PASSENGER_OPERATORS.get(operator_slug)
+            if noc:
+                operators.append((operator_slug, noc))
 
     return operators
 
@@ -254,17 +362,15 @@ class Command(BaseCommand):
 
         # Auto-discover mode
         if options.get("discover"):
-            operator_slugs = discover_passenger_operators(session)
-            logger.info(f"Discovered {len(operator_slugs)} Passenger operators")
+            operator_data = discover_passenger_operators(session)
+            logger.info(f"Discovered {len(operator_data)} Passenger operators with NOCs")
 
-            for slug in operator_slugs:
+            for slug, noc in operator_data:
                 url = f"https://data.discoverpassenger.com/operator/{slug}"
                 # Check if source already exists
                 if not TimetableDataSource.objects.filter(url=url).exists():
-                    # Try to match operator by name
-                    operator = Operator.objects.filter(
-                        name__icontains=slug.replace("-", " ")
-                    ).first()
+                    # Get operator by NOC
+                    operator = Operator.objects.filter(noc=noc).first()
 
                     if operator:
                         source = TimetableDataSource.objects.create(
@@ -273,9 +379,9 @@ class Command(BaseCommand):
                             active=True,
                         )
                         source.operators.add(operator)
-                        logger.info(f"Created source for {operator.name}")
+                        logger.info(f"Created source for {operator.name} ({noc})")
                     else:
-                        logger.warning(f"Could not find operator for {slug}")
+                        logger.warning(f"Could not find operator with NOC {noc}")
             return
 
         prefix = "https://data.discoverpassenger.com/operator"
