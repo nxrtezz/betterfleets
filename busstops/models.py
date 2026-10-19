@@ -1310,15 +1310,18 @@ class TicketCategory(models.Model):
     def __str__(self):
         return self.title
 
+    class Meta:
+        app_label = "busstops"
+
 
 class Ticket(models.Model):
     """A ticket from Passenger mobile products data"""
     id = models.UUIDField(primary_key=True)
     category = models.ForeignKey(
-        TicketCategory, models.CASCADE, related_name="tickets"
+        TicketCategory, models.DB_CASCADE, related_name="tickets"
     )
     operator = models.ForeignKey(
-        Operator, models.CASCADE, related_name="tickets"
+        Operator, models.DB_CASCADE, related_name="tickets"
     )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
