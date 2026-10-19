@@ -215,6 +215,12 @@ class Livery(models.Model):
                 self.set_css()
                 if self.colours and not self.id:
                     self.white_text = get_text_colour(self.colours) == "#fff"
+                # Auto-set colour based on most common colour in colours field
+                colours_list = self.colours.split()
+                if len(colours_list) > 1:
+                    self.colour = Counter(colours_list).most_common()[0][0]
+                elif len(colours_list) == 1:
+                    self.colour = colours_list[0]
             if self.right_css:
                 self.right_css = self.minify(self.right_css)
                 self.left_css = self.minify(self.left_css)
