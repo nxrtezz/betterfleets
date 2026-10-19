@@ -32,12 +32,6 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("collections", nargs="*", type=str)
-        parser.add_argument("--strict-matching", action="store_true",
-                          help="Only match services by service_code, not line_name")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.strict_matching = False
 
     def handle_operator(self, line):
         agency_id = line.agency_id
@@ -123,12 +117,10 @@ class Command(BaseCommand):
             Route.objects.filter(code=line.route_id, service=OuterRef("id"))
         ) | Q(service_code=line.route_id)
 
-        # Only match by line_name/description if not in strict mode
-        if not self.strict_matching:
-            if line_name and line_name not in ("rail", "InterCity"):
-                q |= Q(line_name__iexact=line_name)
-            elif description:
-                q |= Q(description=description)
+        if line_name and line_name not in ("rail", "InterCity"):
+            q |= Q(line_name__iexact=line_name)
+        elif description:
+            q |= Q(description=description)
 
         service = services.filter(q).order_by("id").first()
         if not service:
@@ -299,7 +291,6 @@ class Command(BaseCommand):
         do_route_links(feed, self.source, self.routes, feed_stops)
 
     def handle(self, *args, **options):
-        self.strict_matching = options.get("strict_matching", False)
         collections = DataSource.objects.filter(
             url__startswith="https://www.transportforireland.ie/transitData/Data/GTFS_"
         )

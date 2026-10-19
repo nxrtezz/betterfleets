@@ -1,9 +1,6 @@
 """Import timetable data "fresh from the cow" """
 
-import csv
-import io
 import os
-from datetime import datetime
 from time import sleep
 from urllib.parse import urljoin, urlparse
 
@@ -15,7 +12,7 @@ from django.db.models import Q
 from django.utils import timezone
 from requests import Session
 
-from busstops.models import DataSource, Operator, Ticket, TicketCategory
+from busstops.models import DataSource
 
 from ...download_utils import write_file
 from ...models import TimetableDataSource, Version
@@ -27,112 +24,6 @@ from .import_bod_timetables import (
     logger,
 )
 from .import_gtfs import Command as GTFSImportCommand
-
-
-PASSENGER_OPERATORS = {
-    "unitedminibuses": "UNTM",
-    "a2b": "A2BV",
-    "argtravel": "ARGT",
-    "asdtransport": None,
-    "baytravel": "SBAY",
-    "bts": "BLAC",  # Blackpool Transport
-    "bluestar": "BLUS",
-    "bordersbuses": "BBUS",
-    "brightonhove": "BHBC",
-    "brooklinecoaches": None,
-    "buslink": None,
-    "canavantravel": None,
-    "ccts": "CBUS",  # Cardiff Bus
-    "carloneltd": None,
-    "carouselbuses": "CSLB",
-    "centralconnect": "TMSB",
-    "chalkwellcoach": "CHLK",
-    "chaserider": "CRDR",
-    "coachservices": "CSVC",
-    "commminibus": None,
-    "communityconnexions": None,
-    "communityfirst": None,
-    "connexionsbuses": None,
-    "ctfourn": "CT4N",
-    "dgbuses": "DGCB",
-    "delaine": "DELA",
-    "dewscoaches": "DEWS",
-    "eyms": "EYMS",
-    "edwardscoaches": "EDWC",
-    "falconbuses": "FALC",
-    "faresaverbuses": "FSRV",
-    "farleighcoaches": None,
-    "garelochead": None,
-    "globe": None,
-    "goaheadlondon": "GAHL",
-    "gobus": "GOCH",
-    "gonortheast": "GNEL",
-    "greenline": "GRNL",
-    "gwentvale": "GVTL",
-    "gwynfor": None,
-    "highlandcouncilbuses": None,
-    "hornsbystravel": None,
-    "hotspur": "HOTS",
-    "houstonscoaches": None,
-    "intalink": None,
-    "islaycoaches": None,
-    "jmbtravel": None,
-    "kentcountybus": None,
-    "konectbus": "KCBM",
-    "hedinghamandchambers": "HEDG",  # Konectbuses
-    "msot": None,
-    "mccolls": None,
-    "mcgills": "MCGL",
-    "metrobus": "METR",
-    "mcgillsse": "MCGL",  # McGill's South East
-    "moffatwilliamson": None,
-    "morebus": "WDBC",
-    "kennections": "KNBT",  # Newbury & District
-    "newportbus": "NWPT",
-    "nibs": None,
-    "nctx": "NCTX",
-    "nuventure": None,
-    "omegabus": None,
-    "oxfordbus": "OXBC",
-    "plymouthbus": "PLYC",
-    "prentice": None,
-    "pvttransfer": None,
-    "readingbuses": "RBUS",
-    "redeaglebuses": None,
-    "redgroup": None,
-    "redrose": "RRTR",
-    "redline": "RLNE",
-    "redroutebuses": None,
-    "reliance": None,
-    "safeguard": "SFGC",
-    "salisburyreds": "SWWD",
-    "sanderscoaches": "SNDR",
-    "sargeantsbros": None,
-    "selectbusservices": None,
-    "shielbuses": None,
-    "shuttlebuses": None,
-    "southernvectis": "SVCT",
-    "stanleytravel": None,
-    "stephensons": None,
-    "stuartscoaches": None,
-    "swindonbus": "TDTR",
-    "courtney": "TVBC",  # Thames Valley Buses
-    "tlctravel": None,
-    "transdevblazefield": "TRBD",
-    "coastliner": "COAS",
-    "gocornwallbus": "TFCN",
-    "unibus": "UNIB",
-    "unilink": "UNIL",
-    "warrington": "WARR",
-    "rswaterson": None,
-    "weardale": None,
-    "westcoastmotors": "WCM",
-    "whippet": "WHIP",
-    "wilsonsofrhu": None,
-    "xploredundee": "XPDU",
-    "yorkpullman": "KJTR",
-    "yorkshirebuses": None,
-}
 
 
 def get_version(source, dates, url):
@@ -212,172 +103,14 @@ def get_versions(session, source):
     return versions
 
 
-def get_mobile_products_url(session, source_url):
-    """Get the mobile products CSV URL from a Passenger operator page"""
-    try:
-        response = session.get(source_url, timeout=61)
-    except requests.RequestException as e:
-        logger.warning(f"{source_url} {e}")
-        return None
-    if not response.ok:
-        logger.warning(f"{source_url} {response}")
-        return None
-
-    soup = bs4.BeautifulSoup(response.text, "lxml")
-
-    # Look for any link that goes to /topups
-    for link in soup.find_all("a", href=True):
-        if "/topups" in link.attrs["href"]:
-            return urljoin(response.url, link.attrs["href"])
-
-    return None
-
-
-def import_mobile_products(session, source_url, operator):
-    """Import mobile products (tickets) from Passenger CSV"""
-    csv_url = get_mobile_products_url(session, source_url)
-    if not csv_url:
-        logger.info(f"No mobile products found for {operator}")
-        return
-
-    try:
-        response = session.get(csv_url, timeout=61)
-    except requests.RequestException as e:
-        logger.warning(f"{csv_url} {e}")
-        return
-
-    if not response.ok:
-        logger.warning(f"{csv_url} {response}")
-        return
-
-    # Parse CSV
-    csv_file = io.StringIO(response.text)
-    reader = csv.DictReader(csv_file)
-
-    # Track categories to avoid duplicates
-    categories = {}
-
-    for row in reader:
-        category_id = row["category_id"]
-        if category_id not in categories:
-            categories[category_id], _ = TicketCategory.objects.update_or_create(
-                id=category_id,
-                defaults={
-                    "title": row["category_title"],
-                    "description": row["category_description"],
-                },
-            )
-
-        Ticket.objects.update_or_create(
-            id=row["topup_id"],
-            operator=operator,
-            defaults={
-                "category": categories[category_id],
-                "title": row["topup_title"],
-                "description": row["topup_description"],
-                "price_in_pence": int(row["topup_price_in_pence"]),
-                "entitlement_type": row["topup_entitlement_type"],
-                "entitlement_unit": row["topup_entitlement_unit"],
-                "entitlement_value": (
-                    int(row["topup_entitlement_value"])
-                    if row["topup_entitlement_value"]
-                    else None
-                ),
-                "entitlement_quantity": (
-                    int(row["topup_entitlement_quantity"])
-                    if row["topup_entitlement_quantity"]
-                    else 1
-                ),
-                "start_date": (
-                    datetime.strptime(row["topup_entitlement_start_date"], "%Y-%m-%d").date()
-                    if row["topup_entitlement_start_date"]
-                    else None
-                ),
-                "end_date": (
-                    datetime.strptime(row["topup_entitlement_end_date"], "%Y-%m-%d").date()
-                    if row["topup_entitlement_end_date"]
-                    else None
-                ),
-                "passenger_class_name": row["topup_passenger_class_name"],
-                "passenger_class_quantity": (
-                    int(row["topup_passenger_class_quantity"])
-                    if row["topup_passenger_class_quantity"]
-                    else 1
-                ),
-            },
-        )
-
-    logger.info(f"Imported mobile products for {operator}")
-
-
-def discover_passenger_operators(session):
-    """Discover all operators from Passenger homepage"""
-    try:
-        response = session.get("https://data.discoverpassenger.com/", timeout=61)
-    except requests.RequestException as e:
-        logger.warning(f"https://data.discoverpassenger.com/ {e}")
-        return []
-    if not response.ok:
-        logger.warning(f"https://data.discoverpassenger.com/ {response}")
-        return []
-
-    soup = bs4.BeautifulSoup(response.text, "lxml")
-    operators = []
-
-    # Find all operator links
-    for link in soup.find_all("a", href=True):
-        href = link.attrs["href"]
-        if href.startswith("/operator/"):
-            operator_slug = href.removeprefix("/operator/")
-            noc = PASSENGER_OPERATORS.get(operator_slug)
-            if noc:
-                operators.append((operator_slug, noc))
-
-    return operators
-
-
 class Command(BaseCommand):
     @staticmethod
     def add_arguments(parser):
         parser.add_argument("operator_name", type=str, nargs="?")
-        parser.add_argument(
-            "--discover",
-            action="store_true",
-            help="Auto-discover and add all Passenger operators",
-        )
-        parser.add_argument(
-            "--import-tickets",
-            action="store_true",
-            help="Import mobile products (tickets) from Passenger",
-        )
 
     def handle(self, operator_name, *args, **options):
         command = get_command()
         session = Session()
-
-        # Auto-discover mode
-        if options.get("discover"):
-            operator_data = discover_passenger_operators(session)
-            logger.info(f"Discovered {len(operator_data)} Passenger operators with NOCs")
-
-            for slug, noc in operator_data:
-                url = f"https://data.discoverpassenger.com/operator/{slug}"
-                # Check if source already exists
-                if not TimetableDataSource.objects.filter(url=url).exists():
-                    # Get operator by NOC
-                    operator = Operator.objects.filter(noc=noc).first()
-
-                    if operator:
-                        source = TimetableDataSource.objects.create(
-                            name=f"{operator.name} (Passenger)",
-                            url=url,
-                            active=True,
-                        )
-                        source.operators.add(operator)
-                        logger.info(f"Created source for {operator.name} ({noc})")
-                    else:
-                        logger.warning(f"Could not find operator with NOC {noc}")
-            return
 
         prefix = "https://data.discoverpassenger.com/operator"
         suffix = "/open-data"
@@ -431,9 +164,6 @@ class Command(BaseCommand):
                             # Handle GTFS
                             gtfs_command = GTFSImportCommand()
                             gtfs_command.source = command.source
-                            # Passenger sources should only match by service_code, not line_name
-                            # to avoid incorrectly adding operators to existing services
-                            gtfs_command.strict_matching = True
                             gtfs_command.handle_zipfile(
                                 os.path.join(settings.DATA_DIR, version.name)
                             )
@@ -448,11 +178,6 @@ class Command(BaseCommand):
 
                 foreign_operators = [o for o in operator_ids if o not in operators]
                 logger.info(f"  {foreign_operators}")
-
-            # Import mobile products if requested
-            if options.get("import_tickets"):
-                for operator in source.operators.all():
-                    import_mobile_products(session, source.url, operator)
 
             # even if there are no new versions, delete non-current
             old_versions = source.version_set.filter(

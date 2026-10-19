@@ -375,10 +375,4 @@ def compress_avl_archive():
             file_path.unlink()
 
 
-@db_periodic_task(crontab(minute=0, hour=0))
-def import_passenger_timetables():
-    """
-    Import timetable data from Passenger operators
-    Runs daily at midnight
-    """
-    call_command("import_passenger", import_tickets=True)
+
