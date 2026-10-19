@@ -1,6 +1,6 @@
 {% extends 'page.html' %}
 
-{% block title %}Request an account – bustimes.org{% endblock %}
+{% block title %}Sign up – bustimes.org{% endblock %}
 
 {% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
 
@@ -8,21 +8,14 @@
 
 {% block content %}
 
-{% if form.user %}
-    <p>Check your email ({{ form.user.email }})</p>
-{% else %}
-    <h1>Request an account</h1>
+    <h1>Sign up</h1>
 
-    {% load email_obfuscator %}
+    <p>Create an account to track your vehicles, make edits, and more.</p>
 
-    <p><strong>If you’re a bus operator or transport authority</strong>,
-    although updating the information about your vehicles on this website may not be a high priority,
-    you’re welcome to request an account by emailing
-    {{ 'hallo@bustimes.org?subject=Invitation request&body=[Delete this text. Briefly explain who you are]'|obfuscate_mailto:'hallo@bustimes.org' }}
-    <strong>from an official-looking email address, explaining who you are</strong>.</p>
+    <p><strong>If you're a bus operator or transport authority</strong>,
+    you can sign up for an account to manage your fleet information directly.</p>
 
-    <p>If not, you can still enjoy all the main features of bustimes.org without an account.
-    You can also suggest edits (in line with <a href="/rules">the rules</a>) <a href="/contact">by email</a> or <a href="https://discord.com/invite/gY4PdDFau7">on Discord</a>.</p>
+    <p>You can also suggest edits (in line with <a href="/rules">the rules</a>) <a href="/contact">by email</a> or <a href="https://discord.com/invite/gY4PdDFau7">on Discord</a>.</p>
 
     {% if form %}
 
@@ -30,13 +23,12 @@
 
         {{ form.as_p }}
 
-        <input type="submit" value="Continue">
+        <input type="submit" value="Sign up">
 
         <input type="hidden" name="next" value="{{ next }}">
 
     </form>
 
     {% endif %}
-{% endif %}
 
 {% endblock content %}

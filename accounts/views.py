@@ -3,7 +3,7 @@ from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
 from django.db.models import Q
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render, redirect
 from sql_util.utils import SubqueryCount
 
 from . import forms
@@ -16,6 +16,7 @@ def register(request):
         form = forms.RegistrationForm(request.POST)
         if form.is_valid():
             form.save(request=request)
+            return redirect("login")
     else:
         form = forms.RegistrationForm()
 
@@ -26,10 +27,6 @@ def register(request):
             "form": form,
         },
     )
-
-
-class RegisterConfirmView(auth_views.PasswordResetConfirmView):
-    pass
 
 
 class LoginView(auth_views.LoginView):
@@ -78,12 +75,17 @@ def user_detail(request, pk):
                     user.is_active = False
                     user.save(update_fields=["is_active"])
 
-            elif "name" in form.changed_data:
-                user.username = form.cleaned_data["name"]
-                if not user.username:
-                    user.username = user.email
+            else:
+                if "first_name" in form.changed_data:
+                    user.first_name = form.cleaned_data["first_name"]
+                if "last_name" in form.changed_data:
+                    user.last_name = form.cleaned_data["last_name"]
+                if "name" in form.changed_data:
+                    user.username = form.cleaned_data["name"]
+                    if not user.username:
+                        user.username = user.email
                 try:
-                    user.save(update_fields=["username"])
+                    user.save()
                 except IntegrityError:
                     form.add_error("name", "Username taken")
                     user.refresh_from_db()

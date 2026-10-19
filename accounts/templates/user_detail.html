@@ -1,6 +1,6 @@
 {% extends 'page.html' %}
 
-{% block title %}User {{ object.id }} – bustimes.org{% endblock %}
+{% block title %}{{ object.get_full_name|default:object.username|default:"User" }} – bustimes.org{% endblock %}
 
 {% block canonical %}<meta name="robots" content="noindex,noarchive">{% endblock %}
 
@@ -8,48 +8,284 @@
 
 {% block content %}
 
+<div class="profile-header">
     <h1>
         {% if object.trusted is False %}<s>{% endif %}
-        User {{ object }}
+        {{ object.get_full_name|default:object.username|default:"User" }}
         {% if object.trusted is False %}</s>{% endif %}
     </h1>
 
     {% if perms.accounts.change_user %}
-        <p><a href="{% url 'admin:accounts_user_change' object.id %}">✎</a></p>
+        <p><a href="{% url 'admin:accounts_user_change' object.id %}">✎ Edit in admin</a></p>
     {% endif %}
 
     {% if object == user %}
-        <p>That's you!</p>
+        <p class="you-tag">That's you!</p>
     {% endif %}
+</div>
 
-    <ul class="horizontal">
-        <li><a href="/vehicles/edits?user={{ object.id }}">{{ object.total_count }} edit{{ object.total_count|pluralize }}</a></li>
-        <li><a href="/vehicles/edits?user={{ object.id }}&amp;status=pending">{{ object.pending_count }} pending</a></li>
-        <li><a href="/vehicles/edits?user={{ object.id }}&amp;status=approved">{{ object.approved_count }} approved</a></li>
-        <li><a href="/vehicles/edits?user={{ object.id }}&amp;status=disapproved">{{ object.disapproved_count }} disapproved</a></li>
+<div class="stats-grid">
+    <div class="stat-card">
+        <a href="/vehicles/edits?user={{ object.id }}">
+            <div class="stat-number">{{ object.total_count }}</div>
+            <div class="stat-label">Edit{{ object.total_count|pluralize }}</div>
+        </a>
+    </div>
+    <div class="stat-card">
+        <a href="/vehicles/edits?user={{ object.id }}&amp;status=pending">
+            <div class="stat-number">{{ object.pending_count }}</div>
+            <div class="stat-label">Pending</div>
+        </a>
+    </div>
+    <div class="stat-card">
+        <a href="/vehicles/edits?user={{ object.id }}&amp;status=approved">
+            <div class="stat-number">{{ object.approved_count }}</div>
+            <div class="stat-label">Approved</div>
+        </a>
+    </div>
+    <div class="stat-card">
+        <a href="/vehicles/edits?user={{ object.id }}&amp;status=disapproved">
+            <div class="stat-number">{{ object.disapproved_count }}</div>
+            <div class="stat-label">Disapproved</div>
+        </a>
+    </div>
+</div>
+
+{% if form %}
+<div class="profile-section">
+    <h2>Profile Settings</h2>
+    <form method="POST" autocomplete="off" class="profile-form">
+        <div class="form-group">
+            <label>Email address</label>
+            <div class="form-value">{{ object.email }}</div>
+        </div>
+
+        {{ form.as_p }}
+        <input type="submit" value="Save changes" class="btn btn-primary">
+    </form>
+</div>
+
+<div class="profile-section danger-zone">
+    <h2>Danger Zone</h2>
+    <form method="POST" autocomplete="off" class="delete-form">
+        {{ delete_form.as_p }}
+        <input type="submit" value="Delete my account" class="btn btn-danger">
+    </form>
+</div>
+{% endif %}
+
+{% if object.operatoruser_set.all %}
+<div class="profile-section">
+    <h2>Operator Access</h2>
+    <ul class="operator-list">
+        {% for ou in object.operatoruser_set.all %}
+            <li>{{ ou.operator }} {% if ou.staff %}<span class="badge">Staff</span>{% endif %}</li>
+        {% endfor %}
     </ul>
-
-    {% if form %}
-        <form method="POST" autocomplete="off">
-            <p>
-                Email address<br>
-                {{ object.email }}
-            </p>
-
-            {{ form.as_p }}
-            <input type="submit" value="Save changes">
-        </form>
-
-        <h2>Delete your account?</h2>
-
-        <form method="POST" autocomplete="off">
-            {{ delete_form.as_p }}
-            <input type="submit" value="☠️ Delete my account!">
-        </form>
-    {% endif %}
-
-    {% for ou in object.operatoruser_set.all %}
-        <p>{{ ou.operator }}</p>
-    {% endfor %}
+</div>
+{% endif %}
 
 {% endblock content %}
+
+{% block foot %}
+<style>
+.profile-header {
+    margin-bottom: 2rem;
+}
+
+.profile-header h1 {
+    margin: 0 0 0.5rem 0;
+}
+
+.you-tag {
+    color: #666;
+    font-style: italic;
+    margin: 0;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: var(--card-bg, #f5f5f5);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.stat-card a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--primary-color, #0066cc);
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary, #666);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.profile-section {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.profile-section h2 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+    color: var(--text-primary, #333);
+}
+
+.profile-form p {
+    margin-bottom: 1rem;
+}
+
+.profile-form label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.profile-form input[type="text"],
+.profile-form input[type="email"],
+.profile-form input[type="password"] {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-value {
+    padding: 0.5rem;
+    background: var(--input-bg, #f9f9f9);
+    border-radius: 4px;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-primary {
+    background-color: var(--primary-color, #0066cc);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover, #0052a3);
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
+
+.danger-zone {
+    border-color: #dc3545;
+}
+
+.danger-zone h2 {
+    color: #dc3545;
+}
+
+.delete-form p {
+    margin-bottom: 1rem;
+}
+
+.operator-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.operator-list li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color, #eee);
+}
+
+.operator-list li:last-child {
+    border-bottom: none;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background: var(--badge-bg, #0066cc);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+    .stat-card {
+        background: #2a2a2a;
+    }
+
+    .profile-section {
+        background: #1a1a1a;
+        border-color: #444;
+    }
+
+    .profile-section h2 {
+        color: #fff;
+    }
+
+    .stat-number {
+        color: #4d9fff;
+    }
+
+    .stat-label {
+        color: #999;
+    }
+
+    .form-value {
+        background: #2a2a2a;
+    }
+
+    .operator-list li {
+        border-color: #333;
+    }
+}
+</style>
+{% endblock %}

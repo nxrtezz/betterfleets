@@ -112,7 +112,7 @@ gtag('config', 'G-X2Z0KM7Z5C');
     {% if user.is_authenticated %}
         <form action="{% url 'logout' %}" method="POST">
             <ul class="user">
-                <li><a href="{% url 'user_detail' user.id %}">user {{ user.id }}</a></li>
+                <li><a href="{% url 'user_detail' user.id %}">{{ user.get_full_name|default:user.username|default:"user" }}</a></li>
                 <li>
                     <input type="submit" value="Log out">
                 </li>
