@@ -36,45 +36,37 @@
     </ul>
 
     <form method="get" class="filters" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0;">
-        <div class="filter-group" style="display: inline-block;">
-            <label>Sort by:</label>
-            <select name="sort_by">
-                <option value="fleet_number"{% if request.GET.sort_by != 'reg' %} selected{% endif %}>Fleet number</option>
-                <option value="reg"{% if request.GET.sort_by == 'reg' %} selected{% endif %}>Reg</option>
-            </select>
-        </div>
+        <label>Sort by:</label>
+        <select name="sort_by">
+            <option value="fleet_number"{% if request.GET.sort_by != 'reg' %} selected{% endif %}>Fleet number</option>
+            <option value="reg"{% if request.GET.sort_by == 'reg' %} selected{% endif %}>Reg</option>
+        </select>
         {% if vehicle_types %}
-        <div class="filter-group" style="display: inline-block;">
-            <label>Vehicle types:</label>
-            <select name="vehicle_type">
-                <option value="">All</option>
-                {% for vehicle_type in vehicle_types %}
-                <option value="{{ vehicle_type.id }}"{% if request.GET.vehicle_type == vehicle_type.id|stringformat:"s" %} selected{% endif %}>{{ vehicle_type.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
+        <label>Vehicle types:</label>
+        <select name="vehicle_type">
+            <option value="">All</option>
+            {% for vehicle_type in vehicle_types %}
+            <option value="{{ vehicle_type.id }}"{% if request.GET.vehicle_type == vehicle_type.id|stringformat:"s" %} selected{% endif %}>{{ vehicle_type.name }}</option>
+            {% endfor %}
+        </select>
         {% endif %}
         {% if liveries %}
-        <div class="filter-group" style="display: inline-block;">
-            <label>Liveries:</label>
-            <select name="livery">
-                <option value="">All</option>
-                {% for livery in liveries %}
-                <option value="{{ livery.id }}"{% if request.GET.livery == livery.id|stringformat:"s" %} selected{% endif %}>{{ livery.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
+        <label>Liveries:</label>
+        <select name="livery">
+            <option value="">All</option>
+            {% for livery in liveries %}
+            <option value="{{ livery.id }}"{% if request.GET.livery == livery.id|stringformat:"s" %} selected{% endif %}>{{ livery.name }}</option>
+            {% endfor %}
+        </select>
         {% endif %}
         {% if garages %}
-        <div class="filter-group" style="display: inline-block;">
-            <label>Garage:</label>
-            <select name="garage">
-                <option value="">All</option>
-                {% for garage in garages %}
-                <option value="{{ garage.id }}"{% if request.GET.garage == garage.id|stringformat:"s" %} selected{% endif %}>{{ garage }}</option>
-                {% endfor %}
-            </select>
-        </div>
+        <label>Garage:</label>
+        <select name="garage">
+            <option value="">All</option>
+            {% for garage in garages %}
+            <option value="{{ garage.id }}"{% if request.GET.garage == garage.id|stringformat:"s" %} selected{% endif %}>{{ garage }}</option>
+            {% endfor %}
+        </select>
         {% endif %}
         <button type="submit">Filter</button>
         <a href="{{ object.get_vehicles_url }}" class="button">Clear</a>
