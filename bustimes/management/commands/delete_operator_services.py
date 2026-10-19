@@ -5,6 +5,7 @@ from django.db.models import Q
 
 from busstops.models import Operator, Service
 from bustimes.models import Route
+from vehicles.models import VehicleJourney
 
 
 class Command(BaseCommand):
@@ -32,13 +33,21 @@ class Command(BaseCommand):
         routes = Route.objects.filter(service__in=services)
         route_count = routes.count()
 
-        self.stdout.write(f"Found {service_count} services and {route_count} routes")
+        # Get all vehicle journeys for these services
+        vehicle_journeys = VehicleJourney.objects.filter(service__in=services)
+        vj_count = vehicle_journeys.count()
+
+        self.stdout.write(f"Found {service_count} services, {route_count} routes, and {vj_count} vehicle journeys")
 
         if dry_run:
             self.stdout.write(self.style.WARNING("DRY RUN - No changes made"))
             return
 
-        # Delete routes first (they have foreign key to service)
+        # Delete vehicle journeys first (they have foreign key to service)
+        deleted_vj, _ = vehicle_journeys.delete()
+        self.stdout.write(self.style.SUCCESS(f"Deleted {deleted_vj} vehicle journeys"))
+
+        # Delete routes (they have foreign key to service)
         deleted_routes, _ = routes.delete()
         self.stdout.write(self.style.SUCCESS(f"Deleted {deleted_routes} routes"))
 
