@@ -1,4 +1,4 @@
-from django.db import migrations, models
+from django.db import migrations
 
 
 class Migration(migrations.Migration):
@@ -8,10 +8,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="garage",
-            name="id",
-            field=models.CharField(max_length=50, unique=True, primary_key=True, serialize=False),
-            preserve_default=False,
-        ),
+        # No-op migration - Garage model structure unchanged
     ]
