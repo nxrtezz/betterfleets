@@ -225,15 +225,10 @@ def get_mobile_products_url(session, source_url):
 
     soup = bs4.BeautifulSoup(response.text, "lxml")
 
-    # Find the "Mobile Products" section - look for any heading containing "Mobile Products"
-    for heading in soup.find_all(["h2", "h3"]):
-        if "Mobile Products" in heading.text:
-            for element in heading.next_siblings:
-                if type(element) is not bs4.element.Tag:
-                    continue
-                link = element.find("a")
-                if link and "Download CSV" in link.text:
-                    return urljoin(response.url, link.attrs["href"])
+    # Look for any link that goes to /topups
+    for link in soup.find_all("a", href=True):
+        if "/topups" in link.attrs["href"]:
+            return urljoin(response.url, link.attrs["href"])
 
     return None
 
