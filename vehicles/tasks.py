@@ -15,6 +15,8 @@ from huey.contrib.djhuey import db_periodic_task, db_task
 
 from busstops.models import DataSource, Operator, Service
 
+from django.core.management import call_command
+
 from .management.commands import import_bod_avl
 from .models import (
     SiriSubscription,
@@ -371,3 +373,12 @@ def compress_avl_archive():
                 )
             archive.write(file_path, file_path.name)
             file_path.unlink()
+
+
+@db_periodic_task(crontab(minute=0, hour=0))
+def import_passenger_timetables():
+    """
+    Import timetable data from Passenger operators
+    Runs daily at midnight
+    """
+    call_command("import_passenger", import_tickets=True)

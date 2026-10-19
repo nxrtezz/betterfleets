@@ -8,23 +8,46 @@
 
 <h1>Tickets</h1>
 
-<p>You can buy certain tickets in advance on <a href="https://mytrip.today/">the MyTrip app</a>.
+{% if passenger %}
+    <p>Tickets available from the operator's mobile app.</p>
+{% else %}
+    <p>You can buy certain tickets in advance on <a href="https://mytrip.today/">the MyTrip app</a>.
 A wider range (singles, returns etc.) may be available from your driver.</p>
+{% endif %}
 
 {% for grouping in groupings %}
     {% if grouping.categories %}
         <h2>{{ grouping.title }}</h2>
 
         {% for category in grouping.categories %}
+            {% if passenger %}
+                <div class="ticket">
+                    <h3>{{ category.title }}</h3>
 
-            <a href="{% url 'operator_ticket' operator.slug category.id %}" class="ticket">
-                <h3>{{ category.title }}</h3>
+                    {% if category.description.strip %}
+                        <p>{{ category.description }}</p>
+                    {% endif %}
 
-                {% if category.description.strip %}
-                    <p>{{ category.description }}</p>
-                {% endif %}
-            </a>
+                    <ul>
+                        {% for ticket in category.tickets %}
+                            <li>
+                                <strong>{{ ticket.title }}</strong> – £{{ ticket.price_in_pence|floatformat:2 }}
+                                {% if ticket.description %}
+                                    <br><small>{{ ticket.description }}</small>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% else %}
+                <a href="{% url 'operator_ticket' operator.slug category.id %}" class="ticket">
+                    <h3>{{ category.title }}</h3>
 
+                    {% if category.description.strip %}
+                        <p>{{ category.description }}</p>
+                    {% endif %}
+                </a>
+            {% endif %}
         {% endfor %}
     {% endif %}
 {% endfor %}

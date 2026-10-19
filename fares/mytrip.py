@@ -6,7 +6,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 from django.utils.safestring import mark_safe
 
-from busstops.models import DataSource, Operator, OperatorCode
+from busstops.models import DataSource, Operator, OperatorCode, Ticket, TicketCategory
 
 
 class Tickets:
@@ -38,6 +38,43 @@ def get_response(source, code):
 
 def operator_tickets(request, slug):
     operator = get_object_or_404(Operator, slug=slug)
+
+    # Check if operator has Passenger tickets
+    if operator.tickets.exists():
+        categories = {}
+        for ticket in operator.tickets.select_related("category").all():
+            if ticket.category.id not in categories:
+                categories[ticket.category.id] = {
+                    "title": ticket.category.title,
+                    "description": ticket.category.description,
+                    "tickets": [],
+                }
+            categories[ticket.category.id]["tickets"].append(ticket)
+
+        groupings = [
+            {
+                "value": category["title"],
+                "categories": [
+                    {
+                        "title": category["title"],
+                        "description": category["description"],
+                        "tickets": category["tickets"],
+                    }
+                ],
+            }
+            for category in categories.values()
+        ]
+
+        context = {
+            "breadcrumb": [operator],
+            "operator": operator,
+            "groupings": groupings,
+            "passenger": True,
+        }
+
+        return render(request, "operator_tickets.html", context)
+
+    # Fall back to MyTrip
     source = get_source()
     code = get_object_or_404(OperatorCode, operator=operator, source=source)
     response = get_response(source, code.code)

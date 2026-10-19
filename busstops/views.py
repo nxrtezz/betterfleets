@@ -67,6 +67,8 @@ from .models import (
     ServiceOverride,
     StopArea,
     StopPoint,
+    Ticket,
+    TicketCategory,
 )
 from .utils import get_bounding_box
 
@@ -1088,6 +1090,10 @@ class OperatorDetailView(DetailView):
 
         # tickets tab:
         if any(code.source_name == "MyTrip" for code in operator_codes):
+            context["tickets_link"] = reverse(
+                "operator_tickets", kwargs={"slug": self.object.slug}
+            )
+        elif self.object.tickets.exists():
             context["tickets_link"] = reverse(
                 "operator_tickets", kwargs={"slug": self.object.slug}
             )

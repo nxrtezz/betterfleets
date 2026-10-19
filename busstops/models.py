@@ -1299,3 +1299,56 @@ class SIRISourceOperator(models.Model):
     class Meta:
         db_table = "busstops_sirisource_operators"
         unique_together = ("sirisource", "operator")
+
+
+class TicketCategory(models.Model):
+    """A category of tickets from Passenger mobile products data"""
+    id = models.UUIDField(primary_key=True)
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.title
+
+
+class Ticket(models.Model):
+    """A ticket from Passenger mobile products data"""
+    id = models.UUIDField(primary_key=True)
+    category = models.ForeignKey(
+        TicketCategory, models.CASCADE, related_name="tickets"
+    )
+    operator = models.ForeignKey(
+        Operator, models.CASCADE, related_name="tickets"
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    price_in_pence = models.PositiveIntegerField()
+    entitlement_type = models.CharField(
+        max_length=20,
+        choices=[
+            ("flexible", "Flexible"),
+            ("period", "Period"),
+        ],
+        blank=True,
+    )
+    entitlement_unit = models.CharField(
+        max_length=20,
+        choices=[
+            ("minutes", "Minutes"),
+            ("days", "Days"),
+            ("journeys", "Journeys"),
+        ],
+        blank=True,
+    )
+    entitlement_value = models.PositiveIntegerField(null=True, blank=True)
+    entitlement_quantity = models.PositiveIntegerField(default=1)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    passenger_class_name = models.CharField(max_length=50, blank=True)
+    passenger_class_quantity = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        unique_together = ("operator", "id")
+
+    def __str__(self):
+        return f"{self.title} - £{self.price_in_pence / 100:.2f}"
