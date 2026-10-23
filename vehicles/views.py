@@ -1371,16 +1371,103 @@ def overland(request, uuid=None):
             "RecordedAtTime": timestamp,
         }
 
-        # Use log_vehicle_journey which handles vehicle creation
-        from .tasks import log_vehicle_journey
+        # Create vehicle journey synchronously (not using Huey task)
+        from datetime import datetime, timedelta
+        from django.db.models import Q
+        from busstops.models import DataSource, Operator
+        from vehicles.models import Vehicle, VehicleCode, VehicleJourney
 
-        log_vehicle_journey(
-            data=journey_data,
-            source_name=subscription.name,
-            url=subscription.source.url or "https://eeveeit.uk",
-            time=timestamp,
-            destination=destination,
+        operator_ref = journey_data.get("OperatorRef")
+        vehicle_ref = journey_data.get("VehicleRef")
+        line_name = journey_data.get("LineName")
+
+        if not operator_ref or not vehicle_ref:
+            continue
+
+        # Get operator
+        operator = Operator.objects.filter(noc=operator_ref).first()
+        if not operator:
+            continue
+
+        # Get or create data source
+        data_source, _ = DataSource.objects.get_or_create(
+            {"url": subscription.source.url or "https://eeveeit.uk"},
+            name=subscription.name
         )
+
+        # Look for existing vehicle
+        vehicle_code_code = f"{operator_ref}:{vehicle_ref}"
+        vehicle_code = VehicleCode.objects.filter(
+            scheme=subscription.name, code=vehicle_code_code
+        ).first()
+
+        if vehicle_code:
+            vehicle = vehicle_code.vehicle
+        else:
+            # Try to find existing vehicle
+            defaults = {"source": data_source, "operator": operator, "code": vehicle_ref}
+            operator_query = Q(operator=operator)
+            if operator.group_id:
+                operator_query |= Q(operator__group=operator.group_id)
+            vehicles = Vehicle.objects.filter(
+                operator_query | Q(source=data_source)
+            ).select_related("latest_journey")
+
+            if vehicle_ref.isdigit():
+                defaults["fleet_number"] = vehicle_ref
+                vehicles = vehicles.filter(
+                    Q(code=vehicle_ref)
+                    | Q(code__endswith=f"-{vehicle_ref}")
+                    | Q(code__startswith=f"{vehicle_ref}_-_")
+                )
+            else:
+                vehicles = vehicles.filter(code__iexact=vehicle_ref)
+
+            try:
+                vehicle, _ = vehicles.get_or_create(defaults)
+            except Vehicle.MultipleObjectsReturned:
+                vehicle = vehicles.filter(operator=operator).first()
+
+            VehicleCode.objects.create(
+                scheme=subscription.name, code=vehicle_code_code, vehicle=vehicle
+            )
+
+        # Parse time
+        if isinstance(timestamp, str):
+            try:
+                time = datetime.fromisoformat(timestamp)
+            except ValueError:
+                continue
+        else:
+            continue
+
+        # Check if we should create a new journey
+        if vehicle.latest_journey:
+            last_time = vehicle.latest_journey.datetime
+            if last_time == time or (
+                vehicle.latest_journey.source_id != data_source.id
+                and time - last_time < timedelta(hours=2)
+            ):
+                continue
+
+        # Create the journey
+        date = time.date()
+        journey = VehicleJourney(
+            vehicle=vehicle,
+            route_name=line_name,
+            datetime=time,
+            source=data_source,
+            destination=destination,
+            date=date,
+        )
+
+        try:
+            journey.save()
+            if not vehicle.latest_journey or vehicle.latest_journey.datetime < journey.datetime:
+                vehicle.latest_journey = journey
+                vehicle.save(update_fields=["latest_journey"])
+        except Exception:
+            pass
 
     cache_last_post(request, subscription)
 
