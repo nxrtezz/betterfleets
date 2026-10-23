@@ -1351,12 +1351,35 @@ def overland(request, uuid=None):
 
     for item in data["locations"][-1:]:
         lon, lat = item["geometry"]["coordinates"]
-        queue_device_location(
-            uuid,
-            item["properties"]["timestamp"],
-            item["properties"]["device_id"],
-            lon,
-            lat,
+        device_id = item["properties"]["device_id"]
+        timestamp = item["properties"]["timestamp"]
+
+        # Parse device_id: "operator:vehicle:line_name:journey_ref:destination"
+        parts = device_id.split(":", 4)
+        if len(parts) == 1:
+            parts.insert(0, "")
+        operator, vehicle, line_name, journey_ref, destination = parts + [""] * (
+            5 - len(parts)
+        )
+
+        # Build SIRI-like data for log_vehicle_journey
+        journey_data = {
+            "OperatorRef": operator,
+            "VehicleRef": vehicle,
+            "LineName": line_name,
+            "DestinationRef": destination,
+            "RecordedAtTime": timestamp,
+        }
+
+        # Use log_vehicle_journey which handles vehicle creation
+        from .tasks import log_vehicle_journey
+
+        log_vehicle_journey(
+            data=journey_data,
+            source_name=subscription.name,
+            url=subscription.source.url or "https://eeveeit.uk",
+            time=timestamp,
+            destination=destination,
         )
 
     cache_last_post(request, subscription)
