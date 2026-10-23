@@ -1465,7 +1465,21 @@ def overland(request, uuid=None):
             journey.save()
             if not vehicle.latest_journey or vehicle.latest_journey.datetime < journey.datetime:
                 vehicle.latest_journey = journey
-                vehicle.save(update_fields=["latest_journey"])
+                # Save location data in SIRI format for map display
+                vehicle.latest_journey_data = {
+                    "RecordedAtTime": timestamp,
+                    "MonitoredVehicleJourney": {
+                        "OperatorRef": operator_ref,
+                        "VehicleRef": vehicle_ref,
+                        "PublishedLineName": line_name,
+                        "DestinationName": destination,
+                        "VehicleLocation": {
+                            "Longitude": lon,
+                            "Latitude": lat,
+                        },
+                    }
+                }
+                vehicle.save(update_fields=["latest_journey", "latest_journey_data"])
         except Exception:
             pass
 
