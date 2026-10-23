@@ -1354,11 +1354,11 @@ def overland(request, uuid=None):
         device_id = item["properties"]["device_id"]
         timestamp = item["properties"]["timestamp"]
 
-        # Parse device_id: "operator:vehicle:line_name:journey_ref:destination"
+        # Parse device_id: "operator:vehicle:line_name:destination:journey_ref"
         parts = device_id.split(":", 4)
         if len(parts) == 1:
             parts.insert(0, "")
-        operator, vehicle, line_name, journey_ref, destination = parts + [""] * (
+        operator, vehicle, line_name, destination, journey_ref = parts + [""] * (
             5 - len(parts)
         )
 
@@ -1441,47 +1441,71 @@ def overland(request, uuid=None):
         else:
             continue
 
-        # Check if we should create a new journey
-        if vehicle.latest_journey:
-            last_time = vehicle.latest_journey.datetime
-            if last_time == time or (
-                vehicle.latest_journey.source_id != data_source.id
-                and time - last_time < timedelta(hours=2)
-            ):
-                continue
-
-        # Create the journey
+        # Check if there's a journey today with the same journey_ref
         date = time.date()
-        journey = VehicleJourney(
-            vehicle=vehicle,
-            route_name=line_name,
-            datetime=time,
-            source=data_source,
-            destination=destination,
-            date=date,
-        )
+        existing_journey = None
+        if journey_ref:
+            existing_journey = VehicleJourney.objects.filter(
+                vehicle=vehicle,
+                date=date,
+                code=journey_ref
+            ).first()
 
-        try:
-            journey.save()
-            if not vehicle.latest_journey or vehicle.latest_journey.datetime < journey.datetime:
-                vehicle.latest_journey = journey
-                # Save location data in SIRI format for map display
-                vehicle.latest_journey_data = {
-                    "RecordedAtTime": timestamp,
-                    "MonitoredVehicleJourney": {
-                        "OperatorRef": operator_ref,
-                        "VehicleRef": vehicle_ref,
-                        "PublishedLineName": line_name,
-                        "DestinationName": destination,
-                        "VehicleLocation": {
-                            "Longitude": lon,
-                            "Latitude": lat,
-                        },
+        if existing_journey:
+            # Update existing journey with new location/time
+            try:
+                existing_journey.datetime = time
+                existing_journey.save(update_fields=["datetime"])
+                if not vehicle.latest_journey or vehicle.latest_journey.datetime < time:
+                    vehicle.latest_journey = existing_journey
+                    vehicle.latest_journey_data = {
+                        "RecordedAtTime": timestamp,
+                        "MonitoredVehicleJourney": {
+                            "OperatorRef": operator_ref,
+                            "VehicleRef": vehicle_ref,
+                            "PublishedLineName": line_name,
+                            "DestinationName": destination,
+                            "VehicleLocation": {
+                                "Longitude": lon,
+                                "Latitude": lat,
+                            },
+                        }
                     }
-                }
-                vehicle.save(update_fields=["latest_journey", "latest_journey_data"])
-        except Exception:
-            pass
+                    vehicle.save(update_fields=["latest_journey", "latest_journey_data"])
+            except Exception:
+                pass
+        else:
+            # Create new journey
+            journey = VehicleJourney(
+                vehicle=vehicle,
+                route_name=line_name,
+                datetime=time,
+                source=data_source,
+                destination=destination,
+                date=date,
+                code=journey_ref,
+            )
+
+            try:
+                journey.save()
+                if not vehicle.latest_journey or vehicle.latest_journey.datetime < journey.datetime:
+                    vehicle.latest_journey = journey
+                    vehicle.latest_journey_data = {
+                        "RecordedAtTime": timestamp,
+                        "MonitoredVehicleJourney": {
+                            "OperatorRef": operator_ref,
+                            "VehicleRef": vehicle_ref,
+                            "PublishedLineName": line_name,
+                            "DestinationName": destination,
+                            "VehicleLocation": {
+                                "Longitude": lon,
+                                "Latitude": lat,
+                            },
+                        }
+                    }
+                    vehicle.save(update_fields=["latest_journey", "latest_journey_data"])
+            except Exception:
+                pass
 
     cache_last_post(request, subscription)
 
