@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin
 from django.contrib.gis.admin import GISModelAdmin
 from django.contrib.postgres.search import SearchQuery, SearchRank
@@ -6,6 +7,8 @@ from django.db.models import CharField, Exists, F, OuterRef, Q, Value
 from django.db.models.aggregates import StringAgg
 from django.db.models.functions import Cast, Now, TruncDate
 from django.forms import ModelForm, Textarea
+from django.http import HttpResponseRedirect
+from django.shortcuts import render
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
@@ -16,6 +19,14 @@ from bustimes.admin import log_change
 from bustimes.models import Route, RouteLink
 
 from . import models
+
+
+class AssignToOperatorForm(forms.Form):
+    operator = forms.ModelChoiceField(
+        queryset=models.Operator.objects.all(),
+        required=True,
+        label="Operator"
+    )
 
 
 @admin.register(models.AdminArea)
@@ -352,7 +363,7 @@ class ServiceAdmin(M2MThroughMixin, GISModelAdmin):
     readonly_fields = ("search_vector", "modified_at")
     list_editable = ("colour", "line_brand")
     list_select_related = ("colour",)
-    actions = ("current_false", "public_use_true", "merge", "unmerge", "assign_garage")
+    actions = ("current_false", "public_use_true", "merge", "unmerge", "assign_garage", "assign_to_operator")
 
     def lookup_allowed(self, lookup, value, request):
         if lookup == "route__source__source":
@@ -528,6 +539,33 @@ class ServiceAdmin(M2MThroughMixin, GISModelAdmin):
                     service.save(update_fields=["garage"])
                     count += 1
         self.message_user(request, f"Assigned garage to {count} services.")
+
+    def assign_to_operator(self, request, queryset):
+        if request.method == "POST" and "apply" in request.POST:
+            form = AssignToOperatorForm(request.POST)
+            if form.is_valid():
+                operator = form.cleaned_data["operator"]
+                count = 0
+                for service in queryset:
+                    service.operator.add(operator)
+                    count += 1
+                self.message_user(request, f"Assigned {count} services to {operator}")
+                return HttpResponseRedirect(
+                    reverse("admin:busstops_service_changelist")
+                )
+        else:
+            form = AssignToOperatorForm()
+
+        context = {
+            "form": form,
+            "queryset": queryset,
+            "action_checkbox_name": admin.ACTION_CHECKBOX_NAME,
+            "opts": self.model._meta,
+            "action": "assign_to_operator",
+        }
+        return render(request, "admin/assign_to_operator.html", context)
+
+    assign_to_operator.short_description = "Assign to operator"
 
 
 @admin.register(models.ServiceLink)
