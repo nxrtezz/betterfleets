@@ -363,7 +363,7 @@ class ServiceAdmin(M2MThroughMixin, GISModelAdmin):
     readonly_fields = ("search_vector", "modified_at")
     list_editable = ("colour", "line_brand")
     list_select_related = ("colour",)
-    actions = ("current_false", "public_use_true", "merge", "unmerge", "assign_garage", "assign_to_operator")
+    actions = ("current_false", "current_true", "public_use_true", "merge", "unmerge", "assign_garage", "assign_to_operator")
 
     def lookup_allowed(self, lookup, value, request):
         if lookup == "route__source__source":
@@ -417,6 +417,11 @@ class ServiceAdmin(M2MThroughMixin, GISModelAdmin):
 
     def current_false(self, request, queryset):
         result = queryset.order_by().update(current=False, modified_at=Now())
+        log_change(request, queryset, ["current"])
+        self.message_user(request, f"{result}")
+
+    def current_true(self, request, queryset):
+        result = queryset.order_by().update(current=True, modified_at=Now())
         log_change(request, queryset, ["current"])
         self.message_user(request, f"{result}")
 
