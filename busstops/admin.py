@@ -559,7 +559,7 @@ class ServiceAdmin(M2MThroughMixin, GISModelAdmin):
         context = {
             "form": form,
             "queryset": queryset,
-            "action_checkbox_name": admin.ACTION_CHECKBOX_NAME,
+            "action_checkbox_name": "_selected_action",
             "opts": self.model._meta,
             "action": "assign_to_operator",
         }
