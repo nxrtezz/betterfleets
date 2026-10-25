@@ -157,6 +157,56 @@ def get_revision(vehicle, data):
 
 
 def apply_revision(revision, features=None):
+    from .models import Vehicle
+
+    # Handle vehicle requests (new vehicle creation)
+    if revision.is_request and revision.vehicle is None:
+        # Create a new vehicle from the revision
+        vehicle = Vehicle()
+        vehicle.operator = revision.to_operator
+        vehicle.vehicle_type = revision.to_type
+        vehicle.livery = revision.to_livery
+
+        for field in revision.changes:
+            value = revision.changes[field]
+            # For requests, there's no from_value, just to_value
+            if "\n" in value:
+                parts = value.split("\n")
+                to_value = parts[-1]
+                if to_value.startswith("+"):
+                    to_value = to_value[1:]
+            else:
+                to_value = value
+
+            if field in ("reg", "notes", "branding", "name", "colours"):
+                setattr(vehicle, field, to_value)
+
+            elif field == "fleet number":
+                vehicle.fleet_code = to_value
+                if "/" in to_value:
+                    to_value = to_value.split("/", 1)[1]
+                if to_value.isdigit():
+                    vehicle.fleet_number = int(to_value)
+                else:
+                    vehicle.fleet_number = None
+
+        vehicle.save()
+
+        # Link the revision to the newly created vehicle
+        revision.vehicle = vehicle
+        revision.save(update_fields=["vehicle"])
+
+        # Apply features
+        if features is None:
+            features = revision.vehiclerevisionfeature_set.all()
+
+        for feature in features:
+            if feature.add:
+                vehicle.features.add(feature.feature_id)
+
+        return
+
+    # Normal revision handling (existing vehicle)
     changed_fields = []
     vehicle = revision.vehicle
 

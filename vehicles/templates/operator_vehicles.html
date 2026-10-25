@@ -30,6 +30,9 @@
         {% if request.user.trusted %}
             <li><a href="/vehicles/edits?operator={{ object.noc }}&status=pending">Pending vehicle edits</a></li>
         {% endif %}
+        {% if request.user.is_authenticated %}
+            <li><a href="{% url 'vehicle_request' object.noc %}">Add new vehicle</a></li>
+        {% endif %}
         {% if request.user.is_superuser %}
             <li><a href="{% url 'admin:vehicles_vehicle_changelist' %}?operator={{ object.noc }}">✎</a></li>
         {% endif %}

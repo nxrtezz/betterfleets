@@ -251,13 +251,12 @@ class VehicleAdmin(M2MThroughMixin, admin.ModelAdmin):
 
     def deduplicate(self, request, queryset):
         for vehicle in queryset.order_by("id"):
-            # Try to find duplicates by code/fleet_number first (AVL tracking)
-            if vehicle.code:
+            # Try to find duplicates by fleet_number first
+            if vehicle.fleet_number:
                 try:
                     duplicate = models.Vehicle.objects.get(
                         id__gt=vehicle.id,
-                        code__iexact=vehicle.code,
-                        operator=vehicle.operator_id,
+                        fleet_number=vehicle.fleet_number,
                     )  # newer record
                     self.merge_all_selected(request, (vehicle, duplicate))
                     continue
@@ -275,7 +274,6 @@ class VehicleAdmin(M2MThroughMixin, admin.ModelAdmin):
                 duplicate = models.Vehicle.objects.get(
                     id__gt=vehicle.id,
                     reg__iexact=vehicle.reg,
-                    operator=vehicle.operator_id,
                 )  # newer record
             except (
                 models.Vehicle.DoesNotExist,
@@ -559,12 +557,14 @@ class VehicleRevisionAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
 
-    list_display = ("created_at", "vehicle", "__str__", user, "message")
+    list_display = ("created_at", "vehicle", "to_operator", "__str__", user, "message", "is_request")
     actions = ("revert",)
     list_filter = (
         RevisionChangeFilter,
         UserFilter,
         ("vehicle__operator", admin.RelatedOnlyFieldListFilter),
+        ("to_operator", admin.RelatedOnlyFieldListFilter),
+        "is_request",
     )
     list_select_related = ("from_operator", "to_operator", "vehicle", "user")
 

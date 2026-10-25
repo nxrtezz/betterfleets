@@ -1,6 +1,6 @@
 {% extends 'page.html' %}
 
-{% block title %}Edit details – {{ vehicle }} – bustimes.org{% endblock %}
+{% block title %}{% if vehicle %}Edit details – {{ vehicle }}{% else %}Add new vehicle – {{ object }}{% endif %} – bustimes.org{% endblock %}
 
 {% block head %}
     {% if form and livery %}
@@ -31,8 +31,9 @@
         {% include 'vehicle_revisions.html' with revisions=pending_edits %}
     {% endif %}
 
-    <h1>Edit vehicle details</h1>
+    <h1>{% if vehicle %}Edit vehicle details{% else %}Add new vehicle{% endif %}</h1>
 
+    {% if vehicle %}
     <p>
         Ticket machine code:<br>
         {% if vehicle_unique_id and vehicle_unique_id != vehicle.code %}
@@ -40,15 +41,16 @@
         {% endif %}
         <code>{{ vehicle.code }}</code>
     </p>
+    {% endif %}
 
-    <form action="{{ vehicle.get_edit_url }}" method="POST">
+    <form action="{% if vehicle %}{{ vehicle.get_edit_url }}{% else %}{% url 'vehicle_request' object.noc %}{% endif %}" method="POST">
         <div class="edit-vehicle">
             {{ form.as_p }}
         </div>
 
         <script async src="https://imgbb.com/upload.js" data-auto-insert="viewer-links"></script>
 
-        <input type="submit" value="Save changes">
+        <input type="submit" value="{% if vehicle %}Save changes{% else %}Submit request{% endif %}">
     </form>
 
     {{ form.media }}

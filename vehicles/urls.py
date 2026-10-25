@@ -41,6 +41,11 @@ urlpatterns = [
     path("vehicles/<int:id>/edit", views.edit_vehicle),
     path("vehicles/<slug>/edit", views.edit_vehicle, name="vehicle_edit"),
     path(
+        "operators/<slug:operator_noc>/request",
+        views.vehicle_request,
+        name="vehicle_request",
+    ),
+    path(
         "vehicles/<int:id>/debug",
         views.latest_journey_debug,
         name="latest_journey_debug",

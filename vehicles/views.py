@@ -1118,13 +1118,112 @@ def edit_vehicle(request, **kwargs):
     return response
 
 
+@login_required
+def vehicle_request(request, operator_noc):
+    """View for requesting a new vehicle to be added"""
+    from busstops.models import Operator
+
+    operator = get_object_or_404(Operator, noc=operator_noc)
+
+    if not request.user.has_perm("vehicles.add_vehiclerevision"):
+        form = forms.RulesForm(request.POST or None)
+        if form.is_valid():
+            request.user.user_permissions.add(
+                Permission.objects.get(codename="add_vehiclerevision")
+            )
+        else:
+            return render(
+                request, "rules.html", {"breadcrumb": [operator], "form": form}
+            )
+
+    form_data = request.POST or None
+    form = forms.VehicleRequestForm(form_data, operator=operator)
+
+    if form_data:
+        if form.has_changed() is False or form.changed_data == ["summary"]:
+            form.add_error(None, "You haven't provided any vehicle details")
+
+        if form.is_valid():
+            data = {key: form.cleaned_data[key] for key in form.changed_data}
+
+            # Create a VehicleRevision with vehicle=None (new vehicle request)
+            revision = VehicleRevision(vehicle=None, changes={}, is_request=True)
+            features = []
+
+            # Build the revision from the form data
+            if "vehicle_type" in data:
+                revision.to_type = data.pop("vehicle_type")
+
+            revision.to_operator = operator
+
+            if "colours" in data:
+                livery = data.pop("colours")
+                revision.to_livery = livery
+                revision.changes["colours"] = f"\n+"
+
+            if "other_colour" in data:
+                to_colour = data.pop("other_colour")
+                revision.changes["colours"] = f"\n+{to_colour}"
+
+            if "features" in data:
+                for feature in data.pop("features"):
+                    features.append(
+                        VehicleRevisionFeature(revision=revision, feature=feature, add=True)
+                    )
+
+            revision.message = data.pop("summary")
+
+            if "fleet_number" in data:
+                revision.changes["fleet number"] = f"\n+{data.pop('fleet_number') or ''}"
+
+            for field in ("reg", "notes", "branding", "name"):
+                if field in data:
+                    to_value = data.pop(field)
+                    revision.changes[field] = f"\n+{to_value}"
+
+            assert not data
+
+            revision.user = request.user
+            revision.created_at = timezone.now()
+            revision.pending = True
+
+            try:
+                with transaction.atomic():
+                    revision.save()
+                    VehicleRevisionFeature.objects.bulk_create(features)
+
+            except IntegrityError as e:
+                raise
+
+            return render(
+                request,
+                "edit_vehicle.html",
+                {
+                    "revision": revision,
+                    "form": None,
+                    "vehicle": None,
+                    "object": operator,
+                },
+            )
+
+    return render(
+        request,
+        "edit_vehicle.html",
+        {
+            "form": form,
+            "vehicle": None,
+            "object": operator,
+        },
+    )
+
+
 @require_POST
 @login_required
 @transaction.atomic
 def vehicle_revision_action(request, revision_id, action):
     revision = get_object_or_404(
         VehicleRevision.objects.select_related(
-            *revision_display_related_fields, "vehicle"
+            *revision_display_related_fields, "vehicle", "to_operator"
         )
         .filter(Q(pending=True) | Q(approved_by=request.user))
         .select_for_update(of=["self"]),
@@ -1151,6 +1250,13 @@ def vehicle_revision_action(request, revision_id, action):
 
     revision.save()
 
+    # For vehicle requests, redirect to the operator vehicles page
+    if revision.is_request and action == "apply":
+        if revision.vehicle:
+            return redirect(revision.vehicle.operator.get_vehicles_url())
+        elif revision.to_operator:
+            return redirect(revision.to_operator.get_vehicles_url())
+
     return render(request, "vehicle_revision.html", {"revision": revision})
 
 
@@ -1158,7 +1264,7 @@ def vehicle_revision_action(request, revision_id, action):
 def vehicle_edits(request):
     revisions = (
         VehicleRevision.objects.select_related(
-            *revision_display_related_fields, "user", "vehicle"
+            *revision_display_related_fields, "user", "vehicle", "to_operator"
         )
         .prefetch_related("vehiclerevisionfeature_set__feature")
         .order_by("-id")

@@ -216,6 +216,98 @@ class RulesForm(forms.Form):
     rules = forms.BooleanField(label="I've read the rules", required=True)
 
 
+class VehicleRequestForm(forms.Form):
+    @property
+    def media(self):
+        return forms.Media(
+            js=(
+                "admin/js/vendor/jquery/jquery.min.js",
+                "admin/js/vendor/select2/select2.full.min.js",
+                "js/edit-vehicle.js",
+            ),
+            css={
+                "screen": ("admin/css/vendor/select2/select2.min.css",),
+            },
+        )
+
+    field_order = (
+        "fleet_number",
+        "reg",
+        "vehicle_type",
+        "colours",
+        "other_colour",
+        "branding",
+        "name",
+        "features",
+        "notes",
+    )
+
+    fleet_number = forms.CharField(required=True, max_length=24)
+    reg = RegField(label="Number plate", required=True, max_length=24)
+
+    vehicle_type = forms.ModelChoiceField(
+        widget=AutocompleteWidget(field=Vehicle.vehicle_type.field),
+        queryset=VehicleType.objects,
+        required=False,
+        empty_label="",
+    )
+
+    colours = forms.ModelChoiceField(
+        widget=AutocompleteWidget(field=Vehicle.livery.field),
+        label="Current livery",
+        queryset=Livery.objects,
+        required=False,
+        help_text="""Don't change this until the bus has *been painted*
+(<em>not</em> just "in the paint shop" or "awaiting repaint")""",
+    )
+    other_colour = forms.CharField(
+        label="Other colours",
+        help_text="E.g. '#c0c0c0 #ff0000 #ff0000' (red with a silver front)",
+        validators=[validate_colours],
+        required=False,
+        max_length=255,
+    )
+
+    branding = forms.CharField(
+        label="Other branding",
+        required=False,
+        max_length=40,
+        help_text="If it's interesting or unusual",
+    )
+    name = forms.CharField(
+        label="Vehicle name",
+        required=False,
+        max_length=40,
+    )
+
+    features = forms.ModelMultipleChoiceField(
+        queryset=VehicleFeature.objects,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+    )
+    notes = forms.CharField(required=False, max_length=255)
+    summary = SummaryField(
+        required=True,
+        max_length=255,
+        help_text="""Explain your changes,
+if they need explaining.
+E.g. how you *know* a vehicle has *definitely been* withdrawn or repainted,
+link to a picture to prove it. Be polite.""",
+    )
+
+    def clean_reg(self):
+        reg = self.cleaned_data["reg"].replace(".", "")
+        return reg
+
+    def __init__(self, data, *args, operator, **kwargs):
+        super().__init__(data, *args, **kwargs)
+        self.operator = operator
+
+        # Pre-select operator in operator field if we had one
+        # But we don't need an operator field for vehicle requests
+        # since it's inferred from the URL
+
+
 class TripUpdatesFeedForm(forms.Form):
     feed_name = forms.ChoiceField(required=False)
 

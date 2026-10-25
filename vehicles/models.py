@@ -533,7 +533,7 @@ class VehicleRevisionFeature(models.Model):
 
 
 class VehicleRevision(models.Model):
-    vehicle = models.ForeignKey(Vehicle, models.DB_CASCADE)
+    vehicle = models.ForeignKey(Vehicle, models.DB_SET_NULL, null=True, blank=True)
 
     from_operator = models.ForeignKey(
         Operator,
@@ -589,22 +589,23 @@ class VehicleRevision(models.Model):
     pending = models.BooleanField(default=False)
     disapproved = models.BooleanField(default=False)
     disapproved_reason = models.TextField(null=True, blank=True)
+    is_request = models.BooleanField(default=False, help_text="True if this is a request to add a new vehicle")
 
     class Meta:
         constraints = (
             UniqueConstraint(
                 fields=["vehicle", "to_operator"],
-                condition=Q(pending=True),
+                condition=Q(pending=True) & Q(vehicle__isnull=False),
                 name="unique_pending_operator",
             ),
             UniqueConstraint(
                 fields=["vehicle", "to_type"],
-                condition=Q(pending=True),
+                condition=Q(pending=True) & Q(vehicle__isnull=False),
                 name="unique_pending_type",
             ),
             UniqueConstraint(
                 fields=["vehicle", "to_livery"],
-                condition=Q(pending=True),
+                condition=Q(pending=True) & Q(vehicle__isnull=False),
                 name="unique_pending_livery",
             ),
         )
@@ -641,8 +642,20 @@ class VehicleRevision(models.Model):
                 yield (field, before, after)
         if self.changes:
             for key in self.changes:
-                before, after = self.changes[key].split("\n+")
-                before = before[1:]
+                value = self.changes[key]
+                # Handle vehicle requests where there's no from_value
+                if "\n" in value:
+                    parts = value.split("\n")
+                    before = parts[0]
+                    if before.startswith("-"):
+                        before = before[1:]
+                    after = parts[-1]
+                    if after.startswith("+"):
+                        after = after[1:]
+                else:
+                    before = ""
+                    after = value
+
                 if key == "colours" and html:
                     if before and before != "Other":
                         before = format_html(
