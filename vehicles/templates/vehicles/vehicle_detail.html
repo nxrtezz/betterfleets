@@ -146,7 +146,7 @@
 <script>
 // Adjust text color based on background luminance for hex colours
 function adjustHexColours() {
-    document.querySelectorAll('[class^="hex-colour-"]').forEach(function(element) {
+    document.querySelectorAll('td[class*="hex-colour-"]').forEach(function(element) {
         var style = window.getComputedStyle(element);
         var bg = style.backgroundColor;
         if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
