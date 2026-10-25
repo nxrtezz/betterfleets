@@ -832,7 +832,7 @@ def service_vehicles_history(request, slug=None, noc=None, line_name=None):
         )
 
     context = journeys_list(
-        request, journeys.select_related("vehicle"), service=service
+        request, journeys.select_related("vehicle", "service"), service=service
     )
 
     if not context:
@@ -877,7 +877,7 @@ class VehicleDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        journeys = self.object.vehiclejourney_set.select_related("service")
+        journeys = self.object.vehiclejourney_set.select_related("service", "trip")
         journeys = journeys.annotate(
             line_name=Coalesce("trip__route__line_name", "route_name")
         )
