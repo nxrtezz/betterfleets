@@ -1192,6 +1192,11 @@ def vehicle_request(request, operator_noc):
                     revision.save()
                     VehicleRevisionFeature.objects.bulk_create(features)
 
+                    if request.user.trusted:
+                        apply_revision(revision, features)
+                        revision.pending = False
+                        revision.save(update_fields=["pending"])
+
             except IntegrityError as e:
                 raise
 
