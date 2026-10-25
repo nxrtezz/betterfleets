@@ -126,6 +126,7 @@
     background: {{ colour.background }};
     border-color: {{ colour.foreground }};
     color: {{ colour.foreground }};
+    text-align: center;
 }
 {% endfor %}
 </style>
@@ -136,10 +137,34 @@
 .hex-colour-{{ journey.service.id }} {
     background: {{ journey.service.hex_colour }};
     color: white;
+    text-align: center;
 }
 </style>
 {% endif %}
 {% endfor %}
+
+<script>
+// Adjust text color based on background luminance for hex colours
+function adjustHexColours() {
+    document.querySelectorAll('[class^="hex-colour-"]').forEach(function(element) {
+        var style = window.getComputedStyle(element);
+        var bg = style.backgroundColor;
+        if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+            var rgb = bg.match(/\d+/g);
+            if (rgb && rgb.length >= 3) {
+                var r = parseInt(rgb[0]);
+                var g = parseInt(rgb[1]);
+                var b = parseInt(rgb[2]);
+                var luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+                element.style.color = luminance > 128 ? 'black' : 'white';
+            }
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', adjustHexColours);
+document.body.addEventListener('htmx:afterSwap', adjustHexColours);
+</script>
 
 {% if date %}
     {# outside of the #journeys element! #}
