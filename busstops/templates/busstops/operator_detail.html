@@ -8,7 +8,13 @@
 
 {% block content %}
 
-<h1>{{ object }}</h1>
+<h1>
+    {% if object.logo %}
+        <img src="{{ object.logo.url }}" alt="{{ object }}" style="max-height: 60px; vertical-align: middle;">
+    {% else %}
+        {{ object }}
+    {% endif %}
+</h1>
 
 <p>{{ object.get_a_mode }} operator
     {% if operator.regions.all %}

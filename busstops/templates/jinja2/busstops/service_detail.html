@@ -16,6 +16,14 @@
         }
     </style>
     {% endif %}
+    {% if object.hex_colour %}
+    <style>
+        .hex-colour-{{ object.id }} {
+            background: {{ object.hex_colour }};
+            color: white;
+        }
+    </style>
+    {% endif %}
 {% endblock head %}
 
 {% block bodyclass %}{% endblock %}
@@ -27,14 +35,14 @@
     {% for line_name in object.get_line_names() %}
         {% if line_name and line_name not in object.line_brand %}
             {% if ' ' not in line_name or line_name not in object.description %}
-                <strong class="name{% if ' ' not in line_name %} is-short{% endif %}{% if object.colour_id %} colour colour-{{ object.colour_id }}{% endif %}">
+                <strong class="name{% if ' ' not in line_name %} is-short{% endif %}{% if object.colour_id %} colour colour-{{ object.colour_id }}{% elif object.hex_colour %} colour hex-colour-{{ object.id }}{% endif %}">
                     {{ line_name }}
                 </strong>
             {% endif %}
         {% endif %}
     {% endfor %}
     {% if object.line_brand %}
-        <strong class="name{% if object.colour_id %} colour colour-{{ object.colour_id }}{% endif %}">{{ object.line_brand }}</strong>
+        <strong class="name{% if object.colour_id %} colour colour-{{ object.colour_id }}{% elif object.hex_colour %} colour hex-colour-{{ object.id }}{% endif %}">{{ object.line_brand }}</strong>
     {% endif %}
     </span>
     <span class="description">{{ object.description }}</span>
