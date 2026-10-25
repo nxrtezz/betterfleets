@@ -119,6 +119,28 @@
 
 {% load static %}
 
+{% if colours %}
+<style>
+{% for colour in colours %}
+.colour-{{ colour.id }} {
+    background: {{ colour.background }};
+    border-color: {{ colour.foreground }};
+    color: {{ colour.foreground }};
+}
+{% endfor %}
+</style>
+{% endif %}
+{% for journey in journeys %}
+{% if journey.service and journey.service.hex_colour %}
+<style>
+.hex-colour-{{ journey.service.id }} {
+    background: {{ journey.service.hex_colour }};
+    color: white;
+}
+</style>
+{% endif %}
+{% endfor %}
+
 {% if date %}
     {# outside of the #journeys element! #}
     <script src="{% static 'js/htmx.org/htmx.min.js' %}"></script>
@@ -173,7 +195,7 @@
                     {{ journey.route_name }}
                 </td>
             {% endif %}
-            <td class="link">
+            <td class="link{% if journey.service and journey.service.colour_id %} colour colour-{{ journey.service.colour_id }}{% elif journey.service and journey.service.hex_colour %} colour hex-colour-{{ journey.service.id }}{% endif %}">
                 {% if not vehicle %}
                     {% if journey.vehicle %}
                         <a href="{{ journey.vehicle.get_absolute_url }}?date={{ date.isoformat }}" rel="nofollow">{{ journey.vehicle }}</a>

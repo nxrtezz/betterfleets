@@ -709,7 +709,7 @@ def journeys_list(request, journeys, service=None, vehicle=None) -> dict:
         context["date"] = date
 
         journeys = (
-            journeys.filter(date=date).select_related("trip").order_by("datetime", "id")
+            journeys.filter(date=date).select_related("trip", "service").order_by("datetime", "id")
         )
 
         if dates and date not in dates:
@@ -725,6 +725,12 @@ def journeys_list(request, journeys, service=None, vehicle=None) -> dict:
         return context
 
     context["journeys"] = journeys = list(journeys)
+
+    # collect service colours
+    services = {journey.service for journey in journeys if journey.service}
+    if services:
+        from busstops.views import get_colours
+        context["colours"] = get_colours(services)
 
     # annotate journeys with whether each one has some location history in redis
     # (in order to show the "Map" link or not)

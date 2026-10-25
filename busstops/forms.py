@@ -94,4 +94,10 @@ class DeparturesForm(forms.Form):
 class ServiceOverrideForm(forms.Form):
     description = forms.CharField(label="Description", required=False)
     line_brand = forms.CharField(label="Marketing name", required=False)
-    colour = forms.CharField(label="Colour", required=False, widget=forms.TextInput(attrs={"placeholder": "#"}))
+    colour = forms.CharField(label="Colour", required=False, widget=forms.TextInput(attrs={"placeholder": "77328a"}))
+
+    def clean_colour(self):
+        colour = self.cleaned_data.get("colour", "")
+        if colour and not colour.startswith("#"):
+            colour = "#" + colour
+        return colour
