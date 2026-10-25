@@ -159,7 +159,18 @@
     {% endfor %}
 
     <form method="post">
-        {{ override_form.as_p() }}
+        <p>
+            <label>{{ override_form.description.label }}:</label>
+            {{ override_form.description }}
+        </p>
+        <p>
+            <label>{{ override_form.line_brand.label }}:</label>
+            {{ override_form.line_brand }}
+        </p>
+        <p>
+            <label>{{ override_form.colour.label }}:</label>
+            {{ override_form.colour }}
+        </p>
         <input type="submit" value="Add override" />
     </form>
 {% endif %}

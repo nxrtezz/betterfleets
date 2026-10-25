@@ -1206,7 +1206,6 @@ class ServiceOverride(models.Model):
         choices=(
             ("description", "Description"),
             ("line_brand", "Marketing name"),
-            ("colour", "Colour"),
         ),
         default="description",
     )

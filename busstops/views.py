@@ -1510,19 +1510,30 @@ class ServiceDetailView(DetailView):
         else:
             form = forms.ServiceOverrideForm(request.POST)
             if form.is_valid():
-                ServiceOverride.objects.update_or_create(
-                    service=self.object,
-                    field=form.cleaned_data["field"],
-                    defaults={"value": form.cleaned_data["value"]},
-                )
-                if form.cleaned_data["field"] == "colour":
-                    self.object.hex_colour = form.cleaned_data["value"]
-                    self.object.save(update_fields=["hex_colour"])
-                else:
-                    setattr(
-                        self.object, form.cleaned_data["field"], form.cleaned_data["value"]
+                if form.cleaned_data["description"]:
+                    ServiceOverride.objects.update_or_create(
+                        service=self.object,
+                        field="description",
+                        defaults={"value": form.cleaned_data["description"]},
                     )
-                    self.object.save(update_fields=[form.cleaned_data["field"]])
+                    self.object.description = form.cleaned_data["description"]
+                    self.object.save(update_fields=["description"])
+                if form.cleaned_data["line_brand"]:
+                    ServiceOverride.objects.update_or_create(
+                        service=self.object,
+                        field="line_brand",
+                        defaults={"value": form.cleaned_data["line_brand"]},
+                    )
+                    self.object.line_brand = form.cleaned_data["line_brand"]
+                    self.object.save(update_fields=["line_brand"])
+                if form.cleaned_data["colour"]:
+                    ServiceOverride.objects.update_or_create(
+                        service=self.object,
+                        field="colour",
+                        defaults={"value": form.cleaned_data["colour"]},
+                    )
+                    self.object.hex_colour = form.cleaned_data["colour"]
+                    self.object.save(update_fields=["hex_colour"])
 
         return redirect(self.object)
 

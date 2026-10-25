@@ -1,8 +1,6 @@
 from django import forms
 from turnstile.fields import TurnstileField
 
-from .models import ServiceOverride
-
 
 class ContactForm(forms.Form):
     name = forms.CharField(label="Name")
@@ -93,7 +91,7 @@ class DeparturesForm(forms.Form):
     time = forms.TimeField(required=False)
 
 
-class ServiceOverrideForm(forms.ModelForm):
-    class Meta:
-        model = ServiceOverride
-        fields = ("field", "value")
+class ServiceOverrideForm(forms.Form):
+    description = forms.CharField(label="Description", required=False)
+    line_brand = forms.CharField(label="Marketing name", required=False)
+    colour = forms.CharField(label="Colour", required=False, widget=forms.TextInput(attrs={"placeholder": "#"}))

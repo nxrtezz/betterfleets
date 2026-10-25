@@ -16,7 +16,6 @@ class Migration(migrations.Migration):
                 choices=[
                     ("description", "Description"),
                     ("line_brand", "Marketing name"),
-                    ("colour", "Colour"),
                 ],
                 default="description",
                 max_length=32,
