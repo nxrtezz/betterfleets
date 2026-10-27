@@ -3,7 +3,7 @@ import contextlib
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Q
 from django.db.models.functions import Collate
 from django.forms import ModelForm, Textarea, TextInput
@@ -431,56 +431,57 @@ class VehicleAdmin(M2MThroughMixin, admin.ModelAdmin):
             if "vehicle_operator_and_code" in str(e):
                 # Find the vehicles being edited that caused the conflict
                 # Try to merge them automatically
-                merged_count = 0
-                for changed_form in formset:
-                    if not changed_form.has_changed():
-                        continue
-                    obj = changed_form.instance
-                    if not obj.code or not obj.operator:
-                        continue
+                with transaction.atomic():
+                    merged_count = 0
+                    for changed_form in formset:
+                        if not changed_form.has_changed():
+                            continue
+                        obj = changed_form.instance
+                        if not obj.code or not obj.operator:
+                            continue
 
-                    # Find duplicate
-                    duplicate = models.Vehicle.objects.filter(
-                        code__iexact=obj.code,
-                        operator=obj.operator,
-                    ).exclude(id=obj.id if obj.id else None).first()
+                        # Find duplicate
+                        duplicate = models.Vehicle.objects.filter(
+                            code__iexact=obj.code,
+                            operator=obj.operator,
+                        ).exclude(id=obj.id if obj.id else None).first()
 
-                    if duplicate:
-                        # Merge obj into duplicate
-                        # Move related objects
-                        if obj.id:
-                            obj.vehiclejourney_set.update(vehicle=duplicate)
-                            obj.vehiclecode_set.update(vehicle=duplicate)
-                            obj.vehiclerevision_set.update(vehicle=duplicate)
+                        if duplicate:
+                            # Merge obj into duplicate
+                            # Move related objects
+                            if obj.id:
+                                obj.vehiclejourney_set.update(vehicle=duplicate)
+                                obj.vehiclecode_set.update(vehicle=duplicate)
+                                obj.vehiclerevision_set.update(vehicle=duplicate)
 
-                        # Copy details from obj to duplicate if duplicate lacks them
-                        fields_to_copy = [
-                            'vehicle_type', 'livery', 'reg', 'branding', 'name',
-                            'colours', 'fleet_code', 'fleet_number', 'withdrawn',
-                            'latest_journey', 'data', 'garage'
-                        ]
-                        for field in fields_to_copy:
-                            if getattr(obj, field) and not getattr(duplicate, field):
-                                setattr(duplicate, field, getattr(obj, field))
+                            # Copy details from obj to duplicate if duplicate lacks them
+                            fields_to_copy = [
+                                'vehicle_type', 'livery', 'reg', 'branding', 'name',
+                                'colours', 'fleet_code', 'fleet_number', 'withdrawn',
+                                'latest_journey', 'data', 'garage'
+                            ]
+                            for field in fields_to_copy:
+                                if getattr(obj, field) and not getattr(duplicate, field):
+                                    setattr(duplicate, field, getattr(obj, field))
 
-                        # Copy features
-                        if obj.features.exists() and not duplicate.features.exists():
-                            duplicate.features.set(obj.features.all())
+                            # Copy features
+                            if obj.features.exists() and not duplicate.features.exists():
+                                duplicate.features.set(obj.features.all())
 
-                        duplicate.save()
+                            duplicate.save()
 
-                        # Delete the original if it was saved
-                        if obj.id:
-                            obj.delete()
+                            # Delete the original if it was saved
+                            if obj.id:
+                                obj.delete()
 
-                        merged_count += 1
+                            merged_count += 1
 
-                if merged_count > 0:
-                    self.message_user(
-                        request,
-                        f"Automatically merged {merged_count} duplicate vehicle(s).",
-                        messages.SUCCESS,
-                    )
+                    if merged_count > 0:
+                        self.message_user(
+                            request,
+                            f"Automatically merged {merged_count} duplicate vehicle(s).",
+                            messages.SUCCESS,
+                        )
                 return
             raise
 
