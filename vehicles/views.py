@@ -1217,6 +1217,65 @@ def vehicle_request(request, operator_noc):
                 },
             )
 
+
+@login_required
+def merge_vehicle(request):
+    """View for merging vehicles"""
+    from .models import Vehicle
+
+    reg = request.GET.get("reg", "").strip().upper().replace(" ", "")
+    active_vehicle_id = request.GET.get("active_vehicle_id")
+    merge_vehicle_id = request.GET.get("merge_vehicle_id")
+
+    if merge_vehicle_id and active_vehicle_id:
+        # Perform the merge
+        active_vehicle = get_object_or_404(Vehicle, id=active_vehicle_id)
+        correct_vehicle = get_object_or_404(Vehicle, id=merge_vehicle_id)
+
+        if not request.user.has_perm("vehicles.change_vehicle"):
+            raise PermissionDenied
+
+        # Take all details from correct vehicle and apply to active vehicle
+        active_vehicle.vehicle_type = correct_vehicle.vehicle_type
+        active_vehicle.reg = correct_vehicle.reg
+        active_vehicle.fleet_number = correct_vehicle.fleet_number
+        active_vehicle.fleet_code = correct_vehicle.fleet_code
+        active_vehicle.livery = correct_vehicle.livery
+        active_vehicle.branding = correct_vehicle.branding
+        active_vehicle.name = correct_vehicle.name
+        active_vehicle.colours = correct_vehicle.colours
+
+        # Copy features
+        active_vehicle.features.set(correct_vehicle.features.all())
+
+        # Set code to reg
+        if active_vehicle.reg:
+            active_vehicle.code = active_vehicle.reg
+
+        active_vehicle.save()
+
+        # Delete the correct vehicle
+        correct_vehicle_id = correct_vehicle.id
+        correct_vehicle.delete()
+
+        return redirect(active_vehicle.get_absolute_url())
+
+    # Search for vehicles
+    vehicles = Vehicle.objects.none()
+
+    if reg:
+        vehicles = Vehicle.objects.filter(reg__iexact=reg).select_related(
+            "operator", "vehicle_type", "livery"
+        )
+
+    context = {
+        "vehicles": vehicles,
+        "reg": reg,
+        "active_vehicle_id": active_vehicle_id,
+    }
+
+    return render(request, "merge_vehicle.html", context)
+
     return render(
         request,
         "edit_vehicle.html",

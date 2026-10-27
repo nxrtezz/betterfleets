@@ -45,6 +45,7 @@ urlpatterns = [
         views.vehicle_request,
         name="vehicle_request",
     ),
+    path("vehicles/merge/", views.merge_vehicle, name="merge_vehicle"),
     path(
         "vehicles/<int:id>/debug",
         views.latest_journey_debug,

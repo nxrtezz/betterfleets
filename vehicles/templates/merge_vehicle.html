@@ -1,0 +1,39 @@
+{% extends 'page.html' %}
+
+{% block title %}Merge vehicle – bustimes.org{% endblock %}
+
+{% block content %}
+<h1>Merge vehicle</h1>
+
+{% if reg %}
+    <p>Search results for registration: <strong>{{ reg }}</strong></p>
+
+    {% if vehicles %}
+        <ul class="has-smalls">
+            {% for vehicle in vehicles %}
+                <li>
+                    <a href="?reg={{ reg }}&active_vehicle_id={{ active_vehicle_id }}&merge_vehicle_id={{ vehicle.id }}">
+                        <span>
+                            {% if vehicle.withdrawn %}
+                                <s>{{ vehicle }}</s>
+                            {% else %}
+                                {{ vehicle }}
+                            {% endif %}
+                        </span>
+                        {% if vehicle.operator %}
+                            <small>{{ vehicle.operator }}</small>
+                        {% endif %}
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+        <p>Click on a vehicle to merge it with the active vehicle.</p>
+    {% else %}
+        <p>No vehicles found with that registration.</p>
+    {% endif %}
+{% else %}
+    <p>Please enter a registration number to search for vehicles to merge.</p>
+{% endif %}
+
+<p><a href="javascript:history.back()">Back</a></p>
+{% endblock %}

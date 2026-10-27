@@ -190,6 +190,10 @@ def apply_revision(revision, features=None):
                 else:
                     vehicle.fleet_number = None
 
+        # Set code to reg if reg is present
+        if vehicle.reg:
+            vehicle.code = vehicle.reg
+
         vehicle.save()
 
         # Link the revision to the newly created vehicle
