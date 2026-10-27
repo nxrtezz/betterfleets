@@ -66,7 +66,7 @@ def get_versions(session, source):
     soup = bs4.BeautifulSoup(response.text, "lxml")
 
     for heading in soup.find_all("h3"):
-        if " to " not in heading.text:
+        if "Current Data" not in heading.text or " to " not in heading.text:
             continue
 
         dates = (
