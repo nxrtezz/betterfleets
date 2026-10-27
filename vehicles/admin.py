@@ -384,6 +384,60 @@ class VehicleAdmin(M2MThroughMixin, admin.ModelAdmin):
         if obj.latest_journey:
             return obj.latest_journey.datetime
 
+    def save_model(self, request, obj, form, change):
+        try:
+            super().save_model(request, obj, form, change)
+        except IntegrityError as e:
+            if "vehicle_operator_and_code" in str(e):
+                # Find the duplicate vehicle
+                duplicate = models.Vehicle.objects.filter(
+                    code__iexact=obj.code,
+                    operator=obj.operator,
+                ).exclude(id=obj.id if obj.id else None).first()
+
+                if duplicate:
+                    # Copy details from obj to duplicate if duplicate lacks them
+                    fields_to_copy = [
+                        'vehicle_type', 'livery', 'reg', 'branding', 'name',
+                        'colours', 'fleet_code', 'fleet_number', 'withdrawn',
+                        'latest_journey', 'data', 'garage'
+                    ]
+                    for field in fields_to_copy:
+                        if getattr(obj, field) and not getattr(duplicate, field):
+                            setattr(duplicate, field, getattr(obj, field))
+
+                    # Copy features
+                    if obj.features.exists() and not duplicate.features.exists():
+                        duplicate.features.set(obj.features.all())
+
+                    duplicate.save()
+
+                    self.message_user(
+                        request,
+                        format_html(
+                            "Merged into existing vehicle <a href='{}'>{}</a>",
+                            duplicate.get_absolute_url(),
+                            duplicate,
+                        ),
+                        messages.WARNING,
+                    )
+                    return
+            raise
+
+    def save_formset(self, request, form, formset, change):
+        try:
+            return super().save_formset(request, form, formset, change)
+        except IntegrityError as e:
+            if "vehicle_operator_and_code" in str(e):
+                self.message_user(
+                    request,
+                    "Duplicate vehicle code detected. Select the affected vehicles and use the 'merge_all_selected' action to merge them.",
+                    messages.ERROR,
+                )
+                # Don't raise - let the user handle it manually
+                return
+            raise
+
     def get_changelist_form(self, request, **kwargs):
         kwargs.setdefault("form", VehicleAdminForm)
         return super().get_changelist_form(request, **kwargs)
