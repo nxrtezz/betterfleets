@@ -1631,6 +1631,9 @@ class Command(BaseCommand):
                 for o in self.service_overrides[service.id]:
                     if o.field == "hex_colour":
                         service.hex_colour = o.value
+                    elif o.field == "colour":
+                        # Handle old 'colour' field - treat as hex_colour
+                        service.hex_colour = o.value
                     else:
                         setattr(service, o.field, o.value)
 

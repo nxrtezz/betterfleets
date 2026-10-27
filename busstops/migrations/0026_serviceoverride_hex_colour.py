@@ -17,6 +17,7 @@ class Migration(migrations.Migration):
                     ("description", "Description"),
                     ("line_brand", "Marketing name"),
                     ("hex_colour", "Hex colour"),
+                    ("colour", "Hex colour (legacy)"),
                 ],
                 default="description",
                 max_length=32,
