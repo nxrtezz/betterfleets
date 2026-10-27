@@ -172,6 +172,10 @@ document.body.addEventListener('htmx:afterSwap', adjustHexColours);
     <script src="{% static 'js/htmx.org/htmx.min.js' %}"></script>
 {% endif %}
 
+{% if request.user.is_superuser %}
+<script src="{% static 'js/edit-vehicle.js' %}"></script>
+{% endif %}
+
 <div id="journeys" data-hx-history-elt>
 
 {% if date %}

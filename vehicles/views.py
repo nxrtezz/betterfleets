@@ -1221,6 +1221,9 @@ def vehicle_request(request, operator_noc):
 @login_required
 def merge_vehicle(request):
     """View for merging vehicles"""
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    """View for merging vehicles"""
     from .models import Vehicle
 
     reg = request.GET.get("reg", "").strip().upper().replace(" ", "")

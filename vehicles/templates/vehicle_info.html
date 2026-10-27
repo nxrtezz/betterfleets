@@ -136,6 +136,7 @@
             <li><a href="{% url 'admin:vehicles_vehicle_change' vehicle.pk %}">✎</a></li>
         {% endif %}
 
+        {% if request.user.is_superuser %}
         <li class="vehicle-menu">
             <button type="button" class="menu-button" aria-label="Menu">⋯</button>
             <ul class="menu-dropdown">
@@ -144,5 +145,6 @@
                 <li><button type="button" class="menu-item delete-vehicle">Delete vehicle</button></li>
             </ul>
         </li>
+        {% endif %}
     </ul>
 {% endwith %}
