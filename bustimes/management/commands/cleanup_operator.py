@@ -5,6 +5,8 @@ from django.db.models import Q
 
 from busstops.models import Operator, Service
 
+from vehicles.models import VehicleJourney
+
 from ...models import Route, Trip
 
 
@@ -31,6 +33,10 @@ class Command(BaseCommand):
         # Delete routes for these services
         route_count = Route.objects.filter(service__in=service_ids).delete()[0]
         self.stdout.write(f"Deleted {route_count} routes")
+
+        # Delete vehicle journeys for these services
+        vj_count = VehicleJourney.objects.filter(service__in=service_ids).delete()[0]
+        self.stdout.write(f"Deleted {vj_count} vehicle journeys")
 
         # Delete services
         service_count = Service.objects.filter(operator=operator).delete()[0]
