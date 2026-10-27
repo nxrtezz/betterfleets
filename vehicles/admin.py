@@ -250,8 +250,70 @@ class VehicleAdmin(M2MThroughMixin, admin.ModelAdmin):
             )
 
     def deduplicate(self, request, queryset):
+        # New logic: merge vehicles with same operator and fleet code, both not withdrawn
+        # One has latest_journey (tracks), other has details (livery, type, reg)
         for vehicle in queryset.order_by("id"):
-            # Try to find duplicates by fleet_number first
+            if not vehicle.fleet_code or not vehicle.operator or vehicle.withdrawn:
+                continue
+
+            # Find vehicles with same operator and fleet code, not withdrawn
+            duplicates = models.Vehicle.objects.filter(
+                operator=vehicle.operator,
+                fleet_code__iexact=vehicle.fleet_code,
+                withdrawn=False,
+            ).exclude(id=vehicle.id)
+
+            for duplicate in duplicates:
+                # Check if one has latest_journey and the other has details
+                has_tracking = vehicle.latest_journey is not None or duplicate.latest_journey is not None
+                has_details = (vehicle.vehicle_type or vehicle.livery or vehicle.reg or
+                              duplicate.vehicle_type or duplicate.livery or duplicate.reg)
+
+                if has_tracking and has_details:
+                    # Determine which vehicle to keep (the one with latest_journey)
+                    if vehicle.latest_journey:
+                        keep_vehicle = vehicle
+                        delete_vehicle = duplicate
+                    elif duplicate.latest_journey:
+                        keep_vehicle = duplicate
+                        delete_vehicle = vehicle
+                    else:
+                        continue  # Neither has tracking, skip
+
+                    # Copy details from delete_vehicle to keep_vehicle if keep_vehicle lacks them
+                    fields_to_copy = ['vehicle_type', 'livery', 'reg', 'branding', 'name', 'colours']
+                    for field in fields_to_copy:
+                        if not getattr(keep_vehicle, field) and getattr(delete_vehicle, field):
+                            setattr(keep_vehicle, field, getattr(delete_vehicle, field))
+
+                    # Copy features
+                    if not keep_vehicle.features.exists() and delete_vehicle.features.exists():
+                        keep_vehicle.features.set(delete_vehicle.features.all())
+
+                    # Set code to reg if keep_vehicle doesn't have a code but has a reg
+                    if not keep_vehicle.code and keep_vehicle.reg:
+                        keep_vehicle.code = keep_vehicle.reg
+
+                    keep_vehicle.save()
+
+                    # Move journeys and codes
+                    delete_vehicle.vehiclejourney_set.update(vehicle=keep_vehicle)
+                    delete_vehicle.vehiclecode_set.update(vehicle=keep_vehicle)
+                    delete_vehicle.vehiclerevision_set.update(vehicle=keep_vehicle)
+
+                    delete_vehicle.delete()
+
+                    self.message_user(
+                        request,
+                        format_html(
+                            "Merged {} (with details) into {} (with tracking)",
+                            delete_vehicle,
+                            keep_vehicle,
+                        ),
+                    )
+
+        # Original logic: Try to find duplicates by fleet_number first
+        for vehicle in queryset.order_by("id"):
             if vehicle.fleet_number:
                 try:
                     duplicate = models.Vehicle.objects.get(
