@@ -4,7 +4,7 @@ from django.contrib.gis.db.models import GeometryField
 from django.db.models import CharField, Exists, F, Func, OuterRef, Value
 from django.db.models.aggregates import StringAgg
 from django.db.models.functions import Cast, Now
-from django.forms import ModelForm, Textarea
+from django.forms import ModelForm, SelectMultiple, Textarea
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
@@ -64,12 +64,15 @@ class VersionInline(admin.TabularInline):
 
 class TimetableDataSourceAdminForm(ModelForm):
     class Meta:
-        widgets = {"notes": Textarea()}
+        widgets = {
+            "notes": Textarea(),
+            "operators": SelectMultiple(attrs={"size": 20}),
+        }
 
 
 @admin.register(TimetableDataSource)
 class TimetableDataSourceAdmin(M2MThroughMixin, admin.ModelAdmin):
-    autocomplete_fields = ("operators",)
+    autocomplete_fields = ()
     list_display = (
         "id",
         "name",
