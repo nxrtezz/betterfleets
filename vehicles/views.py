@@ -247,7 +247,7 @@ def operator_vehicles(request, slug=None, group_slug=None):
         vehicles = vehicles.annotate(
             pending_edits=Exists("vehiclerevision", filter=Q(pending=True))
         )
-        vehicles = vehicles.select_related("latest_journey")
+        vehicles = vehicles.select_related("latest_journey", "latest_journey__service", "latest_journey__service__colour")
 
         context = {
             "object": operator,
@@ -312,10 +312,17 @@ def operator_vehicles(request, slug=None, group_slug=None):
         for vehicle in vehicles:
             if vehicle.latest_journey:
                 when = vehicle.latest_journey.datetime
+                service_colour = None
+                if vehicle.latest_journey.service:
+                    if vehicle.latest_journey.service.hex_colour:
+                        service_colour = vehicle.latest_journey.service.hex_colour
+                    elif vehicle.latest_journey.service.colour:
+                        service_colour = vehicle.latest_journey.service.colour.background
                 vehicle.last_seen = {
                     "service": vehicle.latest_journey.route_name,
                     "when": when,
                     "today": when >= today,
+                    "service_colour": service_colour,
                 }
 
         context["map"] = any(

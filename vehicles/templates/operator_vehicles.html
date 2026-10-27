@@ -99,6 +99,28 @@ ticket machines, a byproduct of the live bus tracking.</p>
 
 {% load tz %}
 
+<script>
+// Adjust text color based on background luminance for service colours
+function adjustServiceColours() {
+    document.querySelectorAll('.last-seen.colour').forEach(function(element) {
+        var style = window.getComputedStyle(element);
+        var bg = style.backgroundColor;
+        if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+            var rgb = bg.match(/\d+/g);
+            if (rgb && rgb.length >= 3) {
+                var r = parseInt(rgb[0]);
+                var g = parseInt(rgb[1]);
+                var b = parseInt(rgb[2]);
+                var luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+                element.style.color = luminance > 128 ? 'black' : 'white';
+            }
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', adjustServiceColours);
+</script>
+
 {% timezone object.timezone|default:"Europe/London" %}
 <div class="table-wrapper">
 <table class="fleet compact">
@@ -144,7 +166,7 @@ ticket machines, a byproduct of the live bus tracking.</p>
                     {% endif %}</td>
                 {% endfor %}
 
-                {% if not parent %}<td class="last-seen">
+                {% if not parent %}<td class="last-seen{% if vehicle.last_seen.service_colour %} colour{% endif %}"{% if vehicle.last_seen.service_colour %} style="background: {{ vehicle.last_seen.service_colour }}; text-align: center;"{% endif %}>
                     {{ vehicle.last_seen.service }}
                 </td>
                 <td class="last-seen">
