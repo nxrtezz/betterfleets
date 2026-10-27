@@ -3,7 +3,7 @@
 from django.core.management.base import BaseCommand
 
 from busstops.models import DataSource, Service
-from bustimes.models import Route, Trip
+from bustimes.models import Route
 from vehicles.models import VehicleJourney
 
 
@@ -32,16 +32,12 @@ class Command(BaseCommand):
         routes = Route.objects.filter(service__in=services)
         route_count = routes.count()
 
-        # Get all trips for these services
-        trips = Trip.objects.filter(service__in=services)
-        trip_count = trips.count()
-
         # Get all vehicle journeys for these services
         vehicle_journeys = VehicleJourney.objects.filter(service__in=services)
         vj_count = vehicle_journeys.count()
 
         self.stdout.write(
-            f"Found {service_count} services, {route_count} routes, {trip_count} trips, and {vj_count} vehicle journeys"
+            f"Found {service_count} services, {route_count} routes, and {vj_count} vehicle journeys"
         )
 
         if dry_run:
@@ -51,10 +47,6 @@ class Command(BaseCommand):
         # Delete vehicle journeys first (they have foreign key to service)
         deleted_vj, _ = vehicle_journeys.delete()
         self.stdout.write(self.style.SUCCESS(f"Deleted {deleted_vj} vehicle journeys"))
-
-        # Delete trips (they have foreign key to service)
-        deleted_trips, _ = trips.delete()
-        self.stdout.write(self.style.SUCCESS(f"Deleted {deleted_trips} trips"))
 
         # Delete routes (they have foreign key to service)
         deleted_routes, _ = routes.delete()
