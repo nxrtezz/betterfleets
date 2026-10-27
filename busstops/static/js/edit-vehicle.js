@@ -100,92 +100,74 @@
         minimumInputLength: 1
     });
 
-    // Vehicle menu functionality
-    const menuButton = document.querySelector('.menu-button');
-    const menuDropdown = document.querySelector('.menu-dropdown');
-
-    if (menuButton && menuDropdown) {
-        menuButton.addEventListener('click', function(e) {
-            e.stopPropagation();
-            menuDropdown.classList.toggle('open');
+    // Vehicle management links
+    const addPhotoLink = document.querySelector('.add-photo-link');
+    if (addPhotoLink) {
+        addPhotoLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Open the existing photo form
+            const photoDetails = document.querySelector('details[name="advanced"]');
+            if (photoDetails) {
+                photoDetails.open = true;
+                photoDetails.scrollIntoView({ behavior: 'smooth' });
+            }
         });
+    }
 
-        // Close menu when clicking outside
-        document.addEventListener('click', function() {
-            menuDropdown.classList.remove('open');
+    const mergeVehicleLink = document.querySelector('.merge-vehicle-link');
+    if (mergeVehicleLink) {
+        mergeVehicleLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            const vehicleId = document.querySelector('meta[name="vehicle-id"]')?.content;
+            const reg = prompt('Enter registration number to search for:');
+            if (reg && vehicleId) {
+                window.location.href = '/vehicles/merge/?reg=' + encodeURIComponent(reg) + '&active_vehicle_id=' + vehicleId;
+            }
         });
+    }
 
-        // Add photo functionality
-        const addPhotoButton = document.querySelector('.menu-item.add-photo');
-        if (addPhotoButton) {
-            addPhotoButton.addEventListener('click', function() {
-                menuDropdown.classList.remove('open');
-                // Open the existing photo form
-                const photoDetails = document.querySelector('details[name="advanced"]');
-                if (photoDetails) {
-                    photoDetails.open = true;
-                    photoDetails.scrollIntoView({ behavior: 'smooth' });
-                }
-            });
-        }
-
-        // Merge vehicle functionality
-        const mergeVehicleButton = document.querySelector('.menu-item.merge-vehicle');
-        if (mergeVehicleButton) {
-            mergeVehicleButton.addEventListener('click', function() {
-                menuDropdown.classList.remove('open');
+    const deleteVehicleLink = document.querySelector('.delete-vehicle-link');
+    if (deleteVehicleLink) {
+        deleteVehicleLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (confirm('Are you sure you want to delete this vehicle? This action cannot be undone.')) {
                 const vehicleId = document.querySelector('meta[name="vehicle-id"]')?.content;
-                const reg = prompt('Enter registration number to search for:');
-                if (reg && vehicleId) {
-                    window.location.href = '/vehicles/merge/?reg=' + encodeURIComponent(reg) + '&active_vehicle_id=' + vehicleId;
-                }
-            });
-        }
-
-        // Delete vehicle functionality
-        const deleteVehicleButton = document.querySelector('.menu-item.delete-vehicle');
-        if (deleteVehicleButton) {
-            deleteVehicleButton.addEventListener('click', function() {
-                menuDropdown.classList.remove('open');
-                if (confirm('Are you sure you want to delete this vehicle? This action cannot be undone.')) {
-                    const vehicleId = document.querySelector('meta[name="vehicle-id"]')?.content;
-                    if (vehicleId) {
-                        // Get CSRF token from cookie
-                        function getCookie(name) {
-                            let cookieValue = null;
-                            if (document.cookie && document.cookie !== '') {
-                                const cookies = document.cookie.split(';');
-                                for (let i = 0; i < cookies.length; i++) {
-                                    const cookie = cookies[i].trim();
-                                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                                        break;
-                                    }
+                if (vehicleId) {
+                    // Get CSRF token from cookie
+                    function getCookie(name) {
+                        let cookieValue = null;
+                        if (document.cookie && document.cookie !== '') {
+                            const cookies = document.cookie.split(';');
+                            for (let i = 0; i < cookies.length; i++) {
+                                const cookie = cookies[i].trim();
+                                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                                    break;
                                 }
                             }
-                            return cookieValue;
                         }
-                        const csrfToken = getCookie('csrftoken');
-                        if (csrfToken) {
-                            fetch('/admin/vehicles/vehicle/' + vehicleId + '/delete/', {
-                                method: 'POST',
-                                headers: {
-                                    'X-CSRFToken': csrfToken,
-                                },
-                            }).then(response => {
-                                if (response.ok) {
-                                    window.location.href = '/';
-                                } else {
-                                    alert('Failed to delete vehicle');
-                                }
-                            });
-                        } else {
-                            alert('Could not get CSRF token');
-                        }
+                        return cookieValue;
+                    }
+                    const csrfToken = getCookie('csrftoken');
+                    if (csrfToken) {
+                        fetch('/admin/vehicles/vehicle/' + vehicleId + '/delete/', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': csrfToken,
+                            },
+                        }).then(response => {
+                            if (response.ok) {
+                                window.location.href = '/';
+                            } else {
+                                alert('Failed to delete vehicle');
+                            }
+                        });
+                    } else {
+                        alert('Could not get CSRF token');
                     }
                 }
-            });
-        }
+            }
+        });
     }
 
 })();
