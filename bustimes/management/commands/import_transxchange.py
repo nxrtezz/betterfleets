@@ -1626,10 +1626,13 @@ class Command(BaseCommand):
                 if in_desc and not service.description:
                     service.description = in_desc
 
-            # apply "overrides" of line_brand and description
+            # apply "overrides" of line_brand, description, and hex_colour
             if service.id and service.id in self.service_overrides:
                 for o in self.service_overrides[service.id]:
-                    setattr(service, o.field, o.value)
+                    if o.field == "hex_colour":
+                        service.hex_colour = o.value
+                    else:
+                        setattr(service, o.field, o.value)
 
             service.save()
 
