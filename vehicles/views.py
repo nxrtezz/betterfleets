@@ -62,6 +62,7 @@ from photos.utils import WrongLicense, add_flickr_photo, add_uploaded_photo
 from tfl.models import Journey as TflJourney
 
 from . import filters, forms
+from .forms import DateForm
 from .management.commands import import_bod_avl
 from .models import (
     Driver,
