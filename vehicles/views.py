@@ -892,9 +892,13 @@ class VehicleDetailView(DetailView):
             line_name=Coalesce("trip__route__line_name", "route_name")
         )
 
+        # Check if any journey has drivers
+        has_drivers = any(journey.drivers.exists() for journey in journeys)
+
         context = {
             **context,
             **journeys_list(self.request, journeys, vehicle=self.object),
+            "has_drivers": has_drivers,
         }
         del journeys
 

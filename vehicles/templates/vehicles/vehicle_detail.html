@@ -215,7 +215,7 @@ document.body.addEventListener('htmx:afterSwap', adjustHexColours);
              <th scope="col">{% if not vehicle %}Vehicle{% else %}Route{% endif %}</th>
             <th scope="col" colspan="2">Trip</th>
             <th scope="col">To</th>
-            <th scope="col">Driver</th>
+            {% if has_drivers %}<th scope="col">Driver</th>{% endif %}
         </tr>
     </thead>
     <tbody>
@@ -246,11 +246,13 @@ document.body.addEventListener('htmx:afterSwap', adjustHexColours);
                 <td class="tabular">{{ journey.datetime|time:"H:i" }}{% if journey.datetime|date:"Y-m-d" > date.isoformat %}⁺¹{% endif %}</td>
             {% endif %}
             <td>{% firstof journey.destination journey.direction %}</td>
+            {% if has_drivers %}
             <td class="link">
                 {% for driver in journey.drivers.all %}
                     <a href="{{ driver.get_absolute_url }}" title="{{ driver }}">👤</a>
                 {% endfor %}
             </td>
+            {% endif %}
             {% if journey.locations is not False %}
                 <td class="link"><a href="/journeys/{{ journey.id }}#context={% if vehicle %}vehicle{% else %}service{% endif %}">Map</a></td>
             {% endif %}
