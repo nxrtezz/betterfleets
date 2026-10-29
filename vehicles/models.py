@@ -718,6 +718,25 @@ class VehicleRevision(models.Model):
             yield f"vehicle {vehicle.id} reverted {fields}"
 
 
+class Driver(models.Model):
+    driver_ref = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255, blank=True)
+    operator = models.ForeignKey(
+        Operator, models.DB_SET_NULL, null=True, blank=True
+    )
+
+    class Meta:
+        ordering = ("driver_ref",)
+
+    def __str__(self):
+        if self.name:
+            return f"{self.driver_ref} ({self.name})"
+        return self.driver_ref
+
+    def get_absolute_url(self):
+        return reverse("driver_detail", args=(self.id,))
+
+
 class VehicleJourney(models.Model):
     datetime = models.DateTimeField()
     date = models.DateField()
@@ -738,6 +757,9 @@ class VehicleJourney(models.Model):
     # trip_matched = models.BooleanField(default=True)
     # block = models.ForeignKey("bustimes.Block", models.DB_SET_NULL, null=True, blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, editable=False)
+    drivers = models.ManyToManyField(
+        Driver, blank=True, through="VehicleJourneyDriver"
+    )
 
     def get_absolute_url(self):
         # TODO: change to "/journeys/{self.id}" (actually using `reverse()`)
@@ -794,6 +816,23 @@ class VehicleJourney(models.Model):
             slug = f"{self.vehicle.operator_id}:{self.route_name}"
         return (
             reverse("service_vehicles", args=(slug,)) + "?date=" + self.date.isoformat()
+        )
+
+
+class VehicleJourneyDriver(models.Model):
+    journey = models.ForeignKey(
+        VehicleJourney, models.DB_CASCADE
+    )
+    driver = models.ForeignKey(
+        Driver, models.DB_CASCADE
+    )
+
+    class Meta:
+        constraints = (
+            models.UniqueConstraint(
+                fields=["journey", "driver"],
+                name="unique_journey_driver",
+            ),
         )
 
 

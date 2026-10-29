@@ -64,10 +64,12 @@ from tfl.models import Journey as TflJourney
 from . import filters, forms
 from .management.commands import import_bod_avl
 from .models import (
+    Driver,
     Livery,
     SiriSubscription,
     Vehicle,
     VehicleJourney,
+    VehicleJourneyDriver,
     VehicleRevision,
     VehicleRevisionFeature,
     get_text_colour,
@@ -884,7 +886,7 @@ class VehicleDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        journeys = self.object.vehiclejourney_set.select_related("service", "trip")
+        journeys = self.object.vehiclejourney_set.select_related("service", "trip").prefetch_related("drivers")
         journeys = journeys.annotate(
             line_name=Coalesce("trip__route__line_name", "route_name")
         )
@@ -1737,3 +1739,38 @@ def traccar(request, uuid):
     queue_device_location(uuid, when, device_id, lon, lat, bearing)
 
     return HttpResponse()
+
+
+@require_safe
+def driver_detail(request, pk: int):
+    driver = get_object_or_404(Driver, pk=pk)
+
+    form = DateForm(request.GET)
+    if form.is_valid():
+        date = form.cleaned_data["date"]
+    else:
+        date = timezone.localdate()
+
+    journeys = VehicleJourney.objects.filter(
+        drivers=driver,
+        date=date,
+    ).select_related("vehicle", "service", "trip").prefetch_related("drivers")
+
+    journeys = journeys.annotate(
+        destination_name=Coalesce(
+            "destination",
+            "direction",
+        ),
+    )
+
+    return render(
+        request,
+        "vehicles/driver_detail.html",
+        {
+            "object": driver,
+            "breadcrumb": [driver.operator] if driver.operator else [],
+            "form": form,
+            "date": date,
+            "journeys": journeys,
+        },
+    )

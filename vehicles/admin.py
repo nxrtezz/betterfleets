@@ -539,6 +539,7 @@ class VehicleJourneyAdmin(admin.ModelAdmin):
     show_full_result_count = False
     ordering = ("-id",)
     readonly_fields = ("uuid",)
+    inlines = (VehicleJourneyDriverInline,)
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
@@ -755,3 +756,17 @@ class SiriSubscriptionAdmin(admin.ModelAdmin):
 
 
 admin.site.register(models.VehicleFeature)
+
+
+@admin.register(models.Driver)
+class DriverAdmin(admin.ModelAdmin):
+    list_display = ("driver_ref", "name", "operator")
+    list_filter = (("operator", admin.RelatedOnlyFieldListFilter),)
+    search_fields = ("driver_ref", "name")
+    raw_id_fields = ("operator",)
+
+
+class VehicleJourneyDriverInline(admin.TabularInline):
+    model = models.VehicleJourneyDriver
+    extra = 0
+    autocomplete_fields = ("driver",)

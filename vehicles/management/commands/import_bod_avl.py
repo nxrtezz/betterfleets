@@ -39,7 +39,7 @@ from bustimes.utils import cache_routes
 from tfl import utils as tfl_utils
 
 from ... import utils
-from ...models import Vehicle, VehicleJourney, VehicleLocation
+from ...models import Driver, Vehicle, VehicleJourney, VehicleJourneyDriver, VehicleLocation
 from ...rtpi import stop_times_cache_stats
 from ...utils import append_status
 from ..import_live_vehicles import ImportLiveVehiclesCommand, Status
@@ -787,6 +787,32 @@ class Command(ImportLiveVehiclesCommand):
             # the service date - the start time can be after 24:00
             # (if there's a trip, its start time determines the date instead)
             journey.date = progress_journey.date
+
+        # Handle driver references
+        try:
+            extensions = item.get("Extensions", {})
+            vehicle_journey_ext = extensions.get("VehicleJourney", {})
+            driver_ref = vehicle_journey_ext.get("DriverRef")
+            if driver_ref:
+                journey_operator = None
+                if journey.service and journey.service.operator.exists():
+                    journey_operator = journey.service.operator.first()
+                elif vehicle.operator:
+                    journey_operator = vehicle.operator
+
+                driver, created = Driver.objects.get_or_create(
+                    driver_ref=driver_ref,
+                    defaults={
+                        "operator": journey_operator
+                    }
+                )
+                # Associate driver with journey using the through model
+                VehicleJourneyDriver.objects.get_or_create(
+                    journey=journey,
+                    driver=driver
+                )
+        except (KeyError, TypeError):
+            pass
 
         return journey
 
