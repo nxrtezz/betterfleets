@@ -517,6 +517,12 @@ class UserFilter(admin.SimpleListFilter):
         return queryset.filter(user=self.value())
 
 
+class VehicleJourneyDriverInline(admin.TabularInline):
+    model = models.VehicleJourneyDriver
+    extra = 0
+    autocomplete_fields = ("driver",)
+
+
 @admin.register(models.VehicleJourney)
 class VehicleJourneyAdmin(admin.ModelAdmin):
     list_display = (
@@ -764,9 +770,3 @@ class DriverAdmin(admin.ModelAdmin):
     list_filter = (("operator", admin.RelatedOnlyFieldListFilter),)
     search_fields = ("driver_ref", "name")
     raw_id_fields = ("operator",)
-
-
-class VehicleJourneyDriverInline(admin.TabularInline):
-    model = models.VehicleJourneyDriver
-    extra = 0
-    autocomplete_fields = ("driver",)
