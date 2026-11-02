@@ -1,0 +1,36 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>Upload fleet list from Excel</h1>
+
+<p>Upload an Excel file to update vehicle information for the selected operators.</p>
+
+<p>The Excel file should have the following columns:</p>
+<ul>
+    <li>Vehicle ID</li>
+    <li>Operator (noc)</li>
+    <li>slug</li>
+    <li>code</li>
+    <li>fleet number</li>
+    <li>reg</li>
+    <li>vehicle type</li>
+    <li>livery id</li>
+    <li>branding</li>
+    <li>name</li>
+    <li>garage</li>
+</ul>
+
+<p>Selected operators:</p>
+<ul>
+    {% for obj in queryset %}
+        <li>{{ obj }}</li>
+    {% endfor %}
+</ul>
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="submit" name="apply" value="Upload" class="default">
+    <a href="{% url 'admin:vehicles_vehicle_changelist' %}" class="button">Cancel</a>
+</form>
+{% endblock %}

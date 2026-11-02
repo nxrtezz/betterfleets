@@ -7,11 +7,13 @@ from django.db.models import CharField, Exists, F, OuterRef, Q, Value
 from django.db.models.aggregates import StringAgg
 from django.db.models.functions import Cast, Now, TruncDate
 from django.forms import ModelForm, Textarea
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
+import openpyxl
+from openpyxl.styles import Font
 from sql_util.utils import SubqueryCount
 
 from buses.admin_utils import M2MThroughMixin
@@ -160,6 +162,7 @@ class OperatorAdmin(M2MThroughMixin, admin.ModelAdmin):
     readonly_fields = ("search_vector", "modified_at")
     prepopulated_fields = {"slug": ("name",)}
     autocomplete_fields = ("licences", "payment_methods")
+    actions = ("download_vehicles", "upload_fleet_list")
 
     def get_exclude(self, request, obj=None):
         if obj:
@@ -571,6 +574,260 @@ class ServiceAdmin(M2MThroughMixin, GISModelAdmin):
         return render(request, "admin/assign_to_operator.html", context)
 
     assign_to_operator.short_description = "Assign to operator"
+
+    def download_vehicles(self, request, queryset):
+        from vehicles.models import Vehicle
+
+        response = HttpResponse(
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response["Content-Disposition"] = 'attachment; filename="vehicles.xlsx"'
+
+        workbook = openpyxl.Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Vehicles"
+
+        # Header row
+        headers = [
+            "Vehicle ID",
+            "Operator (noc)",
+            "slug",
+            "code",
+            "fleet number",
+            "reg",
+            "vehicle type",
+            "livery id",
+            "branding",
+            "name",
+            "garage",
+        ]
+        for col_num, header in enumerate(headers, 1):
+            cell = worksheet.cell(row=1, column=col_num, value=header)
+            cell.font = Font(bold=True)
+
+        # Get all vehicles for the selected operators
+        vehicles = Vehicle.objects.filter(operator__in=queryset).select_related(
+            "operator", "vehicle_type", "livery", "garage"
+        )
+
+        for row_num, vehicle in enumerate(vehicles, 2):
+            worksheet.cell(row=row_num, column=1, value=vehicle.id)
+            worksheet.cell(row=row_num, column=2, value=vehicle.operator.noc if vehicle.operator else "")
+            worksheet.cell(row=row_num, column=3, value=vehicle.slug or "")
+            worksheet.cell(row=row_num, column=4, value=vehicle.code or "")
+            worksheet.cell(row=row_num, column=5, value=vehicle.fleet_number or "")
+            worksheet.cell(row=row_num, column=6, value=vehicle.reg or "")
+            worksheet.cell(row=row_num, column=7, value=vehicle.vehicle_type.name if vehicle.vehicle_type else "")
+            worksheet.cell(row=row_num, column=8, value=vehicle.livery_id or "")
+            worksheet.cell(row=row_num, column=9, value=vehicle.branding or "")
+            worksheet.cell(row=row_num, column=10, value=vehicle.name or "")
+            worksheet.cell(row=row_num, column=11, value=vehicle.garage_id or "")
+
+        workbook.save(response)
+        return response
+
+    download_vehicles.short_description = "Download vehicle list as Excel"
+
+    def upload_fleet_list(self, request, queryset):
+        if request.method == "POST" and "apply" in request.POST:
+            from vehicles.admin import VehicleUploadForm
+
+            form = VehicleUploadForm(request.POST, request.FILES)
+            if form.is_valid():
+                file = request.FILES["file"]
+                include_withdrawn = form.cleaned_data["include_withdrawn"]
+                replace_mode = form.cleaned_data["replace_mode"]
+
+                try:
+                    workbook = openpyxl.load_workbook(file)
+                    worksheet = workbook.active
+
+                    if worksheet.max_row < 2:
+                        self.message_user(request, "File is empty", messages.ERROR)
+                        return HttpResponseRedirect(
+                            reverse("admin:busstops_operator_changelist")
+                        )
+
+                    # Verify header row
+                    headers = [
+                        worksheet.cell(row=1, column=col).value
+                        for col in range(1, 12)
+                    ]
+                    expected_headers = [
+                        "Vehicle ID",
+                        "Operator (noc)",
+                        "slug",
+                        "code",
+                        "fleet number",
+                        "reg",
+                        "vehicle type",
+                        "livery id",
+                        "branding",
+                        "name",
+                        "garage",
+                    ]
+                    if headers != expected_headers:
+                        self.message_user(
+                            request,
+                            f"Invalid headers. Expected: {expected_headers}",
+                            messages.ERROR,
+                        )
+                        return HttpResponseRedirect(
+                            reverse("admin:busstops_operator_changelist")
+                        )
+
+                    from bustimes.models import Garage
+                    from vehicles.models import Vehicle, VehicleType, Livery
+
+                    updated_count = 0
+                    created_count = 0
+                    deleted_count = 0
+                    errors = []
+
+                    # Get vehicle IDs from the file for replace mode
+                    file_vehicle_ids = set()
+
+                    for row_num in range(2, worksheet.max_row + 1):
+                        vehicle_id = worksheet.cell(row=row_num, column=1).value
+                        operator_noc = worksheet.cell(row=row_num, column=2).value
+                        slug = worksheet.cell(row=row_num, column=3).value
+                        code = worksheet.cell(row=row_num, column=4).value
+                        fleet_number = worksheet.cell(row=row_num, column=5).value
+                        reg = worksheet.cell(row=row_num, column=6).value
+                        vehicle_type_name = worksheet.cell(row=row_num, column=7).value
+                        livery_id = worksheet.cell(row=row_num, column=8).value
+                        branding = worksheet.cell(row=row_num, column=9).value
+                        name = worksheet.cell(row=row_num, column=10).value
+                        garage_id = worksheet.cell(row=row_num, column=11).value
+
+                        file_vehicle_ids.add(vehicle_id)
+
+                        try:
+                            # Get operator
+                            operator = None
+                            if operator_noc:
+                                operator = models.Operator.objects.filter(noc=operator_noc).first()
+
+                            # Skip if operator not in selected queryset
+                            if operator and operator not in queryset:
+                                continue
+
+                            # Get vehicle type
+                            vehicle_type = None
+                            if vehicle_type_name:
+                                vehicle_type = VehicleType.objects.filter(
+                                    name=vehicle_type_name
+                                ).first()
+
+                            # Get livery
+                            livery = None
+                            if livery_id:
+                                livery = Livery.objects.filter(id=livery_id).first()
+
+                            # Get garage
+                            garage = None
+                            if garage_id:
+                                garage = Garage.objects.filter(id=garage_id).first()
+
+                            if vehicle_id:
+                                # Update existing vehicle
+                                vehicle = Vehicle.objects.filter(id=vehicle_id).first()
+                                if vehicle:
+                                    if operator:
+                                        vehicle.operator = operator
+                                    if slug:
+                                        vehicle.slug = slug
+                                    if code:
+                                        vehicle.code = code
+                                    if fleet_number:
+                                        vehicle.fleet_number = fleet_number
+                                    if reg:
+                                        vehicle.reg = reg
+                                    if vehicle_type:
+                                        vehicle.vehicle_type = vehicle_type
+                                    if livery_id is not None:
+                                        vehicle.livery = livery
+                                    if branding:
+                                        vehicle.branding = branding
+                                    if name:
+                                        vehicle.name = name
+                                    if garage_id is not None:
+                                        vehicle.garage = garage
+
+                                    vehicle.save()
+                                    updated_count += 1
+                                else:
+                                    errors.append(f"Vehicle ID {vehicle_id} not found")
+                            else:
+                                # Create new vehicle
+                                if not operator:
+                                    errors.append(f"Row {row_num}: No operator specified for new vehicle")
+                                    continue
+
+                                vehicle = Vehicle.objects.create(
+                                    operator=operator,
+                                    slug=slug or "",
+                                    code=code or "",
+                                    fleet_number=fleet_number,
+                                    reg=reg or "",
+                                    vehicle_type=vehicle_type,
+                                    livery=livery,
+                                    branding=branding or "",
+                                    name=name or "",
+                                    garage=garage,
+                                )
+                                created_count += 1
+
+                        except Exception as e:
+                            errors.append(f"Row {row_num}: {str(e)}")
+
+                    # Replace mode: delete vehicles not in the file
+                    if replace_mode:
+                        operator_ids = [op.id for op in queryset]
+                        vehicles_to_delete = Vehicle.objects.filter(
+                            operator__id__in=operator_ids
+                        ).exclude(id__in=file_vehicle_ids)
+
+                        if not include_withdrawn:
+                            vehicles_to_delete = vehicles_to_delete.filter(withdrawn=False)
+
+                        deleted_count = vehicles_to_delete.count()
+                        vehicles_to_delete.delete()
+
+                    self.message_user(
+                        request,
+                        f"Updated {updated_count}, created {created_count}, deleted {deleted_count} vehicles",
+                    )
+                    if errors:
+                        self.message_user(
+                            request,
+                            f"Errors: {', '.join(errors[:10])}" + ("..." if len(errors) > 10 else ""),
+                            messages.WARNING,
+                        )
+
+                    return HttpResponseRedirect(
+                        reverse("admin:busstops_operator_changelist")
+                    )
+
+                except Exception as e:
+                    self.message_user(request, f"Error processing file: {str(e)}", messages.ERROR)
+                    return HttpResponseRedirect(
+                        reverse("admin:busstops_operator_changelist")
+                    )
+        else:
+            from vehicles.admin import VehicleUploadForm
+            form = VehicleUploadForm()
+
+        context = {
+            "form": form,
+            "queryset": queryset,
+            "action_checkbox_name": "_selected_action",
+            "opts": self.model._meta,
+            "action": "upload_fleet_list",
+        }
+        return render(request, "vehicles/admin/upload_fleet_list.html", context)
+
+    upload_fleet_list.short_description = "Upload fleet list from Excel"
 
 
 @admin.register(models.ServiceLink)
