@@ -181,6 +181,7 @@ class Command(ImportLiveVehiclesCommand):
         self.cycle = 0
         self.pending = 0
         self.errors = 0
+        self.driver_associations = []  # list of (journey_key, driver_ref, operator) tuples
 
     @staticmethod
     def add_arguments(parser):
@@ -267,6 +268,7 @@ class Command(ImportLiveVehiclesCommand):
         started = timezone.now()
         self.source.datetime = datetime.fromisoformat(message["datetime"]) if message["datetime"] else None
         self.duplicate_vehicles = set(message["duplicates"])
+        self.driver_associations = []  # Reset for this batch
         queries = QueryCounter()
         stop_times_cache_stats.clear()
         with cache_routes() as routes_cache, connection.execute_wrapper(queries):
@@ -800,17 +802,9 @@ class Command(ImportLiveVehiclesCommand):
                 elif vehicle.operator:
                     journey_operator = vehicle.operator
 
-                driver, created = Driver.objects.get_or_create(
-                    driver_ref=driver_ref,
-                    defaults={
-                        "operator": journey_operator
-                    }
-                )
-                # Associate driver with journey using the through model
-                VehicleJourneyDriver.objects.get_or_create(
-                    journey=journey,
-                    driver=driver
-                )
+                # Defer driver association until after journey is saved
+                journey_key = (vehicle.id, journey.datetime)
+                self.driver_associations.append((journey_key, driver_ref, journey_operator))
         except (KeyError, TypeError):
             pass
 

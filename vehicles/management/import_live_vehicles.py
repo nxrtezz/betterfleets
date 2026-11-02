@@ -102,6 +102,7 @@ class ImportLiveVehiclesCommand(BaseCommand):
         self.duplicate_vehicles = set()  # vehicles on 'two journeys at once'
         self.recent_positions = {}  # vehicle id: hashes of last few coordinates
         self.max_datetime = None  # newest item timestamp in the current update
+        self.driver_associations = []  # list of (journey_key, driver_ref, operator) tuples
 
     @staticmethod
     def get_datetime():
@@ -387,6 +388,9 @@ class ImportLiveVehiclesCommand(BaseCommand):
         VehicleJourney.objects.bulk_create(self.journeys_to_create.values())
         self.journeys_to_create = {}
 
+        # Process driver associations after journeys are saved
+        self.process_driver_associations()
+
         # update vehicle records if necessary
         if self.vehicles_to_update:
             for v in self.vehicles_to_update:
@@ -530,6 +534,39 @@ class ImportLiveVehiclesCommand(BaseCommand):
                 logger.error(e)
 
         self.to_save = []
+
+    def process_driver_associations(self):
+        """Process driver associations after journeys are saved to the database"""
+        if not self.driver_associations:
+            return
+
+        from .models import Driver, VehicleJourneyDriver
+
+        for journey_key, driver_ref, operator in self.driver_associations:
+            try:
+                # Find the journey by vehicle id and datetime
+                vehicle_id, journey_datetime = journey_key
+                journey = VehicleJourney.objects.filter(
+                    vehicle_id=vehicle_id,
+                    datetime=journey_datetime
+                ).first()
+
+                if not journey:
+                    continue
+
+                driver, created = Driver.objects.get_or_create(
+                    driver_ref=driver_ref,
+                    defaults={"operator": operator}
+                )
+
+                VehicleJourneyDriver.objects.get_or_create(
+                    journey=journey,
+                    driver=driver
+                )
+            except Exception as e:
+                logger.warning(f"Error associating driver {driver_ref}: {e}")
+
+        self.driver_associations = []
 
     def do_source(self):
         if self.url:
