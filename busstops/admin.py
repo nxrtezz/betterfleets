@@ -107,6 +107,11 @@ class OperatorCodeInline(admin.TabularInline):
     raw_id_fields = ("source",)
 
 
+class OutOfServiceTrackingCodeInline(admin.TabularInline):
+    model = models.OutOfServiceTrackingCode
+    extra = 0
+
+
 class OperatorAdminForm(ModelForm):
     class Meta:
         widgets = {
@@ -158,7 +163,7 @@ class OperatorAdmin(M2MThroughMixin, admin.ModelAdmin):
     )
     search_fields = ("noc", "name")
     raw_id_fields = ("region", "regions", "siblings", "colour", "source")
-    inlines = (OperatorCodeInline,)
+    inlines = (OperatorCodeInline, OutOfServiceTrackingCodeInline)
     readonly_fields = ("search_vector", "modified_at")
     prepopulated_fields = {"slug": ("name",)}
     autocomplete_fields = ("licences", "payment_methods")

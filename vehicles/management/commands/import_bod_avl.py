@@ -30,6 +30,7 @@ from lxml import etree
 from busstops.models import (
     Operator,
     OperatorCode,
+    OutOfServiceTrackingCode,
     Service,
     ServiceCode,
     StopPoint,
@@ -182,6 +183,7 @@ class Command(ImportLiveVehiclesCommand):
         self.pending = 0
         self.errors = 0
         self.driver_associations = []  # list of (journey_key, driver_ref, operator) tuples
+        self.oostc_cache = {}  # cache for out-of-service tracking codes: {operator_id: set(line_names)}
 
     @staticmethod
     def add_arguments(parser):
@@ -203,6 +205,7 @@ class Command(ImportLiveVehiclesCommand):
             asyncio.run(self.run_worker(shard))
         else:
             self.shards = shards
+            self.oostc_cache = {}  # Reset cache
             super().handle(immediate, *args, **options)
 
     @staticmethod
@@ -269,6 +272,7 @@ class Command(ImportLiveVehiclesCommand):
         self.source.datetime = datetime.fromisoformat(message["datetime"]) if message["datetime"] else None
         self.duplicate_vehicles = set(message["duplicates"])
         self.driver_associations = []  # Reset for this batch
+        self.oostc_cache = {}  # Reset cache for this batch
         queries = QueryCounter()
         stop_times_cache_stats.clear()
         with cache_routes() as routes_cache, connection.execute_wrapper(queries):
@@ -624,6 +628,39 @@ class Command(ImportLiveVehiclesCommand):
         ) or monitored_vehicle_journey.get("LineRef", "")
         if not route_name and ticket_machine:
             route_name = ticket_machine.get("TicketMachineServiceCode", "")
+
+        # Check out-of-service tracking codes
+        if vehicle.operator:
+            operator_id = vehicle.operator.id
+
+            # Check if operator has any OOSTC entries (cached)
+            if operator_id not in self.oostc_cache:
+                self.oostc_cache[operator_id] = set(
+                    OutOfServiceTrackingCode.objects.filter(
+                        operator=vehicle.operator
+                    ).values_list("line_name", flat=True)
+                )
+
+            allowed_codes = self.oostc_cache[operator_id]
+
+            if allowed_codes:  # Only check if operator has OOSTC entries
+                is_allowed = route_name.lower() in {code.lower() for code in allowed_codes}
+
+                if not is_allowed:
+                    # Check if vehicle is tracking under a trip with a service under this operator
+                    # If it is, allow it; otherwise suppress tracking
+                    latest_journey = vehicle.latest_journey
+                    if latest_journey and latest_journey.service:
+                        # Check if the service belongs to this operator
+                        if latest_journey.service.operator.filter(id=vehicle.operator.id).exists():
+                            # Vehicle is tracking under a service under this operator, allow it
+                            pass
+                        else:
+                            # Not tracking under this operator's service, suppress
+                            return None
+                    else:
+                        # No latest journey or service, suppress
+                        return None
 
         if origin_aimed_departure_time := monitored_vehicle_journey.get(
             "OriginAimedDepartureTime"

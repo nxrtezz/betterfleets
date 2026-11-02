@@ -1265,6 +1265,19 @@ class ServicePaymentMethod(models.Model):
         unique_together = ("service", "payment_method")
 
 
+class OutOfServiceTrackingCode(models.Model):
+    """PublishedLineName values that are allowed to be tracked for an operator"""
+    operator = models.ForeignKey(Operator, models.CASCADE, related_name="out_of_service_codes")
+    line_name = models.CharField(max_length=64, db_index=True)
+
+    class Meta:
+        unique_together = ("operator", "line_name")
+        ordering = ("line_name",)
+
+    def __str__(self):
+        return f"{self.operator.noc}: {self.line_name}"
+
+
 class Contact(models.Model):
     from_name = models.CharField(max_length=255)
     from_email = models.EmailField()
