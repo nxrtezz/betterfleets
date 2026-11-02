@@ -1267,7 +1267,9 @@ class ServicePaymentMethod(models.Model):
 
 class OutOfServiceTrackingCode(models.Model):
     """PublishedLineName values that are allowed to be tracked for an operator"""
-    operator = models.ForeignKey(Operator, models.CASCADE, related_name="out_of_service_codes")
+    operator = models.ForeignKey(
+        Operator, models.DB_CASCADE, related_name="out_of_service_codes"
+    )
     line_name = models.CharField(max_length=64, db_index=True)
 
     class Meta:
