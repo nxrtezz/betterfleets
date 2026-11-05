@@ -176,6 +176,7 @@ class OperatorAdmin(M2MThroughMixin, admin.ModelAdmin):
     autocomplete_fields = ("licences", "payment_methods")
     actions = ("download_vehicles", "upload_fleet_list")
     change_list_template = "admin/busstops/operator/change_list.html"
+    change_form_template = "admin/busstops/operator/change_form.html"
 
     fleet_list_headers = [
         "Operator",
@@ -222,15 +223,7 @@ class OperatorAdmin(M2MThroughMixin, admin.ModelAdmin):
                 return self.export_fleet_list_csv(request)
             return self.import_fleet_list(request)
 
-        return render(
-            request,
-            "admin/busstops/operator/fleet_list.html",
-            {
-                "import_form": FleetListImportForm(),
-                "operators": models.Operator.objects.order_by("name"),
-                "opts": self.model._meta,
-            },
-        )
+        return self._fleet_list_response(request, FleetListImportForm())
 
     def fleet_list_vehicles(self, operator_ids):
         from vehicles.models import Vehicle
@@ -443,6 +436,7 @@ class OperatorAdmin(M2MThroughMixin, admin.ModelAdmin):
             {
                 "import_form": form,
                 "operators": models.Operator.objects.order_by("name"),
+                "selected_operators": request.GET.getlist("operators"),
                 "opts": self.model._meta,
             },
         )

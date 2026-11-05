@@ -13,7 +13,7 @@
         <label for="id_operators">Operators:</label><br>
         <select name="operators" id="id_operators" multiple size="10" style="min-width: 20em">
             {% for operator in operators %}
-            <option value="{{ operator.pk }}">{{ operator }}</option>
+            <option value="{{ operator.pk }}"{% if operator.pk in selected_operators %} selected{% endif %}>{{ operator }}</option>
             {% endfor %}
         </select>
     </p>
