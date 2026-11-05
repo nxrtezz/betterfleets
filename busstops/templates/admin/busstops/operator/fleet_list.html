@@ -1,0 +1,47 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block content %}
+<h1>Fleet list spreadsheet import/export</h1>
+
+<h2>Export</h2>
+<p>Download a CSV of vehicles. Select operators to limit the export, or leave empty to export all vehicles.</p>
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="export">
+    <p>
+        <label for="id_operators">Operators:</label><br>
+        <select name="operators" id="id_operators" multiple size="10" style="min-width: 20em">
+            {% for operator in operators %}
+            <option value="{{ operator.pk }}">{{ operator }}</option>
+            {% endfor %}
+        </select>
+    </p>
+    <input type="submit" value="Export CSV" class="default">
+</form>
+
+<h2>Import</h2>
+<p>Upload a CSV or Excel file with the following columns:</p>
+<ul>
+    <li>Operator</li>
+    <li>Vehicle ID</li>
+    <li>slug</li>
+    <li>fleet number</li>
+    <li>fleet code</li>
+    <li>registration</li>
+    <li>vehicle type</li>
+    <li>livery name</li>
+    <li>branding</li>
+    <li>withdrawn</li>
+    <li>features</li>
+</ul>
+<p>Rows with a Vehicle ID update that vehicle; rows without one create a new vehicle (Operator is required). Features is a comma-separated list of feature names.</p>
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="import">
+    {{ import_form.as_p }}
+    <input type="submit" value="Import" class="default">
+    <a href="{% url 'admin:busstops_operator_changelist' %}" class="button">Back to operators</a>
+</form>
+{% endblock %}

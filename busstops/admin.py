@@ -1,5 +1,8 @@
+import csv
+import io
+
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.gis.admin import GISModelAdmin
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.db import transaction
@@ -9,7 +12,7 @@ from django.db.models.functions import Cast, Now, TruncDate
 from django.forms import ModelForm, Textarea
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
-from django.urls import reverse
+from django.urls import path, reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 import openpyxl
@@ -21,6 +24,10 @@ from bustimes.admin import log_change
 from bustimes.models import Route, RouteLink
 
 from . import models
+
+
+class FleetListImportForm(forms.Form):
+    file = forms.FileField(label="CSV or Excel file (.csv, .xlsx)", required=True)
 
 
 class AssignToOperatorForm(forms.Form):
@@ -168,6 +175,277 @@ class OperatorAdmin(M2MThroughMixin, admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     autocomplete_fields = ("licences", "payment_methods")
     actions = ("download_vehicles", "upload_fleet_list")
+    change_list_template = "admin/busstops/operator/change_list.html"
+
+    fleet_list_headers = [
+        "Operator",
+        "Vehicle ID",
+        "slug",
+        "fleet number",
+        "fleet code",
+        "registration",
+        "vehicle type",
+        "livery name",
+        "branding",
+        "withdrawn",
+        "features",
+    ]
+
+    fleet_list_columns = {
+        "operator": "operator",
+        "vehicle id": "vehicle_id",
+        "slug": "slug",
+        "fleet number": "fleet_number",
+        "fleet code": "fleet_code",
+        "registration": "reg",
+        "vehicle type": "vehicle_type",
+        "livery name": "livery",
+        "branding": "branding",
+        "withdrawn": "withdrawn",
+        "features": "features",
+    }
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "fleet/",
+                self.admin_site.admin_view(self.fleet_list_view),
+                name="busstops_operator_fleet",
+            ),
+        ]
+        return custom + urls
+
+    def fleet_list_view(self, request):
+        if request.method == "POST":
+            if request.POST.get("action") == "export":
+                return self.export_fleet_list_csv(request)
+            return self.import_fleet_list(request)
+
+        return render(
+            request,
+            "admin/busstops/operator/fleet_list.html",
+            {
+                "import_form": FleetListImportForm(),
+                "operators": models.Operator.objects.order_by("name"),
+                "opts": self.model._meta,
+            },
+        )
+
+    def fleet_list_vehicles(self, operator_ids):
+        from vehicles.models import Vehicle
+
+        vehicles = Vehicle.objects.select_related(
+            "operator", "vehicle_type", "livery"
+        ).prefetch_related("features")
+        if operator_ids:
+            vehicles = vehicles.filter(operator_id__in=operator_ids)
+        return vehicles.order_by("operator__name", "fleet_number", "id")
+
+    def export_fleet_list_csv(self, request):
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="fleet_list.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(self.fleet_list_headers)
+
+        for vehicle in self.fleet_list_vehicles(request.POST.getlist("operators")):
+            writer.writerow(
+                [
+                    vehicle.operator.name if vehicle.operator else "",
+                    vehicle.id,
+                    vehicle.slug or "",
+                    vehicle.fleet_number or "",
+                    vehicle.fleet_code or "",
+                    vehicle.reg or "",
+                    vehicle.vehicle_type.name if vehicle.vehicle_type else "",
+                    vehicle.livery.name if vehicle.livery else "",
+                    vehicle.branding or "",
+                    "True" if vehicle.withdrawn else "False",
+                    ", ".join(
+                        feature.name for feature in vehicle.features.all()
+                    ),
+                ]
+            )
+        return response
+
+    def import_fleet_list(self, request):
+        from vehicles.models import (
+            Livery,
+            Vehicle,
+            VehicleFeature,
+            VehicleType,
+        )
+
+        form = FleetListImportForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return self._fleet_list_response(request, form)
+
+        uploaded = request.FILES["file"]
+        rows = []
+        try:
+            if uploaded.name.lower().endswith((".xlsx", ".xlsm")):
+                workbook = openpyxl.load_workbook(uploaded, read_only=True)
+                worksheet = workbook.active
+                rows_iter = worksheet.iter_rows(values_only=True)
+                headers = [str(cell or "").strip().lower() for cell in next(rows_iter)]
+                column_map = self._fleet_list_column_map(headers)
+                for row in rows_iter:
+                    rows.append(
+                        {
+                            column_map.get(headers[i]): str(cell or "").strip()
+                            for i, cell in enumerate(row)
+                            if i < len(headers) and column_map.get(headers[i])
+                        }
+                    )
+            else:
+                text = uploaded.read().decode("utf-8-sig")
+                reader = csv.DictReader(io.StringIO(text))
+                column_map = self._fleet_list_column_map(
+                    [key.strip().lower() for key in (reader.fieldnames or [])]
+                )
+                if not column_map:
+                    raise ValueError("No recognised columns in CSV header")
+                for raw in reader:
+                    rows.append(
+                        {
+                            column_map[key.strip().lower()]: (value or "").strip()
+                            for key, value in raw.items()
+                            if key is not None
+                            and key.strip().lower() in column_map
+                        }
+                    )
+        except Exception as e:
+            self.message_user(request, f"Error reading file: {e}", messages.ERROR)
+            return self._fleet_list_response(request, FleetListImportForm())
+
+        updated_count = 0
+        created_count = 0
+        errors = []
+
+        for row_num, row in enumerate(rows, 2):
+            try:
+                vehicle = None
+                if row.get("vehicle_id"):
+                    vehicle = Vehicle.objects.filter(id=row["vehicle_id"]).first()
+                    if vehicle is None:
+                        errors.append(f"Row {row_num}: Vehicle ID {row['vehicle_id']} not found")
+                        continue
+
+                operator = None
+                operator_value = row.get("operator", "")
+                if operator_value:
+                    operator = models.Operator.objects.filter(
+                        noc__iexact=operator_value
+                    ).first() or models.Operator.objects.filter(
+                        name__iexact=operator_value
+                    ).first()
+                    if operator is None:
+                        errors.append(
+                            f"Row {row_num}: Operator '{operator_value}' not found"
+                        )
+                        continue
+
+                vehicle_type = None
+                if row.get("vehicle_type"):
+                    vehicle_type = VehicleType.objects.filter(
+                        name__iexact=row["vehicle_type"]
+                    ).first()
+                    if vehicle_type is None:
+                        errors.append(
+                            f"Row {row_num}: Vehicle type '{row['vehicle_type']}' not found"
+                        )
+                        continue
+
+                livery = None
+                if row.get("livery"):
+                    livery = Livery.objects.filter(name__iexact=row["livery"]).first()
+                    if livery is None:
+                        errors.append(
+                            f"Row {row_num}: Livery '{row['livery']}' not found"
+                        )
+                        continue
+
+                if vehicle is None:
+                    if operator is None:
+                        errors.append(
+                            f"Row {row_num}: No operator specified for new vehicle"
+                        )
+                        continue
+                    vehicle = Vehicle(operator=operator)
+                    vehicle.code = row.get("slug") or f"import-{row_num}"
+                    created_count += 1
+                else:
+                    updated_count += 1
+                    if operator is not None:
+                        vehicle.operator = operator
+
+                if "slug" in row and row["slug"]:
+                    vehicle.slug = row["slug"]
+                if "fleet_number" in row:
+                    vehicle.fleet_number = int(row["fleet_number"]) if row["fleet_number"] else None
+                if "fleet_code" in row:
+                    vehicle.fleet_code = row["fleet_code"]
+                if "reg" in row:
+                    vehicle.reg = row["reg"]
+                if "vehicle_type" in row:
+                    vehicle.vehicle_type = vehicle_type
+                if "livery" in row:
+                    vehicle.livery = livery
+                if "branding" in row:
+                    vehicle.branding = row["branding"]
+                if "withdrawn" in row and row["withdrawn"]:
+                    vehicle.withdrawn = row["withdrawn"].lower() in (
+                        "true",
+                        "1",
+                        "yes",
+                    )
+
+                vehicle.save()
+
+                if "features" in row:
+                    features = [
+                        VehicleFeature.objects.get_or_create(name=name)[0]
+                        for name in (
+                            feature.strip()
+                            for feature in row["features"].split(",")
+                            if feature.strip()
+                        )
+                    ]
+                    vehicle.features.set(features)
+            except Exception as e:
+                errors.append(f"Row {row_num}: {e}")
+
+        self.message_user(
+            request,
+            f"Imported fleet list: {created_count} created, {updated_count} updated",
+        )
+        if errors:
+            self.message_user(
+                request,
+                f"Errors: {', '.join(errors[:10])}"
+                + ("..." if len(errors) > 10 else ""),
+                messages.WARNING,
+            )
+        return self._fleet_list_response(request, FleetListImportForm())
+
+    def _fleet_list_column_map(self, headers):
+        return {
+            header: self.fleet_list_columns[header]
+            for header in headers
+            if header in self.fleet_list_columns
+        }
+
+    def _fleet_list_response(self, request, form):
+        return render(
+            request,
+            "admin/busstops/operator/fleet_list.html",
+            {
+                "import_form": form,
+                "operators": models.Operator.objects.order_by("name"),
+                "opts": self.model._meta,
+            },
+        )
 
     def get_exclude(self, request, obj=None):
         if obj:
