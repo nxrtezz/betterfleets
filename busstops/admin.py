@@ -725,7 +725,7 @@ class ServiceAdmin(M2MThroughMixin, GISModelAdmin):
     def service_spreadsheet_queryset(self, operator_ids):
         services = self.model.objects.prefetch_related("operator")
         if operator_ids:
-            services = services.filter(operator_id__in=operator_ids)
+            services = services.filter(operator__in=operator_ids)
         return services
 
     def export_service_list_csv(self, request):
