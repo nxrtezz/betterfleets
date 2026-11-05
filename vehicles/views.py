@@ -878,10 +878,18 @@ class VehicleDetailView(DetailView):
         try:
             return super().get_object(**kwargs)
         except Http404:
-            if slug := self.kwargs.get("slug"):
-                return get_object_or_404(
-                    self.queryset, vehiclecode__code=slug, vehiclecode__scheme="slug"
-                )
+            slug = self.kwargs.get("slug")
+            if slug is None and (pk := self.kwargs.get("pk")) is not None:
+                # Numeric slugs are captured by the <int:pk> route first
+                slug = str(pk)
+            if slug:
+                vehicle = self.queryset.filter(slug=slug).first()
+                if vehicle is None:
+                    vehicle = self.queryset.filter(
+                        vehiclecode__code=slug, vehiclecode__scheme="slug"
+                    ).first()
+                if vehicle is not None:
+                    return vehicle
             raise
 
     def get_context_data(self, **kwargs):
@@ -1007,12 +1015,16 @@ revision_display_related_fields = (
 def edit_vehicle(request, **kwargs):
     check_user(request)
 
-    vehicle = get_object_or_404(
-        Vehicle.objects.select_related(
-            "vehicle_type", "livery", "operator", "latest_journey"
-        ),
-        **kwargs,
+    queryset = Vehicle.objects.select_related(
+        "vehicle_type", "livery", "operator", "latest_journey"
     )
+    try:
+        vehicle = get_object_or_404(queryset, **kwargs)
+    except Http404:
+        if "id" not in kwargs:
+            raise
+        # Numeric slugs are captured by the <int:id> route first
+        vehicle = get_object_or_404(queryset, slug=str(kwargs["id"]))
 
     if not request.user.is_superuser and not vehicle.is_editable():
         raise PermissionDenied
