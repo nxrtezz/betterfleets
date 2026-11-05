@@ -1,6 +1,6 @@
 import requests
 from django.core.management.base import BaseCommand
-from django.db import IntegrityError
+from django.db import IntegrityError, connection
 from busstops.models import Operator, DataSource
 from vehicles.models import Vehicle, VehicleType, Livery, VehicleJourney, VehicleFeature
 
@@ -24,6 +24,16 @@ class Command(BaseCommand):
         # Then import vehicles
         self.stdout.write("\nImporting vehicles...")
         self.import_vehicles(source)
+
+        # Rows are created with explicit upstream IDs, which leaves the
+        # database sequences behind and causes PK collisions on later inserts.
+        self.reset_sequences([VehicleType, Livery, Vehicle])
+
+    def reset_sequences(self, models):
+        with connection.cursor() as cursor:
+            for model in models:
+                for sql in connection.ops.sequence_reset_sql(model):
+                    cursor.execute(sql)
 
     def import_vehicle_types(self):
         url = "https://bustimes.org/api/vehicletypes/"
