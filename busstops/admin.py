@@ -30,6 +30,41 @@ class FleetListImportForm(forms.Form):
     file = forms.FileField(label="CSV or Excel file (.csv, .xlsx)", required=True)
 
 
+def read_spreadsheet_rows(uploaded):
+    """Read an uploaded CSV or Excel file.
+
+    Returns (headers, rows): headers is a list of lowercased, stripped
+    header names; rows is a list of dicts keyed by those header names.
+    """
+    if uploaded.name.lower().endswith((".xlsx", ".xlsm")):
+        workbook = openpyxl.load_workbook(uploaded, read_only=True)
+        worksheet = workbook.active
+        rows_iter = worksheet.iter_rows(values_only=True)
+        headers = [str(cell or "").strip().lower() for cell in next(rows_iter)]
+        rows = [
+            {
+                headers[i]: str(cell or "").strip()
+                for i, cell in enumerate(row)
+                if i < len(headers) and headers[i]
+            }
+            for row in rows_iter
+        ]
+    else:
+        text = uploaded.read().decode("utf-8-sig")
+        reader = csv.DictReader(io.StringIO(text))
+        headers = [
+            (key or "").strip().lower() for key in (reader.fieldnames or [])
+        ]
+        rows = [
+            {
+                (key or "").strip().lower(): (value or "").strip()
+                for key, value in raw.items()
+            }
+            for raw in reader
+        ]
+    return headers, rows
+
+
 class AssignToOperatorForm(forms.Form):
     operator = forms.ModelChoiceField(
         queryset=models.Operator.objects.all(),
@@ -275,42 +310,27 @@ class OperatorAdmin(M2MThroughMixin, admin.ModelAdmin):
             return self._fleet_list_response(request, form)
 
         uploaded = request.FILES["file"]
-        rows = []
         try:
-            if uploaded.name.lower().endswith((".xlsx", ".xlsm")):
-                workbook = openpyxl.load_workbook(uploaded, read_only=True)
-                worksheet = workbook.active
-                rows_iter = worksheet.iter_rows(values_only=True)
-                headers = [str(cell or "").strip().lower() for cell in next(rows_iter)]
-                column_map = self._fleet_list_column_map(headers)
-                for row in rows_iter:
-                    rows.append(
-                        {
-                            column_map.get(headers[i]): str(cell or "").strip()
-                            for i, cell in enumerate(row)
-                            if i < len(headers) and column_map.get(headers[i])
-                        }
-                    )
-            else:
-                text = uploaded.read().decode("utf-8-sig")
-                reader = csv.DictReader(io.StringIO(text))
-                column_map = self._fleet_list_column_map(
-                    [key.strip().lower() for key in (reader.fieldnames or [])]
-                )
-                if not column_map:
-                    raise ValueError("No recognised columns in CSV header")
-                for raw in reader:
-                    rows.append(
-                        {
-                            column_map[key.strip().lower()]: (value or "").strip()
-                            for key, value in raw.items()
-                            if key is not None
-                            and key.strip().lower() in column_map
-                        }
-                    )
+            headers, raw_rows = read_spreadsheet_rows(uploaded)
         except Exception as e:
             self.message_user(request, f"Error reading file: {e}", messages.ERROR)
             return self._fleet_list_response(request, FleetListImportForm())
+
+        column_map = self._fleet_list_column_map(headers)
+        if not column_map:
+            self.message_user(
+                request, "No recognised columns in file header", messages.ERROR
+            )
+            return self._fleet_list_response(request, FleetListImportForm())
+
+        rows = [
+            {
+                column_map[header]: value
+                for header, value in raw.items()
+                if header in column_map
+            }
+            for raw in raw_rows
+        ]
 
         updated_count = 0
         created_count = 0
@@ -644,6 +664,220 @@ class ServiceAdmin(M2MThroughMixin, GISModelAdmin):
     list_editable = ("colour", "line_brand")
     list_select_related = ("colour",)
     actions = ("current_false", "current_true", "public_use_true", "merge", "unmerge", "assign_garage", "assign_to_operator")
+    change_list_template = "admin/busstops/service/change_list.html"
+
+    service_spreadsheet_headers = [
+        "Operator",
+        "Service ID",
+        "Line name",
+        "Line brand",
+        "Description",
+        "Slug",
+        "Mode",
+        "Colour",
+        "Hex colour",
+    ]
+
+    service_spreadsheet_columns = {
+        "operator": "operator",
+        "service id": "service_id",
+        "line name": "line_name",
+        "line brand": "line_brand",
+        "description": "description",
+        "slug": "slug",
+        "mode": "mode",
+        "colour": "colour",
+        "hex colour": "hex_colour",
+    }
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "spreadsheet/",
+                self.admin_site.admin_view(self.spreadsheet_view),
+                name="busstops_service_spreadsheet",
+            ),
+        ]
+        return custom + urls
+
+    def spreadsheet_view(self, request):
+        if request.method == "POST":
+            if request.POST.get("action") == "export":
+                return self.export_service_list_csv(request)
+            return self.import_service_list(request)
+
+        return self._spreadsheet_response(request, FleetListImportForm())
+
+    def _spreadsheet_response(self, request, form):
+        return render(
+            request,
+            "admin/busstops/service/spreadsheet.html",
+            {
+                "import_form": form,
+                "operators": models.Operator.objects.order_by("name"),
+                "selected_operators": request.GET.getlist("operators"),
+                "headers": self.service_spreadsheet_headers,
+                "opts": self.model._meta,
+            },
+        )
+
+    def service_spreadsheet_queryset(self, operator_ids):
+        services = self.model.objects.prefetch_related("operator")
+        if operator_ids:
+            services = services.filter(operator_id__in=operator_ids)
+        return services
+
+    def export_service_list_csv(self, request):
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="services.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(self.service_spreadsheet_headers)
+
+        for service in self.service_spreadsheet_queryset(
+            request.POST.getlist("operators")
+        ):
+            writer.writerow(
+                [
+                    ", ".join(
+                        sorted(
+                            operator.name
+                            for operator in service.operator.all()
+                        )
+                    ),
+                    service.id,
+                    service.line_name or "",
+                    service.line_brand or "",
+                    service.description or "",
+                    service.slug or "",
+                    service.mode or "",
+                    service.colour.name if service.colour else "",
+                    service.hex_colour or "",
+                ]
+            )
+        return response
+
+    def import_service_list(self, request):
+        form = FleetListImportForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return self._spreadsheet_response(request, form)
+
+        uploaded = request.FILES["file"]
+        try:
+            headers, raw_rows = read_spreadsheet_rows(uploaded)
+        except Exception as e:
+            self.message_user(request, f"Error reading file: {e}", messages.ERROR)
+            return self._spreadsheet_response(request, FleetListImportForm())
+
+        column_map = {
+            header: self.service_spreadsheet_columns[header]
+            for header in headers
+            if header in self.service_spreadsheet_columns
+        }
+        if not column_map:
+            self.message_user(
+                request, "No recognised columns in file header", messages.ERROR
+            )
+            return self._spreadsheet_response(request, FleetListImportForm())
+
+        rows = [
+            {
+                column_map[header]: value
+                for header, value in raw.items()
+                if header in column_map
+            }
+            for raw in raw_rows
+        ]
+
+        updated_count = 0
+        created_count = 0
+        errors = []
+
+        for row_num, row in enumerate(rows, 2):
+            try:
+                service = None
+                if row.get("service_id"):
+                    service = self.model.objects.filter(
+                        id=row["service_id"]
+                    ).first()
+                    if service is None:
+                        errors.append(
+                            f"Row {row_num}: Service ID {row['service_id']} not found"
+                        )
+                        continue
+
+                operators = []
+                operator_names = [
+                    name.strip()
+                    for name in row.get("operator", "").split(",")
+                    if name.strip()
+                ]
+                if operator_names:
+                    for name in operator_names:
+                        operator = models.Operator.objects.filter(
+                            noc__iexact=name
+                        ).first() or models.Operator.objects.filter(
+                            name__iexact=name
+                        ).first()
+                        if operator is None:
+                            errors.append(
+                                f"Row {row_num}: Operator '{name}' not found"
+                            )
+                            break
+                        operators.append(operator)
+                    if len(operators) != len(operator_names):
+                        continue
+
+                colour = None
+                if row.get("colour"):
+                    colour = models.ServiceColour.objects.filter(
+                        name__iexact=row["colour"]
+                    ).first()
+                    if colour is None:
+                        colour = models.ServiceColour.objects.create(
+                            name=row["colour"]
+                        )
+
+                if service is None:
+                    service = self.model()
+                    created_count += 1
+                else:
+                    updated_count += 1
+
+                for field in (
+                    "line_name",
+                    "line_brand",
+                    "description",
+                    "mode",
+                    "hex_colour",
+                ):
+                    if field in row:
+                        setattr(service, field, row[field])
+                if row.get("slug"):
+                    service.slug = row["slug"]
+                if "colour" in row:
+                    service.colour = colour
+
+                service.save()
+
+                if operator_names:
+                    service.operator.set(operators)
+            except Exception as e:
+                errors.append(f"Row {row_num}: {e}")
+
+        self.message_user(
+            request,
+            f"Imported service list: {created_count} created, {updated_count} updated",
+        )
+        if errors:
+            self.message_user(
+                request,
+                f"Errors: {', '.join(errors[:10])}"
+                + ("..." if len(errors) > 10 else ""),
+                messages.WARNING,
+            )
+        return self._spreadsheet_response(request, FleetListImportForm())
 
     def lookup_allowed(self, lookup, value, request):
         if lookup == "route__source__source":

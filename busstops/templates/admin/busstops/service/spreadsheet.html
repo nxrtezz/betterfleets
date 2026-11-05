@@ -1,0 +1,39 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block content %}
+<h1>Service list spreadsheet import/export</h1>
+
+<h2>Export</h2>
+<p>Download a CSV of services. Select operators to limit the export, or leave empty to export all services.</p>
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="export">
+    <p>
+        <label for="id_operators">Operators:</label><br>
+        <select name="operators" id="id_operators" multiple size="10" style="min-width: 20em">
+            {% for operator in operators %}
+            <option value="{{ operator.pk }}"{% if operator.pk in selected_operators %} selected{% endif %}>{{ operator }}</option>
+            {% endfor %}
+        </select>
+    </p>
+    <input type="submit" value="Export CSV" class="default">
+</form>
+
+<h2>Import</h2>
+<p>Upload a CSV or Excel file with the following columns:</p>
+<ul>
+    {% for header in headers %}
+    <li>{{ header }}</li>
+    {% endfor %}
+</ul>
+<p>Rows with a Service ID update that service; rows without one create a new service. Operator accepts a comma-separated list of operator names or NOCs. Colour is matched by name (created if missing); leave empty to clear.</p>
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="import">
+    {{ import_form.as_p }}
+    <input type="submit" value="Import" class="default">
+    <a href="{% url 'admin:busstops_service_changelist' %}" class="button">Back to services</a>
+</form>
+{% endblock %}
