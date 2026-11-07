@@ -34,4 +34,5 @@ jobs:
             cd /srv/DATA/betterfleets/bfdev/betterfleets
             git pull
             docker compose up -d --build
+            docker compose exec -T web python manage.py migrate --noinput
           '

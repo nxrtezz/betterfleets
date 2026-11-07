@@ -180,9 +180,7 @@ link to a picture to prove it. Be polite.""",
         # same garages as the fleet list filter: garages assigned to the
         # operator, plus any garage other vehicles under it are listed at
         submitted_operator = data.get("operator") if data else None
-        operator_id = vehicle.operator_id
-        if submitted_operator and submitted_operator.isdigit():
-            operator_id = int(submitted_operator)
+        operator_id = submitted_operator or vehicle.operator_id
         garage_queryset = Garage.objects.filter(id=vehicle.garage_id)
         if operator_id:
             garage_queryset |= Garage.objects.filter(

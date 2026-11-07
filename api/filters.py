@@ -126,8 +126,6 @@ class GarageFilter(FilterSet):
     operator = CharFilter(method="filter_operator", label="Operator")
 
     def filter_operator(self, queryset, name, value):
-        if not str(value).isdigit():
-            return queryset.none()
         # same logic as the garage filter on the vehicle fleet list:
         # garages assigned to the operator, plus garages its vehicles use
         return queryset.filter(
