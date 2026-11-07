@@ -46,7 +46,6 @@ from redis.exceptions import ConnectionError
 from requests import RequestException
 from sql_util.utils import Exists, SubqueryMax, SubqueryMin
 
-from accounts.models import User
 from buses.utils import format_json
 from busstops.models import (
     SERVICE_ORDER_REGEX,
@@ -1044,19 +1043,6 @@ def edit_vehicle(request, **kwargs):
             return render(
                 request, "rules.html", {"breadcrumb": [vehicle], "form": form}
             )
-
-    if (
-        vehicle.operator_id
-        and (
-            User.operators.through.objects.filter(operator=vehicle.operator_id)
-            .exclude(user=request.user)
-            .exists()
-        )
-        and not request.user.operators.filter(noc=vehicle.operator_id).exists()
-    ):
-        raise PermissionDenied(
-            f'Editing {vehicle.operator} vehicles is restricted to "local experts"'
-        )
 
     context = {
         "previous": vehicle.get_previous(),
