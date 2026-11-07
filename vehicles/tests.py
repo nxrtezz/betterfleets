@@ -457,6 +457,53 @@ class VehiclesTests(TestCase):
             },
         )
 
+    def test_deduplicate_skips_deleted_vehicles(self):
+        self.client.force_login(self.staff_user)
+        source = DataSource.objects.create(name="Dedup source")
+        fleet_code = "SCSO1"
+
+        vehicle_a = Vehicle.objects.create(
+            code="DEDUP_A",
+            reg="AA00AAA",
+            fleet_code=fleet_code,
+            operator=self.lynx,
+        )
+        vehicle_b = Vehicle.objects.create(
+            code="DEDUP_B",
+            reg="BB00BBB",
+            fleet_code=fleet_code,
+            operator=self.lynx,
+        )
+        vehicle_c = Vehicle.objects.create(
+            code="DEDUP_C",
+            reg="CC00CCC",
+            fleet_code=fleet_code,
+            operator=self.lynx,
+        )
+        vehicle_c.features.set([self.wifi])
+
+        for vehicle in (vehicle_a, vehicle_b):
+            journey = VehicleJourney.objects.create(
+                vehicle=vehicle,
+                datetime="2020-10-20 12:00:00+00:00",
+                date=date(2020, 10, 20),
+                source=source,
+            )
+            vehicle.latest_journey = journey
+            vehicle.save()
+
+        self.client.post(
+            "/admin/vehicles/vehicle/",
+            {
+                "action": "deduplicate",
+                "_selected_action": [vehicle_a.id, vehicle_b.id, vehicle_c.id],
+            },
+        )
+
+        survivor = Vehicle.objects.get(fleet_code=fleet_code)
+        self.assertEqual(survivor.id, vehicle_a.id)
+        self.assertTrue(survivor.features.filter(id=self.wifi.id).exists())
+
     def test_vehiclejourneys_admin(self):
         self.client.force_login(self.staff_user)
 

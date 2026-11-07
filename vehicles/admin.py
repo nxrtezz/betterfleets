@@ -269,7 +269,16 @@ class VehicleAdmin(M2MThroughMixin, admin.ModelAdmin):
     def deduplicate(self, request, queryset):
         # New logic: merge vehicles with same operator and fleet code, both not withdrawn
         # One has latest_journey (tracks), other has details (livery, type, reg)
-        for vehicle in queryset.order_by("id"):
+        for vehicle_id in queryset.order_by("id").values_list("id", flat=True):
+            vehicle = (
+                models.Vehicle.objects.select_related(
+                    "operator", "livery", "vehicle_type", "latest_journey"
+                )
+                .filter(id=vehicle_id)
+                .first()
+            )
+            if vehicle is None:
+                continue
             if not vehicle.fleet_code or not vehicle.operator or vehicle.withdrawn:
                 continue
 
@@ -319,6 +328,8 @@ class VehicleAdmin(M2MThroughMixin, admin.ModelAdmin):
                     delete_vehicle.vehiclerevision_set.update(vehicle=keep_vehicle)
 
                     delete_vehicle.delete()
+                    if delete_vehicle is vehicle:
+                        vehicle = keep_vehicle
 
                     self.message_user(
                         request,
@@ -330,7 +341,16 @@ class VehicleAdmin(M2MThroughMixin, admin.ModelAdmin):
                     )
 
         # Original logic: Try to find duplicates by fleet_number first
-        for vehicle in queryset.order_by("id"):
+        for vehicle_id in queryset.order_by("id").values_list("id", flat=True):
+            vehicle = (
+                models.Vehicle.objects.select_related(
+                    "operator", "livery", "vehicle_type", "latest_journey"
+                )
+                .filter(id=vehicle_id)
+                .first()
+            )
+            if vehicle is None:
+                continue
             if vehicle.fleet_number:
                 try:
                     duplicate = models.Vehicle.objects.get(
