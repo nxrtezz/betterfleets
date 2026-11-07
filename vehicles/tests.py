@@ -504,6 +504,42 @@ class VehiclesTests(TestCase):
         self.assertEqual(survivor.id, vehicle_a.id)
         self.assertTrue(survivor.features.filter(id=self.wifi.id).exists())
 
+    def test_apply_revision_merges_duplicate_vehicle(self):
+        from .utils import apply_revision
+
+        source = DataSource.objects.create(name="Merge source")
+        vehicle_type = VehicleType.objects.create(name="Merge Type")
+        vehicle = Vehicle.objects.create(code="LF75OUM", operator=self.lynx)
+        duplicate = Vehicle.objects.create(
+            code="LF75OUM", operator=self.chicken, vehicle_type=vehicle_type
+        )
+        duplicate.features.set([self.wifi])
+        journey = VehicleJourney.objects.create(
+            vehicle=duplicate,
+            datetime="2020-10-20 12:00:00+00:00",
+            date=date(2020, 10, 20),
+            source=source,
+        )
+        duplicate.latest_journey = journey
+        duplicate.save()
+
+        revision = VehicleRevision.objects.create(
+            vehicle=vehicle,
+            from_operator=self.lynx,
+            to_operator=self.chicken,
+            changes={},
+            created_at=timezone.now(),
+        )
+
+        apply_revision(revision)
+
+        vehicle.refresh_from_db()
+        self.assertEqual(vehicle.operator, self.chicken)
+        self.assertEqual(vehicle.vehicle_type, vehicle_type)
+        self.assertEqual(vehicle.latest_journey_id, journey.id)
+        self.assertTrue(vehicle.features.filter(id=self.wifi.id).exists())
+        self.assertFalse(Vehicle.objects.filter(id=duplicate.id).exists())
+
     def test_vehiclejourneys_admin(self):
         self.client.force_login(self.staff_user)
 

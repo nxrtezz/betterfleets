@@ -5,6 +5,7 @@ import redis.asyncio
 from django.conf import settings
 from django.core.cache import caches
 from django.core.cache.backends.base import InvalidCacheBackendError
+from django.db import IntegrityError, transaction
 
 from .models import VehicleRevision, VehicleRevisionFeature
 
@@ -160,6 +161,72 @@ def get_revision(vehicle, data):
     return revision, features
 
 
+def _merge_duplicate_vehicle(vehicle, duplicate, changed_fields):
+    from photos.models import PhotoVehicle
+
+    duplicate.vehiclejourney_set.update(vehicle=vehicle)
+    vehicle_code = duplicate.vehiclecode_set.model
+    for code in list(duplicate.vehiclecode_set.all()):
+        if vehicle_code.objects.filter(
+            vehicle=vehicle, code=code.code, scheme=code.scheme
+        ).exists():
+            code.delete()
+        else:
+            code.vehicle = vehicle
+            code.save(update_fields=["vehicle"])
+    duplicate.vehiclerevision_set.update(vehicle=vehicle)
+    PhotoVehicle.objects.filter(vehicle=duplicate).exclude(
+        photo_id__in=PhotoVehicle.objects.filter(vehicle=vehicle).values("photo_id")
+    ).update(vehicle=vehicle)
+
+    existing_features = set(vehicle.features.values_list("id", flat=True))
+    features = [
+        feature
+        for feature in duplicate.features.all()
+        if feature.id not in existing_features
+    ]
+    if features:
+        vehicle.features.add(*features)
+
+    if duplicate.latest_journey_id and (
+        not vehicle.latest_journey_id
+        or duplicate.latest_journey_id > vehicle.latest_journey_id
+    ):
+        vehicle.latest_journey_id = duplicate.latest_journey_id
+        if "latest_journey" not in changed_fields:
+            changed_fields.append("latest_journey")
+
+    for field in (
+        "vehicle_type",
+        "livery",
+        "reg",
+        "branding",
+        "name",
+        "colours",
+        "fleet_code",
+        "fleet_number",
+        "data",
+        "garage",
+    ):
+        if field in changed_fields:
+            continue
+        if field in {"vehicle_type", "livery", "garage"}:
+            if getattr(vehicle, f"{field}_id") is None and getattr(
+                duplicate, f"{field}_id"
+            ) is not None:
+                setattr(vehicle, f"{field}_id", getattr(duplicate, f"{field}_id"))
+                changed_fields.append(field)
+        elif field == "data":
+            if not vehicle.data and duplicate.data:
+                vehicle.data = duplicate.data
+                changed_fields.append("data")
+        elif not getattr(vehicle, field) and getattr(duplicate, field):
+            setattr(vehicle, field, getattr(duplicate, field))
+            changed_fields.append(field)
+
+    duplicate.delete()
+
+
 def apply_revision(revision, features=None):
     from .models import Vehicle
 
@@ -267,7 +334,21 @@ def apply_revision(revision, features=None):
         else:
             raise ValueError(field)
 
-    vehicle.save(update_fields=changed_fields)
+    try:
+        with transaction.atomic():
+            vehicle.save(update_fields=changed_fields)
+    except IntegrityError as e:
+        if "vehicle_operator_and_code" not in str(e):
+            raise
+        duplicate = Vehicle.objects.filter(
+            operator_id=vehicle.operator_id,
+            code__iexact=vehicle.code,
+        ).exclude(id=vehicle.id).first()
+        if duplicate is None:
+            raise
+        with transaction.atomic():
+            _merge_duplicate_vehicle(vehicle, duplicate, changed_fields)
+            vehicle.save(update_fields=changed_fields)
 
     if features is None:
         features = revision.vehiclerevisionfeature_set.all()
