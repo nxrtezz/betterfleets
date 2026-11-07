@@ -50,7 +50,14 @@ def read_spreadsheet_rows(uploaded):
             for row in rows_iter
         ]
     else:
-        text = uploaded.read().decode("utf-8-sig")
+        data = uploaded.read()
+        if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+            text = data.decode("utf-16")
+        else:
+            try:
+                text = data.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                text = data.decode("cp1252", errors="replace")
         reader = csv.DictReader(io.StringIO(text))
         headers = [
             (key or "").strip().lower() for key in (reader.fieldnames or [])

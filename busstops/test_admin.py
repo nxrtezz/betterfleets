@@ -1,11 +1,13 @@
 from django.contrib.admin import site
 from django.contrib.contenttypes.models import ContentType
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import User
 from bustimes.models import Route, RouteLink
 
+from .admin import read_spreadsheet_rows
 from .models import DataSource, Service, StopPoint
 
 
@@ -62,6 +64,18 @@ class BusStopsAdminTests(TestCase):
 
     def setUp(self):
         ContentType.objects.clear_cache()
+
+    def test_read_spreadsheet_rows_cp1252(self):
+        uploaded = SimpleUploadedFile(
+            "fleet.csv",
+            "Operator,Vehicle ID\nSPOS\xa0,123\n".encode("cp1252"),
+            content_type="text/csv",
+        )
+
+        headers, rows = read_spreadsheet_rows(uploaded)
+
+        self.assertEqual(headers, ["operator", "vehicle id"])
+        self.assertEqual(rows, [{"operator": "SPOS", "vehicle id": "123"}])
 
     def make_url(self, site, model, page: str) -> str:
         return reverse(
