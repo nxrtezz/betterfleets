@@ -1008,6 +1008,8 @@ revision_display_related_fields = (
     "to_operator",
     "from_livery",
     "to_livery",
+    "from_garage",
+    "to_garage",
 )
 
 
@@ -1402,7 +1404,14 @@ class VehicleJourneyDetailView(DetailView):
 
 @require_safe
 def latest_journey_debug(request, **kwargs):
-    vehicle = get_object_or_404(Vehicle, **kwargs, latest_journey_data__isnull=False)
+    queryset = Vehicle.objects.filter(latest_journey_data__isnull=False)
+    try:
+        vehicle = get_object_or_404(queryset, **kwargs)
+    except Http404:
+        if "id" not in kwargs:
+            raise
+        # Numeric slugs are captured by the <int:id> route first
+        vehicle = get_object_or_404(queryset, slug=str(kwargs["id"]))
 
     # redact possible personal information
     with contextlib.suppress(KeyError, TypeError):

@@ -106,6 +106,10 @@ def get_revision(vehicle, data):
         revision.from_operator = revision.vehicle.operator
         revision.to_operator = data.pop("operator")
 
+    if "garage" in data:
+        revision.from_garage = revision.vehicle.garage
+        revision.to_garage = data.pop("garage")
+
     if "colours" in data:
         livery = data.pop("colours")
         if revision.vehicle.livery_id != (livery and livery.id):
@@ -218,7 +222,7 @@ def apply_revision(revision, features=None):
         vehicle.vehicle_type_id = revision.to_type_id
         changed_fields.append("vehicle_type")
 
-    for field in ("operator", "livery"):
+    for field in ("operator", "livery", "garage"):
         from_value = getattr(revision, f"from_{field}_id")
         to_value = getattr(revision, f"to_{field}_id")
         if from_value != to_value:

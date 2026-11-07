@@ -2,8 +2,10 @@ from django import forms
 from django.conf import settings
 from django.contrib.admin.widgets import AutocompleteSelect
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 
 from busstops.models import Operator
+from bustimes.models import Garage
 
 from .fields import validate_colours
 from .form_fields import RegField, SummaryField
@@ -41,6 +43,7 @@ class EditVehicleForm(forms.Form):
         "fleet_number",
         "reg",
         "operator",
+        "garage",
         "vehicle_type",
         "colours",
         "other_colour",
@@ -66,6 +69,13 @@ class EditVehicleForm(forms.Form):
     operator = forms.ModelChoiceField(
         queryset=Operator.objects,
         widget=AutocompleteWidget(field=Vehicle.operator.field),
+        required=False,
+        empty_label="",
+    )
+
+    garage = forms.ModelChoiceField(
+        queryset=Garage.objects.none(),
+        widget=AutocompleteWidget(field=Vehicle.garage.field),
         required=False,
         empty_label="",
     )
@@ -135,6 +145,7 @@ link to a picture to prove it. Be polite.""",
         super().__init__(data, *args, **kwargs)
 
         self.fields["operator"].initial = vehicle.operator
+        self.fields["garage"].initial = vehicle.garage
         self.fields["reg"].initial = vehicle.reg
         self.fields["vehicle_type"].initial = vehicle.vehicle_type
         self.fields["colours"].initial = vehicle.livery_id
@@ -165,6 +176,25 @@ link to a picture to prove it. Be polite.""",
             self.fields["fleet_number"].initial = vehicle.fleet_code
         elif vehicle.fleet_number is not None:
             self.fields["fleet_number"].initial = str(vehicle.fleet_number)
+
+        # same garages as the fleet list filter: garages assigned to the
+        # operator, plus any garage other vehicles under it are listed at
+        submitted_operator = data.get("operator") if data else None
+        operator_id = vehicle.operator_id
+        if submitted_operator and submitted_operator.isdigit():
+            operator_id = int(submitted_operator)
+        garage_queryset = Garage.objects.filter(id=vehicle.garage_id)
+        if operator_id:
+            garage_queryset |= Garage.objects.filter(
+                Q(operator_id=operator_id)
+                | Q(
+                    vehicle__operator_id=operator_id,
+                    vehicle__withdrawn=False,
+                )
+            )
+        self.fields["garage"].queryset = garage_queryset.distinct().order_by(
+            "name", "code"
+        )
 
         if vehicle.vehicle_type_id and not vehicle.is_spare_ticket_machine():
             del self.fields["spare_ticket_machine"]

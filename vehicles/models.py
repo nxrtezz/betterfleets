@@ -565,6 +565,20 @@ class VehicleRevision(models.Model):
     to_livery = models.ForeignKey(
         Livery, models.DB_SET_NULL, null=True, blank=True, related_name="revision_to"
     )
+    from_garage = models.ForeignKey(
+        "bustimes.Garage",
+        models.DB_SET_NULL,
+        null=True,
+        blank=True,
+        related_name="revision_from_garage",
+    )
+    to_garage = models.ForeignKey(
+        "bustimes.Garage",
+        models.DB_SET_NULL,
+        null=True,
+        blank=True,
+        related_name="revision_to_garage",
+    )
 
     features = models.ManyToManyField(
         VehicleFeature, blank=True, through=VehicleRevisionFeature
@@ -617,7 +631,7 @@ class VehicleRevision(models.Model):
         )
 
     def list_changes(self, html=True):
-        for field in ("operator", "type", "livery"):
+        for field in ("operator", "type", "livery", "garage"):
             if getattr(self, f"from_{field}_id") or getattr(self, f"to_{field}_id"):
                 if getattr(__class__, f"from_{field}").is_cached(self):
                     before = getattr(self, f"from_{field}")
@@ -684,6 +698,7 @@ class VehicleRevision(models.Model):
             ("operator", "operator"),
             ("type", "vehicle_type"),
             ("livery", "livery"),
+            ("garage", "garage"),
         ):
             before = getattr(self, f"from_{key}_id")
             after = getattr(self, f"to_{key}_id")

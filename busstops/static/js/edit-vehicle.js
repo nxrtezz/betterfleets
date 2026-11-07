@@ -100,6 +100,35 @@
         minimumInputLength: 1
     });
 
+    $('#id_garage').select2({
+        allowClear: true,
+        placeholder: "",
+        ajax: {
+            url: '/api/garages/',
+            data: function(params) {
+                var query = {
+                    limit: 100,
+                    offset: ((params.page | 1) - 1) * 100,
+                };
+                if (params.term) {
+                    query.name__icontains = params.term;
+                }
+                var operator = $('#id_operator').val();
+                if (operator) {
+                    query.operator = operator;
+                }
+                return query;
+            },
+            processResults: processResults,
+            delay: 250
+        },
+    });
+
+    // garages belong to an operator, so reset the choice when it changes
+    $('#id_operator').on('change', function() {
+        $('#id_garage').val(null).trigger('change');
+    });
+
     // Vehicle management links
     const addPhotoLink = document.querySelector('.add-photo-link');
     if (addPhotoLink) {

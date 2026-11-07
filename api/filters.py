@@ -12,7 +12,7 @@ from django_filters.rest_framework import (
 )
 
 from busstops.models import Operator, Service, StopPoint
-from bustimes.models import Trip
+from bustimes.models import Garage, Trip
 from vehicles.models import DataSource, Livery, Vehicle, VehicleType
 
 
@@ -119,6 +119,27 @@ class LiveryFilter(FilterSet):
             "name": ["icontains"],
             "published": ["exact"],
             "id": ["exact", "in"],
+        }
+
+
+class GarageFilter(FilterSet):
+    operator = CharFilter(method="filter_operator", label="Operator")
+
+    def filter_operator(self, queryset, name, value):
+        if not str(value).isdigit():
+            return queryset.none()
+        # same logic as the garage filter on the vehicle fleet list:
+        # garages assigned to the operator, plus garages its vehicles use
+        return queryset.filter(
+            Q(operator_id=value)
+            | Q(vehicle__operator_id=value, vehicle__withdrawn=False)
+        ).distinct()
+
+    class Meta:
+        model = Garage
+        fields = {
+            "id": ["exact", "in"],
+            "name": ["icontains"],
         }
 
 

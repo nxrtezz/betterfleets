@@ -919,6 +919,8 @@ class VehicleRevisionAdmin(admin.ModelAdmin):
         "to_operator",
         "from_livery",
         "to_livery",
+        "from_garage",
+        "to_garage",
         "from_type",
         "to_type",
         "vehicle",
