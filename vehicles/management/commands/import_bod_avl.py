@@ -630,8 +630,8 @@ class Command(ImportLiveVehiclesCommand):
             route_name = ticket_machine.get("TicketMachineServiceCode", "")
 
         # Check out-of-service tracking codes
-        if vehicle.operator:
-            operator_id = vehicle.operator.id
+        if vehicle.operator_id:
+            operator_id = vehicle.operator_id
 
             # Check if operator has any OOSTC entries (cached)
             if operator_id not in self.oostc_cache:
@@ -652,7 +652,7 @@ class Command(ImportLiveVehiclesCommand):
                     latest_journey = vehicle.latest_journey
                     if latest_journey and latest_journey.service:
                         # Check if the service belongs to this operator
-                        if latest_journey.service.operator.filter(id=vehicle.operator.id).exists():
+                        if latest_journey.service.operator.filter(pk=vehicle.operator_id).exists():
                             # Vehicle is tracking under a service under this operator, allow it
                             pass
                         else:
