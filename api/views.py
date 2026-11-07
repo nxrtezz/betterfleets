@@ -20,7 +20,7 @@ from rest_framework.response import Response
 from sql_util.utils import Exists
 
 from busstops.models import Locality, Operator, Service, StopPoint
-from bustimes.models import Garage, StopTime, Trip
+from bustimes.models import StopTime, Trip
 from bustimes.utils import contiguous_stoptimes_only
 from departures.gtfsr import maybe_get_and_apply_trip_update
 from tfl import countdown
@@ -104,13 +104,6 @@ class OperatorViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = CursorPagination
     filter_backends = (DjangoFilterBackend,)
     filterset_class = filters.OperatorFilter
-
-
-class GarageViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Garage.objects.order_by("name", "code")
-    serializer_class = serializers.GarageSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filterset_class = filters.GarageFilter
 
 
 class ServiceViewSet(viewsets.ReadOnlyModelViewSet):

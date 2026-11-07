@@ -169,7 +169,6 @@ class GarageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Garage
         fields = (
-            "id",
             "code",
             "name",
         )
