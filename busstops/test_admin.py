@@ -8,7 +8,7 @@ from accounts.models import User
 from bustimes.models import Route, RouteLink
 
 from .admin import read_spreadsheet_rows
-from .models import DataSource, Service, StopPoint
+from .models import DataSource, Operator, Service, StopPoint
 
 
 class BusStopsAdminTests(TestCase):
@@ -76,6 +76,32 @@ class BusStopsAdminTests(TestCase):
 
         self.assertEqual(headers, ["operator", "vehicle id"])
         self.assertEqual(rows, [{"operator": "SPOS", "vehicle id": "123"}])
+
+    def test_fleet_import_creates_vehicle_type(self):
+        from vehicles.models import Vehicle, VehicleType
+
+        Operator.objects.create(noc="SPOS", name="SPOT")
+        self.client.force_login(self.staff_user)
+        uploaded = SimpleUploadedFile(
+            "fleet.csv",
+            (
+                "Operator,Vehicle ID,slug,fleet number,fleet code,registration,"
+                "vehicle type,livery name,branding,withdrawn,features\n"
+                "SPOS,,SPOS-1,1,1,AB12CDE,Mercedes Sprinter Minibus,,,False,\n"
+            ).encode(),
+            content_type="text/csv",
+        )
+
+        response = self.client.post(
+            "/admin/busstops/operator/fleet/",
+            {"action": "import", "file": uploaded},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        vehicle_type = VehicleType.objects.get(name="Mercedes Sprinter Minibus")
+        vehicle = Vehicle.objects.get(code="SPOS-1")
+        self.assertEqual(vehicle.vehicle_type, vehicle_type)
+        self.assertEqual(vehicle.operator.noc, "SPOS")
 
     def make_url(self, site, model, page: str) -> str:
         return reverse(

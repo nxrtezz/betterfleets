@@ -372,10 +372,9 @@ class OperatorAdmin(M2MThroughMixin, admin.ModelAdmin):
                         name__iexact=row["vehicle_type"]
                     ).first()
                     if vehicle_type is None:
-                        errors.append(
-                            f"Row {row_num}: Vehicle type '{row['vehicle_type']}' not found"
+                        vehicle_type = VehicleType.objects.create(
+                            name=row["vehicle_type"]
                         )
-                        continue
 
                 livery = None
                 if row.get("livery"):
@@ -1234,8 +1233,12 @@ class ServiceAdmin(M2MThroughMixin, GISModelAdmin):
                             vehicle_type = None
                             if vehicle_type_name:
                                 vehicle_type = VehicleType.objects.filter(
-                                    name=vehicle_type_name
+                                    name__iexact=vehicle_type_name
                                 ).first()
+                                if vehicle_type is None:
+                                    vehicle_type = VehicleType.objects.create(
+                                        name=vehicle_type_name
+                                    )
 
                             # Get livery
                             livery = None
