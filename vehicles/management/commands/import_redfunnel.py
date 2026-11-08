@@ -396,7 +396,7 @@ class Command(BaseCommand):
         location.id = vehicle.id
 
         # Update Redis (always update Redis even if we didn't create a journey)
-        if redis_client:
+        if redis_client and location.journey:
             try:
                 redis_json = location.get_redis_json()
                 redis_json = json.dumps(redis_json, default=str)
