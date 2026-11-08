@@ -540,7 +540,7 @@ class ImportLiveVehiclesCommand(BaseCommand):
         if not self.driver_associations:
             return
 
-        from .models import Driver, VehicleJourneyDriver
+        from ..models import Driver, VehicleJourneyDriver
 
         for journey_key, driver_ref, operator in self.driver_associations:
             try:
