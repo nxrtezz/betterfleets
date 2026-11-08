@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from django.contrib.gis.geos import Point
+from django.db import IntegrityError
 from django.utils.timezone import make_aware
 
 from busstops.models import Service
@@ -41,9 +42,20 @@ class Command(ImportLiveVehiclesCommand):
         }
         if vehicle_code[:1] == "J" and vehicle_code[1:].isdigit():
             defaults["reg"] = vehicle_code
-        return self.vehicles.get_or_create(
-            defaults, source=self.source, code=vehicle_code
-        )
+        try:
+            return self.vehicles.get_or_create(
+                defaults, source=self.source, code=vehicle_code
+            )
+        except IntegrityError:
+            # vehicle_operator_and_code is unique on (operator, code) but the
+            # get_or_create lookup includes source - the vehicle may already
+            # exist under a different source
+            return (
+                self.vehicles.get(
+                    operator_id=self.operator, code__iexact=vehicle_code
+                ),
+                False,
+            )
 
     def get_items(self):
         return super().get_items()["updates"]
