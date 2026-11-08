@@ -5,9 +5,15 @@
 #
 # Each step runs even if a previous one failed; exit status is non-zero
 # if any step failed. Requires BODS_API_KEY in the environment for the
-# Bus Open Data step. TNDS is skipped - no FTP credentials are configured.
+# Bus Open Data step. TNDS credentials are read from /app/.env when present.
 
 cd /app || exit 1
+
+if [ -f /app/.env ]; then
+    set -a
+    . /app/.env
+    set +a
+fi
 
 FAILED=""
 
@@ -28,6 +34,12 @@ run import_passenger
 run import_bod_timetables
 run import_ni
 run import_gtfs
+
+if [ -n "$TNDS_USERNAME" ] && [ -n "$TNDS_PASSWORD" ]; then
+    run import_tnds "$TNDS_USERNAME" "$TNDS_PASSWORD"
+else
+    echo "=== $(date -Is) SKIP: import_tnds (no TNDS credentials in .env) ==="
+fi
 
 echo ""
 if [ -n "$FAILED" ]; then

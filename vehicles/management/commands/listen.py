@@ -18,8 +18,11 @@ MAX_LENGTH = 2000
 WINDOW = 10
 
 
+BASE_URL = "https://eeveeit.uk"
+
+
 def get_link(slug):
-    return f"[{slug}](https://bustimes.org/vehicles/{slug})"
+    return f"[{slug}]({BASE_URL}/vehicles/{slug})"
 
 
 def get_chunks(slugs):
