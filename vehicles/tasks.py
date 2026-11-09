@@ -354,6 +354,9 @@ def compress_avl_archive():
 
     today_str = timezone.now().date().isoformat()
 
+    if not settings.AVL_ARCHIVE_DIR.exists():
+        return
+
     for path in settings.AVL_ARCHIVE_DIR.iterdir():
         if not path.name.isdigit():
             continue
