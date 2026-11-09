@@ -89,18 +89,6 @@ gtag('config', 'G-X2Z0KM7Z5C');
                     <a href="/accounts/login/?next={{ request.path }}"><img src="{{ static('svg/user.svg') }}" alt="Sign in" width="20" height="20"></a>
                 {% endif %}
             </li>
-            <li>
-                <select id="site-theme" class="theme-select" aria-label="Theme">
-                    <option value="">Theme: auto</option>
-                    <option value="brighton">Brighton &amp; Hove</option>
-                    <option value="brighton-cream">Brighton &amp; Hove Cream</option>
-                    <option value="bluestar">Bluestar</option>
-                    <option value="southern-vectis">Southern Vectis</option>
-                    <option value="solent">Solent Blue</option>
-                    <option value="goahead">Go-Ahead Women</option>
-                    <option value="christmas">Christmas</option>
-                </select>
-            </li>
         </ul>
         <form method="GET" action="/search" class="search">
             <label>
@@ -112,6 +100,48 @@ gtag('config', 'G-X2Z0KM7Z5C');
     </div>
 </header>
 {% endblock header %}
+<main>
+    {% block breadcrumb %}{% include 'breadcrumb.html' %}{% endblock %}
+    <div id="content">
+        {% block content %}{% endblock %}
+    </div>
+</main>
+
+{% block footer %}
+<footer>
+    {% if request.user.is_authenticated %}
+        <form action="{{ url('logout') }}" method="POST">
+            <ul class="user">
+                <li><a href="{{ url('user_detail', args=[request.user.id]) }}">user {{ request.user.id }}</a></li>
+                <li>
+                    <input type="submit" value="Log out">
+                </li>
+                <li><a href="/rules">Rules & FAQ</a></li>
+                <li><a href="https://discord.com/invite/gY4PdDFau7">Discord</a></li>
+            </ul>
+        </form>
+    {% endif %}
+    <ul>
+        <li><a href="/contact">Contact</a></li>
+        <li><a href="/data">Data sources</a></li>
+        <li><a href="https://status.bustimes.org">Status</a></li>
+        <li><a href="/privacy">Privacy policy</a></li>
+        {% if ad %}<li><a href="javascript:window.__tcfapi('displayConsentUi',2,function(){})">Privacy settings</a></li>{% endif %}
+        <li>
+            <select id="site-theme" class="theme-select" aria-label="Theme">
+                <option value="">Theme: auto</option>
+                <option value="brighton">Brighton &amp; Hove</option>
+                <option value="brighton-cream">Brighton &amp; Hove Cream</option>
+                <option value="bluestar">Bluestar</option>
+                <option value="southern-vectis">Southern Vectis</option>
+                <option value="solent">Solent Blue</option>
+                <option value="goahead">Go-Ahead Women</option>
+                <option value="christmas">Christmas</option>
+            </select>
+        </li>
+    </ul>
+</footer>
+{% endblock footer %}
 <script>
 (function () {
     var themes = ["brighton", "brighton-cream", "bluestar", "southern-vectis", "solent", "goahead", "christmas"];
@@ -144,36 +174,6 @@ gtag('config', 'G-X2Z0KM7Z5C');
     }
 })();
 </script>
-<main>
-    {% block breadcrumb %}{% include 'breadcrumb.html' %}{% endblock %}
-    <div id="content">
-        {% block content %}{% endblock %}
-    </div>
-</main>
-
-{% block footer %}
-<footer>
-    {% if request.user.is_authenticated %}
-        <form action="{{ url('logout') }}" method="POST">
-            <ul class="user">
-                <li><a href="{{ url('user_detail', args=[request.user.id]) }}">user {{ request.user.id }}</a></li>
-                <li>
-                    <input type="submit" value="Log out">
-                </li>
-                <li><a href="/rules">Rules & FAQ</a></li>
-                <li><a href="https://discord.com/invite/gY4PdDFau7">Discord</a></li>
-            </ul>
-        </form>
-    {% endif %}
-    <ul>
-        <li><a href="/contact">Contact</a></li>
-        <li><a href="/data">Data sources</a></li>
-        <li><a href="https://status.bustimes.org">Status</a></li>
-        <li><a href="/privacy">Privacy policy</a></li>
-        {% if ad %}<li><a href="javascript:window.__tcfapi('displayConsentUi',2,function(){})">Privacy settings</a></li>{% endif %}
-    </ul>
-</footer>
-{% endblock footer %}
 
 {% block foot %}{% endblock %}
 

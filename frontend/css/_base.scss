@@ -417,16 +417,6 @@ body {
             padding-right: 8px;
         }
     }
-
-    .theme-select {
-        appearance: auto;
-        background: transparent;
-        border: 0;
-        color: var(--header-text-color);
-        font: inherit;
-        margin: 0;
-        padding: .75em .25em;
-    }
 }
 
 .search {
@@ -1869,6 +1859,16 @@ li[title="ATCO code"] {
     ul {
         margin: .25em 0 .25em 1em;
     }
+}
+
+.theme-select {
+    appearance: auto;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    margin: 0;
+    padding: .5em .25em;
 }
 
 footer {
