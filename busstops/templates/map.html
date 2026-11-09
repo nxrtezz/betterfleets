@@ -17,6 +17,17 @@
         <a href="/" class="site-name">bustimes.org</a>
         <ul>
             <li><a href="/map{% if object.latlong %}#16/{{ object.latlong.y|floatformat:4 }}/{{ object.latlong.x|floatformat:4 }}{% endif %}">Map</a></li>
+            <li>
+                <select id="site-theme" class="theme-select" aria-label="Theme">
+                    <option value="">Theme: auto</option>
+                    <option value="brighton">Brighton &amp; Hove</option>
+                    <option value="bluestar">Bluestar</option>
+                    <option value="southern-vectis">Southern Vectis</option>
+                    <option value="solent">Solent Blue</option>
+                    <option value="goahead">Go-Ahead Women</option>
+                    <option value="christmas">Christmas</option>
+                </select>
+            </li>
         </ul>
         <form method="GET" action="/search" class="search">
             <label>

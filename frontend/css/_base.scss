@@ -18,6 +18,9 @@
     --active-link-color: var(--black);
     --summary-marker-color: var(--border-color);
 
+    --header-text-color: #222;
+    --header-accent: linear-gradient(90deg, var(--brand-color-darker), var(--brand-color-darker-darker));
+
     color-scheme: light;
 }
 
@@ -37,7 +40,137 @@
 
     --summary-marker-color: #eee;
 
+    --header-text-color: #fff;
+    --header-accent: linear-gradient(90deg, #555, #666);
+
     color-scheme: dark;
+}
+
+// operator livery themes; these come after .dark-mode so they win when both are set
+.theme-brighton {
+    --brand-color: #016273;
+    --brand-color-darker: #014e60;
+    --brand-color-darker-darker: #013a47;
+
+    --border-color: var(--brand-color-darker);
+    --border-color-darker: var(--brand-color-darker-darker);
+
+    --background-color: #eef7f6;
+    --text-color: #12333d;
+
+    --link-color: #016273;
+    --active-link-color: #fff;
+    --summary-marker-color: var(--border-color-darker);
+
+    --header-text-color: #fff;
+    --header-accent: radial-gradient(circle at 10% 45%, #64cdc9 65%, #016273 65%);
+
+    color-scheme: light;
+}
+
+.theme-bluestar {
+    --brand-color: #0055a5;
+    --brand-color-darker: #004582;
+    --brand-color-darker-darker: #003463;
+
+    --border-color: var(--brand-color-darker);
+    --border-color-darker: var(--brand-color-darker-darker);
+
+    --background-color: #f2f8fd;
+    --text-color: #0d2438;
+
+    --link-color: #0055a5;
+    --active-link-color: #fff;
+    --summary-marker-color: var(--border-color-darker);
+
+    --header-text-color: #fff;
+    --header-accent: radial-gradient(at 50% 30%, #87edff 2%, #00d9ff 15%, #2773e6 35%, #0055a5 50%);
+
+    color-scheme: light;
+}
+
+.theme-southern-vectis {
+    --brand-color: #006a2e;
+    --brand-color-darker: #005424;
+    --brand-color-darker-darker: #003f1a;
+
+    --border-color: var(--brand-color-darker);
+    --border-color-darker: var(--brand-color-darker-darker);
+
+    --background-color: #f5f8ec;
+    --text-color: #1c2b12;
+
+    --link-color: #006a2e;
+    --active-link-color: #fff;
+    --summary-marker-color: var(--border-color-darker);
+
+    --header-text-color: #fff;
+    --header-accent: linear-gradient(55deg, #006a2e 16%, #109710 16% 18%, #006a2e 18% 20%, #109710 20% 31%, #a1c616 31% 33%, #109710 33% 35%, #a1c616 35% 76%, #006a2e 76% 78%, #a1c616 78% 80%, #006a2e 80%);
+
+    color-scheme: light;
+}
+
+.theme-solent {
+    --brand-color: #002244;
+    --brand-color-darker: #001a33;
+    --brand-color-darker-darker: #001226;
+
+    --border-color: var(--brand-color-darker);
+    --border-color-darker: var(--brand-color-darker-darker);
+
+    --background-color: #f3f6fb;
+    --text-color: #0f1e33;
+
+    --link-color: #0057b8;
+    --active-link-color: #fff;
+    --summary-marker-color: var(--border-color-darker);
+
+    --header-text-color: #fff;
+    --header-accent: conic-gradient(at 40% 90%, #8df 0deg 35deg, #0bf 35deg 150deg, #08d 150deg 320deg, #024 320deg 330deg, #ff0 330deg 340deg, #8df 340deg);
+
+    color-scheme: light;
+}
+
+.theme-goahead {
+    --brand-color: #ff066b;
+    --brand-color-darker: #d9045c;
+    --brand-color-darker-darker: #b8034d;
+
+    --border-color: var(--brand-color-darker);
+    --border-color-darker: var(--brand-color-darker-darker);
+
+    --background-color: #fff6fa;
+    --text-color: #3d1024;
+
+    --link-color: #c4005a;
+    --active-link-color: #fff;
+    --summary-marker-color: var(--border-color-darker);
+
+    --header-text-color: #fff;
+    --header-accent: radial-gradient(circle at 0 45%, #ff066b 40%, #ff94ef 40%);
+
+    color-scheme: light;
+}
+
+.theme-christmas {
+    --brand-color: #14532d;
+    --brand-color-darker: #0e4021;
+    --brand-color-darker-darker: #0a3018;
+
+    --border-color: var(--brand-color-darker);
+    --border-color-darker: var(--brand-color-darker-darker);
+
+    --background-color: #f7faf3;
+    --text-color: #1e2b1f;
+
+    --link-color: #b91c1c;
+    --active-link-color: #fff;
+    --summary-marker-color: var(--border-color-darker);
+
+    --header-text-color: #fff;
+    --header-accent: repeating-linear-gradient(90deg, #b91c1c 0 16px, #14532d 16px 32px, #d4a017 32px 36px);
+
+    color-scheme: light;
 }
 
 body {
@@ -183,6 +316,13 @@ body {
     overflow: hidden;
     position: relative;
 
+    &::after {
+        background: var(--header-accent);
+        content: "";
+        display: block;
+        height: 4px;
+    }
+
     a {
         color: var(--header-text-color);
         display: inline-block;
@@ -255,6 +395,16 @@ body {
         label {
             padding-right: 8px;
         }
+    }
+
+    .theme-select {
+        appearance: auto;
+        background: transparent;
+        border: 0;
+        color: var(--header-text-color);
+        font: inherit;
+        margin: 0;
+        padding: .75em .25em;
     }
 }
 

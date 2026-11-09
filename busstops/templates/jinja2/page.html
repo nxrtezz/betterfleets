@@ -68,6 +68,10 @@ gtag('config', 'G-X2Z0KM7Z5C');
     if (m && (!a || a.endsWith("_satellite")) || a && a.endsWith("_dark")) {
         document.body.classList.add("dark-mode")
     }
+    var t = localStorage && localStorage["site-theme"];
+    if (t && ["brighton", "bluestar", "southern-vectis", "solent", "goahead", "christmas"].indexOf(t) !== -1) {
+        document.body.classList.add("theme-" + t)
+    }
 })();
 </script>
 
@@ -85,6 +89,17 @@ gtag('config', 'G-X2Z0KM7Z5C');
                     <a href="/accounts/login/?next={{ request.path }}"><img src="{{ static('svg/user.svg') }}" alt="Sign in" width="20" height="20"></a>
                 {% endif %}
             </li>
+            <li>
+                <select id="site-theme" class="theme-select" aria-label="Theme">
+                    <option value="">Theme: auto</option>
+                    <option value="brighton">Brighton &amp; Hove</option>
+                    <option value="bluestar">Bluestar</option>
+                    <option value="southern-vectis">Southern Vectis</option>
+                    <option value="solent">Solent Blue</option>
+                    <option value="goahead">Go-Ahead Women</option>
+                    <option value="christmas">Christmas</option>
+                </select>
+            </li>
         </ul>
         <form method="GET" action="/search" class="search">
             <label>
@@ -96,6 +111,38 @@ gtag('config', 'G-X2Z0KM7Z5C');
     </div>
 </header>
 {% endblock header %}
+<script>
+(function () {
+    var themes = ["brighton", "bluestar", "southern-vectis", "solent", "goahead", "christmas"];
+    var select = document.getElementById("site-theme");
+    function apply(theme) {
+        themes.forEach(function (t) {
+            document.body.classList.toggle("theme-" + t, t === theme);
+        });
+        if (select) {
+            select.value = theme || "";
+        }
+    }
+    var saved = null;
+    try { saved = localStorage.getItem("site-theme"); } catch (e) {}
+    if (saved && themes.indexOf(saved) !== -1) {
+        apply(saved);
+    }
+    if (select) {
+        select.addEventListener("change", function () {
+            var theme = select.value;
+            try {
+                if (theme) {
+                    localStorage.setItem("site-theme", theme);
+                } else {
+                    localStorage.removeItem("site-theme");
+                }
+            } catch (e) {}
+            apply(theme);
+        });
+    }
+})();
+</script>
 <main>
     {% block breadcrumb %}{% include 'breadcrumb.html' %}{% endblock %}
     <div id="content">
