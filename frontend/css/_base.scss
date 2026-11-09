@@ -152,6 +152,27 @@
     color-scheme: light;
 }
 
+.theme-brighton-cream {
+    --brand-color: #ffffcb;
+    --brand-color-darker: #eaea9f;
+    --brand-color-darker-darker: #d8d885;
+
+    --border-color: var(--brand-color-darker);
+    --border-color-darker: var(--brand-color-darker-darker);
+
+    --background-color: #fffdf2;
+    --text-color: #222;
+
+    --link-color: #cb1212;
+    --active-link-color: var(--black);
+    --summary-marker-color: var(--border-color-darker);
+
+    --header-text-color: #222;
+    --header-accent: linear-gradient(#0000 90%, #000 90%), linear-gradient(295deg, #cb1212 30%, #fff 30% 33%, #000 33% 40%, #fff 40% 43%, #cb1212 43% 46%, #ffffcb 46%);
+
+    color-scheme: light;
+}
+
 .theme-christmas {
     --brand-color: #14532d;
     --brand-color-darker: #0e4021;
