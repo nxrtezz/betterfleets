@@ -38,7 +38,7 @@ class DarwinListener:
             self.on_status("connected")
         dest = DESTINATION
         if not dest.startswith("/"):
-            dest = f"/queue/{dest}"
+            dest = f"/topic/{dest}"
         self.conn.subscribe(destination=dest, id=1, ack="auto")
 
     def on_send(self, frame):
@@ -79,6 +79,7 @@ class DarwinListener:
                     [(HOST, PORT)],
                     heartbeats=(10000, 10000),
                     reconnect_attempts_max=10,
+                    auto_decode=False,  # bodies are gzip'd XML - keep raw bytes
                 )
                 self.conn.set_listener("", self)
                 self.conn.connect(USERNAME, PASSWORD, wait=True)

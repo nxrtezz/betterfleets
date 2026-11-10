@@ -27,6 +27,7 @@ class ServiceState:
         self.ts_locations = []
         self.coaches = []
         self.late_reason = None
+        self.deactivated = False
         self.first_seen = None
         self.last_seen = None
 
@@ -171,6 +172,8 @@ class DarwinState:
                 state.apply_ts(update)
             case "formation":
                 state.apply_formation(update)
+            case "deactivated":
+                state.deactivated = True
 
     def prune_before(self, cutoff: date):
         """drop services whose service date is before cutoff"""

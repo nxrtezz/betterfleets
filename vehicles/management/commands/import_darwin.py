@@ -238,7 +238,7 @@ class Command(BaseCommand):
     def handle_service(self, rid: str, state) -> bool:
         """-> True if handled (signature can be recorded),
         False if it should be retried next flush"""
-        if not state.is_passenger or state.cancelled:
+        if not state.is_passenger or state.cancelled or state.deactivated:
             return True
         if not state.headcode and not state.toc:
             return True  # no schedule seen yet - can't identify the service

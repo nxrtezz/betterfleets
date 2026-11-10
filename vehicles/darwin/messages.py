@@ -230,6 +230,15 @@ def parse_pport(xml_bytes: bytes) -> list[dict]:
                 if formation := parse_formations(child):
                     formation["update_origin"] = origin
                     updates.append(formation)
+            elif tag == "deactivated":
+                if rid := child.get("rid"):
+                    updates.append(
+                        {
+                            "kind": "deactivated",
+                            "rid": rid,
+                            "update_origin": origin,
+                        }
+                    )
             # association, formationLoading, station messages, alerts,
             # train order, alarms etc are ignored for now
     return updates
