@@ -356,6 +356,19 @@ class StopPoint(models.Model):
     naptan_code = models.CharField(
         verbose_name="NaPTAN code", max_length=16, null=True, blank=True
     )
+    tiploc = models.CharField(
+        verbose_name="TIPLOC",
+        max_length=16,
+        null=True,
+        blank=True,
+        help_text="National Rail TIPLOC code from NaPTAN AnnotatedRailRef",
+    )
+    crs = models.CharField(
+        max_length=3,
+        null=True,
+        blank=True,
+        help_text="National Rail CRS station code",
+    )
 
     common_name = models.CharField(max_length=48)
     short_common_name = models.CharField(max_length=48, blank=True)

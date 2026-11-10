@@ -63,6 +63,28 @@ services:
       - redis
     restart: always
 
+  darwin:
+    build: .
+    entrypoint: sh -c "uv sync --group dev --group test; ./manage.py import_darwin"
+    container_name: django_darwin
+    environment:
+      - SECRET_KEY=${SECRET_KEY-}
+      - DATABASE_URL=${DATABASE_URL-postgis://postgres:postgres@postgres/postgres}
+      - REDIS_URL=${REDIS_URL-redis://redis:6379}
+      - DARWIN_STOMP_HOST=${DARWIN_STOMP_HOST-}
+      - DARWIN_STOMP_PORT=${DARWIN_STOMP_PORT-61613}
+      - DARWIN_STOMP_USER=${DARWIN_STOMP_USER-}
+      - DARWIN_STOMP_PASSWORD=${DARWIN_STOMP_PASSWORD-}
+      - DARWIN_STOMP_DESTINATION=${DARWIN_STOMP_DESTINATION-}
+      - DARWIN_S3_ACCESS_KEY=${DARWIN_S3_ACCESS_KEY-}
+      - DARWIN_S3_SECRET_KEY=${DARWIN_S3_SECRET_KEY-}
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+      - redis
+    restart: always
+
 volumes:
   postgres_data:
   staticfiles:

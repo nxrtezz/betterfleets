@@ -115,6 +115,11 @@ def get_stop(element: ET.Element, atco_code: str):
         if stop.indicator == stop.naptan_code:
             stop.indicator = ""
 
+    rail_ref = element.find("StopClassification/OffStreet/Rail/AnnotatedRailRef")
+    if rail_ref is not None:
+        stop.tiploc = rail_ref.findtext("TiplocRef") or None
+        stop.crs = rail_ref.findtext("CrsRef") or None
+
     return stop
 
 
@@ -215,6 +220,8 @@ class Command(BaseCommand):
         "suburb",
         "town",
         "active",
+        "tiploc",
+        "crs",
         "source",
     )
 

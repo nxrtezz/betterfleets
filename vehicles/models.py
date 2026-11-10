@@ -763,9 +763,18 @@ class VehicleJourney(models.Model):
     vehicle = models.ForeignKey(
         Vehicle, models.DB_CASCADE, null=True, blank=True, db_index=False
     )
+    operator = models.ForeignKey(
+        "busstops.Operator",
+        models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=False,
+        help_text="operator for journeys without a vehicle (eg Darwin trains)",
+    )
     code = models.CharField(max_length=255, blank=True)
     destination = models.CharField(max_length=255, blank=True)
     direction = models.CharField(max_length=13, blank=True)
+    data = models.JSONField(null=True, blank=True)
     trip = models.ForeignKey(
         "bustimes.Trip", models.DB_SET_NULL, null=True, blank=True, db_index=False
     )
@@ -825,13 +834,18 @@ class VehicleJourney(models.Model):
         return f"{url}?date={self.date}"
 
     def get_service_link(self):
-        if self.service:
-            slug = self.service.slug
-        else:
-            slug = f"{self.vehicle.operator_id}:{self.route_name}"
-        return (
-            reverse("service_vehicles", args=(slug,)) + "?date=" + self.date.isoformat()
-        )
+        date = "?date=" + self.date.isoformat()
+        if self.service_id:
+            return reverse("service_vehicles", args=(self.service.slug,)) + date
+        if self.route_name:
+            if self.vehicle_id:
+                noc = self.vehicle.operator_id
+            else:
+                noc = self.operator_id or "None"
+            return (
+                reverse("ad_hoc_service_vehicles", args=(noc, self.route_name)) + date
+            )
+        return ""
 
 
 class VehicleJourneyDriver(models.Model):

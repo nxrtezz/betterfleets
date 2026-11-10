@@ -22,7 +22,7 @@ from django.core.exceptions import PermissionDenied
 from django.core.mail import EmailMessage
 from django.core.paginator import Paginator
 from django.db import connection
-from django.db.models import Case, F, OuterRef, Prefetch, Q, StringAgg, Value, When
+from django.db.models import Case, Count, F, Max, OuterRef, Prefetch, Q, StringAgg, Value, When
 from django.db.models.functions import Coalesce, Now
 from django.http import (
     Http404,
@@ -373,7 +373,10 @@ def status(request):
         ),
     }
 
-    statuses = {"bod_avl_status": get_statuses("bod_avl_status")} | cache.get_many(
+    statuses = {
+        "bod_avl_status": get_statuses("bod_avl_status"),
+        "darwin_status": get_statuses("darwin_status"),
+    } | cache.get_many(
         [
             f"{key}_status"
             for key in (
@@ -1051,57 +1054,91 @@ class OperatorDetailView(DetailView):
             )
         )
 
-        # services list:
+        is_rail = self.object.vehicle_mode in {"rail", "train"}
 
-        services = (
-            self.object.service_set.with_line_names()
-            .filter(current=True)
-            .defer("geometry", "search_vector")
-        )
-        services = services.annotate(start_date=SubqueryMin("route__start_date"))
-
-        # Apply filters
-        public_use_filter = self.request.GET.get("public_use")
-        if public_use_filter in ["true", "false"]:
-            services = services.filter(public_use=(public_use_filter == "true"))
-        elif public_use_filter == "null":
-            services = services.filter(public_use__isnull=True)
-
-        special_service_filter = self.request.GET.get("special_service")
-        if special_service_filter in ["true", "false"]:
-            services = services.filter(special_service=(special_service_filter == "true"))
-        elif special_service_filter == "null":
-            services = services.filter(special_service__isnull=True)
-
-        garage_filter = self.request.GET.get("garage")
-        if garage_filter:
-            services = services.filter(garage_id=garage_filter)
-
-        if self.object.name == "National Express":
-            services = services.annotate(
-                group=Case(
-                    When(
-                        route__code__contains="_Events-",
-                        then=Value("Festival & event travel"),
+        if is_rail:
+            # rail operators don't have routes - they have headcodes
+            context["headcodes"] = [
+                {
+                    "headcode": route["route_name"],
+                    "destinations": route["destinations"],
+                    "last_seen": route["last_seen"],
+                    "count": route["count"],
+                    "get_absolute_url": reverse(
+                        "ad_hoc_service_vehicles",
+                        args=(self.object.noc, route["route_name"]),
                     ),
-                    default=Value(""),
+                }
+                for route in VehicleJourney.objects.filter(
+                    Q(vehicle__operator=self.object) | Q(operator=self.object),
+                    service=None,
+                    route_name__gt="",
+                    date__gte=timezone.localdate()
+                    - datetime.timedelta(days=2),
                 )
+                .values("route_name")
+                .annotate(
+                    destinations=StringAgg(
+                        "destination", Value(", "), distinct=True
+                    ),
+                    last_seen=Max("datetime"),
+                    count=Count("id"),
+                )
+                .order_by("route_name")
+            ]
+            context["services"] = []
+        else:
+            # services list:
+
+            services = (
+                self.object.service_set.with_line_names()
+                .filter(current=True)
+                .defer("geometry", "search_vector")
             )
+            services = services.annotate(start_date=SubqueryMin("route__start_date"))
 
-        context["services"] = sorted(services, key=Service.get_order)
+            # Apply filters
+            public_use_filter = self.request.GET.get("public_use")
+            if public_use_filter in ["true", "false"]:
+                services = services.filter(public_use=(public_use_filter == "true"))
+            elif public_use_filter == "null":
+                services = services.filter(public_use__isnull=True)
 
-        # Get garages for this operator for the filter dropdown
-        from bustimes.models import Garage
-        garages = Garage.objects.filter(
-            Q(operator=self.object) | Q(id__in=services.values_list("garage_id", flat=True))
-        ).distinct()
-        context["garages"] = garages
+            special_service_filter = self.request.GET.get("special_service")
+            if special_service_filter in ["true", "false"]:
+                services = services.filter(special_service=(special_service_filter == "true"))
+            elif special_service_filter == "null":
+                services = services.filter(special_service__isnull=True)
 
-        if context["services"]:
-            # for 'from {date}' for future services:
-            context["today"] = timezone.localdate()
+            garage_filter = self.request.GET.get("garage")
+            if garage_filter:
+                services = services.filter(garage_id=garage_filter)
 
-            context["colours"] = get_colours(context["services"])
+            if self.object.name == "National Express":
+                services = services.annotate(
+                    group=Case(
+                        When(
+                            route__code__contains="_Events-",
+                            then=Value("Festival & event travel"),
+                        ),
+                        default=Value(""),
+                    )
+                )
+
+            context["services"] = sorted(services, key=Service.get_order)
+
+            # Get garages for this operator for the filter dropdown
+            from bustimes.models import Garage
+            garages = Garage.objects.filter(
+                Q(operator=self.object) | Q(id__in=services.values_list("garage_id", flat=True))
+            ).distinct()
+            context["garages"] = garages
+
+            if context["services"]:
+                # for 'from {date}' for future services:
+                context["today"] = timezone.localdate()
+
+                context["colours"] = get_colours(context["services"])
 
         context["breadcrumb"] = [self.object.region]
 
@@ -1142,41 +1179,48 @@ class OperatorDetailView(DetailView):
             withdrawn=False, latest_journey__isnull=False
         ).exists()
         if redis_client and (
-            context["vehicles"] or any(s.tracking for s in context["services"])
+            context["vehicles"]
+            or (is_rail and context.get("headcodes"))
+            or any(s.tracking for s in context["services"])
         ):
             with contextlib.suppress(ConnectionError):
                 context["map"] = redis_client.exists(
                     f"operator{self.object.noc}vehicles"
                 )
 
-        context["ad_hoc_services"] = [
-            {
-                "get_line_names": [route["route_name"]],
-                "line_name": route["route_name"],
-                "line_brand": "",
-                "description": route["description"],
-                "get_absolute_url": reverse(
-                    "ad_hoc_service_vehicles",
-                    args=(self.object.noc, route["route_name"]),
-                ),
-            }
-            for route in VehicleJourney.objects.filter(
-                latest_vehicle__operator=self.object,
-                service=None,
-                date__gte=Now() - datetime.timedelta(days=2),
-            )
-            .exclude(route_name="")
-            .values("route_name")
-            .annotate(description=StringAgg("destination", Value(", "), distinct=True))
-            .order_by("route_name")
-        ]
+        if not is_rail:
+            context["ad_hoc_services"] = [
+                {
+                    "get_line_names": [route["route_name"]],
+                    "line_name": route["route_name"],
+                    "line_brand": "",
+                    "description": route["description"],
+                    "get_absolute_url": reverse(
+                        "ad_hoc_service_vehicles",
+                        args=(self.object.noc, route["route_name"]),
+                    ),
+                }
+                for route in VehicleJourney.objects.filter(
+                    latest_vehicle__operator=self.object,
+                    service=None,
+                    date__gte=Now() - datetime.timedelta(days=2),
+                )
+                .exclude(route_name="")
+                .values("route_name")
+                .annotate(description=StringAgg("destination", Value(", "), distinct=True))
+                .order_by("route_name")
+            ]
 
         return context
 
     def render_to_response(self, context):
         status_code = None
 
-        if not context["services"] and not context["vehicles"]:
+        if (
+            not context["services"]
+            and not context["vehicles"]
+            and not context.get("headcodes")
+        ):
             alternative = Operator.objects.filter(
                 operator_has_current_services,
                 name=self.object.name,

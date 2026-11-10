@@ -73,6 +73,31 @@
 
 {% include 'services.html' with services=services %}
 
+{% if headcodes %}
+    <h2>Headcodes</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Headcode</th>
+                <th>Destinations</th>
+                <th>Journeys</th>
+                <th>Last seen</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for headcode in headcodes %}
+            <tr>
+                <td class="link"><a href="{{ headcode.get_absolute_url }}">{{ headcode.headcode }}</a></td>
+                <td>{{ headcode.destinations }}</td>
+                <td class="tabular">{{ headcode.count }}</td>
+                <td class="tabular">{{ headcode.last_seen|date:"H:i" }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+
 {% if ad_hoc_services %}
     <h2>Other routes</h2>
 

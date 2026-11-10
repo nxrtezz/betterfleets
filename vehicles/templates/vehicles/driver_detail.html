@@ -42,7 +42,7 @@
             </td>
             <td class="link">
                 {% if journey.service or journey.route_name %}
-                    <a href="{{ journey.get_service_link }}">{{ journey.line_name }}</a>
+                    <a href="{{ journey.get_service_link }}">{{ journey.line_name|default:journey.route_name }}</a>
                 {% else %}
                     {{ journey.line_name }}
                 {% endif %}

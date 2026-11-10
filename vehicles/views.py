@@ -837,7 +837,11 @@ def service_vehicles_history(request, slug=None, noc=None, line_name=None):
         else:
             operator = get_object_or_404(Operator, noc=noc)
         journeys = VehicleJourney.objects.filter(
-            service=None, route_name=line_name, vehicle__operator=operator
+            service=None, route_name=line_name
+        ).filter(
+            Q(vehicle__operator=operator) | Q(operator=operator)
+            if operator
+            else Q(vehicle__operator__isnull=True)
         )
 
     context = journeys_list(
