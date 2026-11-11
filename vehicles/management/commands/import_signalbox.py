@@ -72,6 +72,8 @@ INFO_FETCH_WORKERS = 3
 RTT_LOOKUP_INTERVAL = 37  # ~97/hour, under the 100/hour plan limit
 RTT_MAX_REMAINING = timedelta(minutes=10)  # don't look up nearly-finished journeys
 RTT_MAX_PROGRESS = 0.65  # or ones that are mostly done
+BOOST_POLL_SECONDS = 5  # how often to check for superuser-boosted journeys
+BOOST_MAX_ATTEMPTS = 3
 SCRAPE_RETRY_SECONDS = 1200  # wait before re-scraping a journey
 SCRAPE_MIN_INTERVAL = 10  # seconds between page loads (politeness)
 RTT_SERVICE_URL = "https://www.realtimetrains.co.uk/service/gb-nr:{uid}/{date}/detailed"
@@ -112,10 +114,8 @@ class Command(BaseCommand):
         self.rtt = RttClient()
         # heap of (-departure_ts, uid, journey): most recent departures first
         self.rtt_heap: list = []
-        # same, but for journeys a superuser is watching - drained first
-        self.rtt_boost_heap: list = []
-        self._boosted_seen: set = set()
         self.rtt_queued: set[str] = set()
+        self._boost_attempts: dict[str, int] = {}
         self.rtt_retries: dict[str, int] = {}
         self._rtt_next = 0.0
         # playwright scraper fallback for journeys past halfway without a unit
@@ -224,50 +224,17 @@ class Command(BaseCommand):
             return True
         return max(timed) - now < RTT_MAX_REMAINING
 
-    def _sync_boosted(self):
-        """move queued lookups for superuser-watched journeys to the
-        front of the queue (flag set by /journeys/<id>/boost)"""
-        if not redis_client or not (self.rtt_heap or self.rtt_boost_heap):
-            return
-        try:
-            boosted = {
-                m.decode() if isinstance(m, bytes) else m
-                for m in redis_client.smembers("rtt_boosted")
-            }
-        except Exception:
-            return
-        if not boosted and not self._boosted_seen and not self.rtt_boost_heap:
-            return
-        self._boosted_seen = boosted
-        normal, boost = [], []
-        for entry in self.rtt_heap + self.rtt_boost_heap:
-            (boost if entry[1] in boosted else normal).append(entry)
-        self.rtt_heap = normal
-        heapq.heapify(self.rtt_heap)
-        self.rtt_boost_heap = boost
-        heapq.heapify(self.rtt_boost_heap)
-
     def _process_rtt(self):
-        self._sync_boosted()
-        if (
-            not (self.rtt_heap or self.rtt_boost_heap)
-            or time.time() < self._rtt_next
-        ):
+        if not self.rtt_heap or time.time() < self._rtt_next:
             return
         now = timezone.now()
-        entry = heap_used = None
-        for heap in (self.rtt_boost_heap, self.rtt_heap):
-            # drop stale entries - they would otherwise burn lookup slots
-            while heap:
-                candidate = heapq.heappop(heap)
-                if not self._rtt_done(candidate[2], now):
-                    entry, heap_used = candidate, heap
-                    break
-            if entry is not None:
+        # drop stale entries - they would otherwise burn lookup slots
+        while self.rtt_heap:
+            _, uid, journey = heapq.heappop(self.rtt_heap)
+            if not self._rtt_done(journey, now):
                 break
-        if entry is None:
+        else:
             return
-        _, uid, journey = entry
         self._rtt_next = time.time() + RTT_LOOKUP_INTERVAL
         try:
             service = self.rtt.service(uid, journey.date.isoformat())
@@ -276,9 +243,66 @@ class Command(BaseCommand):
             # retry once - transient failures shouldn't lose the unit
             if self.rtt_retries.get(uid, 0) < 1:
                 self.rtt_retries[uid] = self.rtt_retries.get(uid, 0) + 1
-                heapq.heappush(heap_used, entry)
+                departed = journey.datetime or timezone.now()
+                heapq.heappush(
+                    self.rtt_heap,
+                    (-departed.timestamp(), uid, journey),
+                )
             return
         self._apply_rtt(journey, service)
+
+    # -- superuser boost ------------------------------------------------------
+
+    def _journey_for_uid(self, uid: str) -> VehicleJourney | None:
+        for journey in list(self.journeys.values()):
+            if (journey.data or {}).get("uid") == uid:
+                return journey
+        return VehicleJourney.objects.filter(
+            source=self.source, data__uid=uid
+        ).order_by("-date").first()
+
+    def _clear_boost(self, uid: str):
+        try:
+            redis_client.srem("rtt_boosted", uid)
+        except Exception:
+            pass
+
+    def _check_boosts(self):
+        """look up RTT allocations for superuser-watched journeys,
+        ignoring the normal queue, rate limit and staleness rules"""
+        if not redis_client or not self.rtt.configured:
+            return
+        uids = {
+            m.decode() if isinstance(m, bytes) else m
+            for m in redis_client.smembers("rtt_boosted")
+        }
+        for uid in uids:
+            journey = self._journey_for_uid(uid)
+            if journey is None or journey.vehicle_id:
+                self._clear_boost(uid)
+                continue
+            try:
+                service = self.rtt.service(uid, journey.date.isoformat())
+            except RttError as e:
+                logger.warning("rtt boost lookup failed for %s: %s", uid, e)
+                attempts = self._boost_attempts.get(uid, 0) + 1
+                self._boost_attempts[uid] = attempts
+                if attempts >= BOOST_MAX_ATTEMPTS:
+                    self._clear_boost(uid)
+                    del self._boost_attempts[uid]
+                continue
+            self._apply_rtt(journey, service)
+            self._clear_boost(uid)
+            self._boost_attempts.pop(uid, None)
+            logger.info("rtt boost: resolved unit for journey %s", journey.id)
+
+    def _boost_worker(self):
+        while True:
+            time.sleep(BOOST_POLL_SECONDS)
+            try:
+                self._check_boosts()
+            except Exception:
+                logger.exception("rtt boost check failed")
 
     def _apply_rtt(self, journey: VehicleJourney, service: dict):
         summary = allocation_summary(service)
@@ -750,4 +774,5 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.do_source()
         threading.Thread(target=self._scrape_worker, daemon=True).start()
+        threading.Thread(target=self._boost_worker, daemon=True).start()
         self.update()
