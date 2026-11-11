@@ -98,7 +98,7 @@
     {% endif %}
 
     {% if tracking %}
-        <p><a href="{{ tracking }}" class="button">Track this bus</a></p>
+        <p><a href="{{ tracking }}" class="button">{% if vehicle.vehicle_type.style == 'train' %}Track this train{% else %}Track this bus{% endif %}</a></p>
     {% endif %}
 {% else %}
     <h1>{{ object }}</h1>
