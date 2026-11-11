@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
                 db_index=False,
                 help_text="operator for journeys without a vehicle (eg Darwin trains)",
                 null=True,
-                on_delete=django.db.models.deletion.SET_NULL,
+                on_delete=django.db.models.deletion.DB_SET_NULL,
                 to="busstops.operator",
             ),
         ),

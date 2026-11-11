@@ -765,7 +765,7 @@ class VehicleJourney(models.Model):
     )
     operator = models.ForeignKey(
         "busstops.Operator",
-        models.SET_NULL,
+        models.DB_SET_NULL,
         null=True,
         blank=True,
         db_index=False,
