@@ -23,7 +23,7 @@ from channels.layers import get_channel_layer
 from django.contrib.gis.geos import Point
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from django.utils.asyncio import async_to_sync
+from asgiref.sync import async_to_sync
 from redis.exceptions import ConnectionError
 
 from busstops.models import DataSource, Operator

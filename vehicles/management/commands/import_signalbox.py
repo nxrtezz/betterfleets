@@ -52,8 +52,8 @@ BASE_URL = os.environ.get(
 )
 POLL_INTERVAL = 30  # seconds between /api/locations polls
 INFO_CACHE_SIZE = 6000
-INFO_FETCH_BATCH = 100  # max train-information lookups per poll
-INFO_FETCH_WORKERS = 8
+INFO_FETCH_BATCH = 15  # max train-information lookups per poll
+INFO_FETCH_WORKERS = 3
 RTT_LOOKUP_INTERVAL = 40  # ~90/hour, under the 100/hour plan limit
 STATE_RETENTION_DAYS = 2
 
@@ -312,9 +312,9 @@ class Command(BaseCommand):
         )
 
     def flush_redis(self):
+        from asgiref.sync import async_to_sync
         from channels.exceptions import ChannelFull
         from channels.layers import get_channel_layer
-        from django.utils.asyncio import async_to_sync
 
         if not self._pending_writes:
             return
