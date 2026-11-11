@@ -222,7 +222,11 @@ type VehiclesProps = {
   journeyId?: string;
   clickedVehicleMarkerId?: number;
   setClickedVehicleMarker: (vehicleId?: number) => void;
+  filters?: { buses: boolean; trains: boolean };
 };
+
+const isTrainVehicle = (vehicle: VehicleLocation) =>
+  /^(train|tram)(<|$)/i.test(vehicle.vehicle?.features?.trim() ?? "");
 
 const Vehicles = memo(function Vehicles({
   vehicles,
@@ -230,15 +234,25 @@ const Vehicles = memo(function Vehicles({
   journeyId,
   clickedVehicleMarkerId,
   setClickedVehicleMarker,
+  filters,
 }: VehiclesProps) {
+  const visibleVehicles = React.useMemo(
+    () =>
+      filters
+        ? vehicles.filter((vehicle) =>
+            isTrainVehicle(vehicle) ? filters.trains : filters.buses,
+          )
+        : vehicles,
+    [vehicles, filters],
+  );
   const vehiclesGeoJson = React.useMemo(() => {
-    if (vehicles.length < 1000) {
+    if (visibleVehicles.length < 1000) {
       return null;
     }
     return {
       type: "FeatureCollection" as const,
-      features: vehicles
-        ? vehicles.map((vehicle) => {
+      features: visibleVehicles
+        ? visibleVehicles.map((vehicle) => {
             return {
               type: "Feature" as const,
               geometry: {
@@ -258,7 +272,7 @@ const Vehicles = memo(function Vehicles({
           })
         : [],
     };
-  }, [vehicles]);
+  }, [visibleVehicles]);
 
   const vehiclesById = React.useMemo<
     { [id: string]: VehicleLocation } | undefined
@@ -280,7 +294,7 @@ const Vehicles = memo(function Vehicles({
   let markers: ReactElement[] | ReactElement;
 
   if (!vehiclesGeoJson) {
-    markers = vehicles.map((item) => {
+    markers = visibleVehicles.map((item) => {
       return (
         <VehicleMarker
           key={item.id}
@@ -310,10 +324,15 @@ const Vehicles = memo(function Vehicles({
     );
   }
 
+  const showClickedVehicle = !!(
+    clickedVehicle &&
+    visibleVehicles.some((item) => item.id === clickedVehicle.id)
+  );
+
   return (
     <React.Fragment>
       {markers}
-      {clickedVehicle && (
+      {clickedVehicle && showClickedVehicle ? (
         <VehiclePopup
           item={clickedVehicle}
           activeLink={
@@ -324,8 +343,8 @@ const Vehicles = memo(function Vehicles({
           onClose={() => setClickedVehicleMarker()}
           snazzyTripLink
         />
-      )}
-      {clickedVehicle && vehiclesGeoJson && (
+      ) : null}
+      {clickedVehicle && showClickedVehicle && vehiclesGeoJson && (
         <VehicleMarker selected={true} vehicle={clickedVehicle} />
       )}
     </React.Fragment>
@@ -609,6 +628,28 @@ export default function BigMap(
   const [journey, setJourney] = React.useState<VehicleJourney>();
 
   const [vehicles, setVehicles] = React.useState<VehicleLocation[]>();
+
+  const [vehicleFilters, setVehicleFilters] = React.useState(() => {
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem("vehicleMapFilters") || "{}",
+      );
+      return { buses: saved.buses !== false, trains: saved.trains !== false };
+    } catch {
+      return { buses: true, trains: true };
+    }
+  });
+
+  const updateVehicleFilter = React.useCallback(
+    (key: "buses" | "trains", value: boolean) => {
+      setVehicleFilters((filters) => {
+        const next = { ...filters, [key]: value };
+        localStorage.setItem("vehicleMapFilters", JSON.stringify(next));
+        return next;
+      });
+    },
+    [],
+  );
 
   const [zoom, setZoom] = React.useState<number>();
 
@@ -1221,6 +1262,9 @@ export default function BigMap(
               journeyId={props.journeyId}
               clickedVehicleMarkerId={clickedVehicleMarkerId}
               setClickedVehicleMarker={setClickedVehicleMarker}
+              filters={
+                props.mode === MapMode.Slippy ? vehicleFilters : undefined
+              }
             />
           ) : null}
 
@@ -1249,6 +1293,30 @@ export default function BigMap(
             </Popup>
           ) : null}
         </BusTimesMap>
+        {props.mode === MapMode.Slippy ? (
+          <div className="map-select-services vehicle-filters">
+            <label>
+              <input
+                type="checkbox"
+                checked={vehicleFilters.buses}
+                onChange={(e) =>
+                  updateVehicleFilter("buses", e.target.checked)
+                }
+              />{" "}
+              Show buses
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={vehicleFilters.trains}
+                onChange={(e) =>
+                  updateVehicleFilter("trains", e.target.checked)
+                }
+              />{" "}
+              Show trains
+            </label>
+          </div>
+        ) : null}
       </div>
 
       {props.mode === MapMode.Trip ? (

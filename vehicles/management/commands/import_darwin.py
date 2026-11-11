@@ -46,7 +46,12 @@ from vehicles.models import (
     VehicleLocation,
     VehicleType,
 )
-from vehicles.utils import VEHICLE_POSITIONS_CHANNEL, append_status, redis_client
+from vehicles.utils import (
+    VEHICLE_POSITIONS_CHANNEL,
+    append_status,
+    get_operator_livery,
+    redis_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -227,10 +232,14 @@ class Command(BaseCommand):
 
         if vehicle is None:
             toc_name = get_toc_name(state.toc, self.reference)
-            redis_json["vehicle"] = {
+            vehicle_json = {
                 "name": f"{state.headcode or ''} {toc_name or state.toc or ''}".strip(),
                 "features": "train",
             }
+            # no unit assigned yet - show the operator's most common livery
+            if livery_id := get_operator_livery(journey.operator):
+                vehicle_json["livery"] = livery_id
+            redis_json["vehicle"] = vehicle_json
         if state.toc:
             redis_json.setdefault("service", {})["toc"] = state.toc
 

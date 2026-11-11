@@ -53,7 +53,12 @@ from vehicles.rtt import (
     allocation_summary,
     tops_display_name,
 )
-from vehicles.utils import VEHICLE_POSITIONS_CHANNEL, append_status, redis_client
+from vehicles.utils import (
+    VEHICLE_POSITIONS_CHANNEL,
+    append_status,
+    get_operator_livery,
+    redis_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -529,10 +534,14 @@ class Command(BaseCommand):
                 )
                 if part
             )
-            redis_json["vehicle"] = {
+            vehicle_json = {
                 "name": name or journey.route_name or "Train",
                 "features": "train",
             }
+            # no unit assigned yet - show the operator's most common livery
+            if livery_id := get_operator_livery(journey.operator):
+                vehicle_json["livery"] = livery_id
+            redis_json["vehicle"] = vehicle_json
         if info.get("toc_code"):
             redis_json.setdefault("service", {})["toc"] = info["toc_code"]
         return redis_json

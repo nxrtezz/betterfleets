@@ -1,13 +1,15 @@
 import math
 import pickle
+import time
 
 import redis.asyncio
 from django.conf import settings
 from django.core.cache import caches
 from django.core.cache.backends.base import InvalidCacheBackendError
 from django.db import IntegrityError, transaction
+from django.db.models import Count
 
-from .models import VehicleRevision, VehicleRevisionFeature
+from .models import Vehicle, VehicleRevision, VehicleRevisionFeature
 
 try:
     redis_client = caches["redis"]._cache.get_client()
@@ -46,6 +48,34 @@ VEHICLE_POSITIONS_CHANNEL = "vehicle_positions"
 # Redis sorted set of vehicle_id -> number of websocket clients currently watching it,
 # updated by VehicleLocationConsumer.connect/disconnect
 VEHICLE_WATCHERS_KEY = "vehicle_watchers"
+
+
+_operator_livery_cache: dict[int, tuple[float, int | None]] = {}
+OPERATOR_LIVERY_TTL = 86400  # one day
+
+
+def get_operator_livery(operator) -> int | None:
+    """the most common published livery in an operator's fleet.
+
+    Used as a fallback for live vehicles with no unit assigned (e.g.
+    trains whose allocation hasn't resolved yet)."""
+    if operator is None:
+        return None
+    cached = _operator_livery_cache.get(operator.id)
+    if cached and time.time() - cached[0] < OPERATOR_LIVERY_TTL:
+        return cached[1]
+    livery_id = (
+        Vehicle.objects.filter(
+            operator=operator, withdrawn=False, livery__published=True
+        )
+        .values("livery_id")
+        .annotate(n=Count("id"))
+        .order_by("-n", "livery_id")
+        .values_list("livery_id", flat=True)
+        .first()
+    )
+    _operator_livery_cache[operator.id] = (time.time(), livery_id)
+    return livery_id
 
 
 def filename_from_content_disposition(response) -> str:
