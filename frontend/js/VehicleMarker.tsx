@@ -42,6 +42,7 @@ export type Vehicle = {
   service?: {
     url?: string;
     line_name: string;
+    cars?: number;
   };
   vehicle?: {
     url: string;

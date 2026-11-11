@@ -139,6 +139,7 @@ export default function VehiclePopup({
         </div>
       )}
       {item.rid && <div>RID {item.rid}</div>}
+      {item.service?.cars ? <div>{item.service.cars}-car formation</div> : null}
       <Delay item={item} />
       <div>
         <TimeAgo date={item.datetime} now={now} key={item.datetime} />

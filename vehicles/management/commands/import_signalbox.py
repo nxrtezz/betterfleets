@@ -70,6 +70,8 @@ INFO_CACHE_SIZE = 6000
 INFO_FETCH_BATCH = 15  # max train-information lookups per poll
 INFO_FETCH_WORKERS = 3
 RTT_LOOKUP_INTERVAL = 37  # ~97/hour, under the 100/hour plan limit
+RTT_MAX_REMAINING = timedelta(minutes=10)  # don't look up nearly-finished journeys
+RTT_MAX_PROGRESS = 0.65  # or ones that are mostly done
 SCRAPE_RETRY_SECONDS = 1200  # wait before re-scraping a journey
 SCRAPE_MIN_INTERVAL = 10  # seconds between page loads (politeness)
 RTT_SERVICE_URL = "https://www.realtimetrains.co.uk/service/gb-nr:{uid}/{date}/detailed"
@@ -198,11 +200,39 @@ class Command(BaseCommand):
             (-departed.timestamp(), uid, journey),
         )
 
+    def _rtt_done(self, journey: VehicleJourney, now: datetime) -> bool:
+        """True if a queued RTT lookup is no longer worth a request:
+        the journey already has a unit, is nearly finished, or is
+        mostly complete."""
+        if journey.vehicle_id:
+            return True
+        timed = [
+            t
+            for t in (
+                self._stop_time(stop)
+                for stop in (journey.data or {}).get("stops") or []
+            )
+            if t
+        ]
+        if not timed:
+            return False
+        passed = sum(1 for t in timed if t <= now)
+        if passed / len(timed) >= RTT_MAX_PROGRESS:
+            return True
+        return max(timed) - now < RTT_MAX_REMAINING
+
     def _process_rtt(self):
         if not self.rtt_heap or time.time() < self._rtt_next:
             return
+        now = timezone.now()
+        # drop stale entries - they would otherwise burn lookup slots
+        while self.rtt_heap:
+            _, uid, journey = heapq.heappop(self.rtt_heap)
+            if not self._rtt_done(journey, now):
+                break
+        else:
+            return
         self._rtt_next = time.time() + RTT_LOOKUP_INTERVAL
-        _, uid, journey = heapq.heappop(self.rtt_heap)
         try:
             service = self.rtt.service(uid, journey.date.isoformat())
         except RttError as e:
@@ -544,6 +574,10 @@ class Command(BaseCommand):
             redis_json["vehicle"] = vehicle_json
         if info.get("toc_code"):
             redis_json.setdefault("service", {})["toc"] = info["toc_code"]
+        # formation length from the RTT allocation, once resolved
+        cars = ((journey.data or {}).get("rtt") or {}).get("passenger_vehicles")
+        if cars:
+            redis_json.setdefault("service", {})["cars"] = cars
         return redis_json
 
     def queue_redis_write(self, location, journey, vehicle, info):
