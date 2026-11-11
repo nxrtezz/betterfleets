@@ -34,6 +34,7 @@ run import_passenger
 run import_bod_timetables
 run import_ni
 run import_gtfs
+run import_redfunnel_timetables
 
 if [ -n "$TNDS_USERNAME" ] && [ -n "$TNDS_PASSWORD" ]; then
     run import_tnds "$TNDS_USERNAME" "$TNDS_PASSWORD"

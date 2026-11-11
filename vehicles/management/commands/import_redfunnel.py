@@ -30,6 +30,7 @@ Data mapping:
 
 import json
 import logging
+from datetime import timedelta
 from time import sleep
 
 import requests
@@ -38,10 +39,12 @@ from channels.exceptions import ChannelFull
 from channels.layers import get_channel_layer
 from django.contrib.gis.geos import Point
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 from django.utils import timezone
 from redis.exceptions import ConnectionError
 
 from busstops.models import DataSource, Operator, Service
+from bustimes.models import Calendar, Trip
 from vehicles.models import Vehicle, VehicleJourney, VehicleLocation
 from vehicles.utils import VEHICLE_POSITIONS_CHANNEL, redis_client
 
@@ -205,6 +208,43 @@ class Command(BaseCommand):
 
         return vehicle, True
 
+    # destination name -> timetable stop point, per service
+    # (ferry runs identical times in both directions, so the
+    # destination terminal is what disambiguates the sailing)
+    DESTINATION_STOPS = {
+        "RedJet": {
+            "Southampton": "RF-SOU-T2",
+            "West Cowes": "RF-WES",
+            "Cowes": "RF-WES",
+        },
+        "RedFunnel": {
+            "Southampton": "RF-SOU-T1",
+            "East Cowes": "RF-EAS",
+            "Cowes": "RF-EAS",
+        },
+    }
+
+    def match_trip(self, journey: VehicleJourney):
+        """match a new journey to a timetabled sailing - the feed gives
+        no timetable reference, so match on destination terminal and
+        approximate departure time (scheduled -10/+5 min)"""
+        atco = self.DESTINATION_STOPS.get(journey.route_name, {}).get(
+            journey.destination
+        )
+        if not atco or not journey.service_id:
+            return None
+        now = timezone.localtime(journey.datetime)
+        start = timedelta(hours=now.hour, minutes=now.minute)
+        date = journey.date
+        return Trip.objects.filter(
+            Q(route__service=journey.service)
+            & (Q(route__start_date__isnull=True) | Q(route__start_date__lte=date))
+            & (Q(route__end_date__isnull=True) | Q(route__end_date__gte=date)),
+            destination=atco,
+            start__range=(start - timedelta(minutes=10), start + timedelta(minutes=5)),
+            calendar__in=Calendar.objects.active_on(date),
+        ).first()
+
     def create_vehicle_location(self, item: dict) -> VehicleLocation | None:
         """
         Create VehicleLocation from Red Funnel data.
@@ -312,6 +352,7 @@ class Command(BaseCommand):
                 ).first()
                 if service:
                     journey.service = service
+                    journey.trip = self.match_trip(journey)
 
             journey.save()
             location.journey = journey
