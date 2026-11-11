@@ -54,6 +54,7 @@ def get_stop(source, key):
             "source": source,
             "timezone": TIMEZONE,
             "town": "Southampton" if "southampton" in key else "Cowes",
+            "active": True,
         },
     )
     return stop
