@@ -112,6 +112,9 @@ class Command(BaseCommand):
         self.rtt = RttClient()
         # heap of (-departure_ts, uid, journey): most recent departures first
         self.rtt_heap: list = []
+        # same, but for journeys a superuser is watching - drained first
+        self.rtt_boost_heap: list = []
+        self._boosted_seen: set = set()
         self.rtt_queued: set[str] = set()
         self.rtt_retries: dict[str, int] = {}
         self._rtt_next = 0.0
@@ -221,17 +224,50 @@ class Command(BaseCommand):
             return True
         return max(timed) - now < RTT_MAX_REMAINING
 
+    def _sync_boosted(self):
+        """move queued lookups for superuser-watched journeys to the
+        front of the queue (flag set by /journeys/<id>/boost)"""
+        if not redis_client or not (self.rtt_heap or self.rtt_boost_heap):
+            return
+        try:
+            boosted = {
+                m.decode() if isinstance(m, bytes) else m
+                for m in redis_client.smembers("rtt_boosted")
+            }
+        except Exception:
+            return
+        if not boosted and not self._boosted_seen and not self.rtt_boost_heap:
+            return
+        self._boosted_seen = boosted
+        normal, boost = [], []
+        for entry in self.rtt_heap + self.rtt_boost_heap:
+            (boost if entry[1] in boosted else normal).append(entry)
+        self.rtt_heap = normal
+        heapq.heapify(self.rtt_heap)
+        self.rtt_boost_heap = boost
+        heapq.heapify(self.rtt_boost_heap)
+
     def _process_rtt(self):
-        if not self.rtt_heap or time.time() < self._rtt_next:
+        self._sync_boosted()
+        if (
+            not (self.rtt_heap or self.rtt_boost_heap)
+            or time.time() < self._rtt_next
+        ):
             return
         now = timezone.now()
-        # drop stale entries - they would otherwise burn lookup slots
-        while self.rtt_heap:
-            _, uid, journey = heapq.heappop(self.rtt_heap)
-            if not self._rtt_done(journey, now):
+        entry = heap_used = None
+        for heap in (self.rtt_boost_heap, self.rtt_heap):
+            # drop stale entries - they would otherwise burn lookup slots
+            while heap:
+                candidate = heapq.heappop(heap)
+                if not self._rtt_done(candidate[2], now):
+                    entry, heap_used = candidate, heap
+                    break
+            if entry is not None:
                 break
-        else:
+        if entry is None:
             return
+        _, uid, journey = entry
         self._rtt_next = time.time() + RTT_LOOKUP_INTERVAL
         try:
             service = self.rtt.service(uid, journey.date.isoformat())
@@ -240,11 +276,7 @@ class Command(BaseCommand):
             # retry once - transient failures shouldn't lose the unit
             if self.rtt_retries.get(uid, 0) < 1:
                 self.rtt_retries[uid] = self.rtt_retries.get(uid, 0) + 1
-                departed = journey.datetime or timezone.now()
-                heapq.heappush(
-                    self.rtt_heap,
-                    (-departed.timestamp(), uid, journey),
-                )
+                heapq.heappush(heap_used, entry)
             return
         self._apply_rtt(journey, service)
 
