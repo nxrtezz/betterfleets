@@ -61,8 +61,8 @@ class RegistrationTest(TransactionTestCase):
                 headers={"CF-Connecting-IP": "1.2.3.4"},
             )
         self.assertContains(response, "Check your email (rufus@herring.pizza")
-        self.assertEqual("bustimes.org account", mail.outbox[0].subject)
-        self.assertIn("a bustimes.org account", mail.outbox[0].body)
+        self.assertEqual("BetterFleets account", mail.outbox[0].subject)
+        self.assertIn("a BetterFleets account", mail.outbox[0].body)
 
         user = User.objects.get(email="rufus@herring.pizza")
         user.is_active = False

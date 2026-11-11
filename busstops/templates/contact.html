@@ -1,6 +1,6 @@
 {% extends 'page.html' %}
 
-{% block title %}Contact bustimes.org{% endblock %}
+{% block title %}Contact BetterFleets{% endblock %}
 
 {% block canonical %}
     <link rel="canonical" href="https://bustimes.org/contact">
@@ -18,9 +18,9 @@
 
 {% else %}
 
-    <h1>Contact bustimes.org</h1>
+    <h1>Contact BetterFleets</h1>
 
-    <p>Here you can contact <strong>bustimes.org</strong>, which is <strong>just a website</strong> and not an operator of bus services.</p>
+    <p>Here you can contact <strong>BetterFleets</strong>, which is <strong>just a website</strong> and not an operator of bus services.</p>
 
     <p>What would you like to contact me about?</p>
 
@@ -39,7 +39,7 @@
     </details>
 
     <details{% if form.is_bound or form.initial.message %} open{% endif %}>
-        <summary>This website, bustimes.org</summary>
+        <summary>This website, BetterFleets</summary>
 
         {% load email_obfuscator %}
 

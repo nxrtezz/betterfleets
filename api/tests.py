@@ -29,10 +29,10 @@ class ApiTest(TestCase):
             )
 
         self.assertContains(
-            response, "<title>Vehicle List – API – bustimes.org</title>"
+            response, "<title>Vehicle List – API – BetterFleets</title>"
         )
         self.assertContains(
-            response, "<a class='navbar-brand' href='/'>bustimes.org</a>"
+            response, "<a class='navbar-brand' href='/'>BetterFleets</a>"
         )
 
     @override_settings(
