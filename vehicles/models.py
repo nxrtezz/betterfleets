@@ -451,11 +451,15 @@ class Vehicle(models.Model):
         if (
             self.vehicle_type_id
             and self.vehicle_type.style == VehicleTypeType.TRAIN
-            and self.name
         ):
             # TOPS fleet numbers are displayed with a space ("700 114")
             # but photos are often tagged without it ("700114")
-            terms = {self.name, self.name.replace(" ", "")}
+            label = (
+                self.fleet_code
+                or (str(self.fleet_number) if self.fleet_number else "")
+                or self.name
+            )
+            terms = {label, label.replace(" ", "")}
             terms.discard("")
             if terms:
                 search = " or ".join(

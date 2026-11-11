@@ -23,7 +23,7 @@ from django.core.mail import EmailMessage
 from django.core.paginator import Paginator
 from django.db import connection
 from django.db.models import Case, Count, F, Max, OuterRef, Prefetch, Q, StringAgg, Value, When
-from django.db.models.functions import Coalesce, Now
+from django.db.models.functions import Coalesce, Now, Replace
 from django.http import (
     Http404,
     HttpResponse,
@@ -2022,7 +2022,14 @@ def search(request):
             query_text = query_text.replace(" ", "")
             if len(query_text) >= 4:
                 if query_text.isdigit():
-                    context["vehicles"] = vehicles.filter(fleet_code__iexact=query_text)
+                    # fleet codes can contain a space ("701 001") while the
+                    # search strips them - compare with spaces removed
+                    context["vehicles"] = vehicles.annotate(
+                        _fleet_code=Replace("fleet_code", Value(" "), Value(""))
+                    ).filter(
+                        Q(_fleet_code__iexact=query_text)
+                        | Q(fleet_number=query_text)
+                    )
                 elif not query_text.isalpha():
                     context["vehicles"] = vehicles.filter(
                         Q(reg__iexact=query_text)
