@@ -12,10 +12,15 @@ rolling stock allocations are enriched separately via the RTT API
 (vehicles/rtt.py) using the Darwin uid that train-information provides.
 """
 
+import os
+
+# playwright's sync API runs under anyio, which makes Django's async
+# detection think ORM calls are unsafe - they aren't, it's a worker thread
+os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "1")
+
 import heapq
 import json
 import logging
-import os
 import queue
 import re
 import threading
