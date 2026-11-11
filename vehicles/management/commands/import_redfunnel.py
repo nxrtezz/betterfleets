@@ -142,35 +142,13 @@ def get_destination(info: list[str]) -> str:
     return ""
 
 
-def get_journey_identity(item: dict) -> tuple:
-    """
-    Generate journey identity for change detection.
-
-    THIS LOGIC IS SPECIFIC TO RED FUNNEL ONLY.
-
-    Args:
-        item: Vehicle data from Red Funnel API
-
-    Returns:
-        Tuple for journey identity
-    """
-    vehicle_id = item.get("id")
-    vehicle_class = item.get("class")
-    info = item.get("label", {}).get("info", [])
-    destination = get_destination(info)
-    route_number = get_route_number(vehicle_class, info)
-
-    status = info[0] if info else ""
-    return (vehicle_id, route_number, destination, status)
-
-
 class Command(BaseCommand):
     """Red Funnel importer - standalone, not extending ImportLiveVehiclesCommand."""
 
     source_name = "Red Funnel"
     vehicle_code_scheme = "RF"
     url = "http://ais.redfunnel.co.uk/home/boats"
-    wait = 60
+    wait = 30
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -178,7 +156,6 @@ class Command(BaseCommand):
         self.session.headers.update({"User-Agent": "betterfleet/1.0"})
         self.source = None
         self.operator = None
-        self.journey_identities = {}
 
     def do_source(self):
         """Get or create the DataSource for Red Funnel."""
@@ -224,47 +201,6 @@ class Command(BaseCommand):
         vehicle.save()
 
         return vehicle, True
-
-    def get_journey(self, item: dict, vehicle: Vehicle, now=None) -> VehicleJourney:
-        if now is None:
-            now = timezone.now()
-        """
-        Get or create journey from Red Funnel data.
-
-        THIS LOGIC IS SPECIFIC TO RED FUNNEL ONLY.
-
-        Args:
-            item: Vehicle data from Red Funnel API
-            vehicle: Vehicle instance
-
-        Returns:
-            VehicleJourney instance
-        """
-        vehicle_class = item.get("class")
-        info = item.get("label", {}).get("info", [])
-        destination = get_destination(info)
-        route_number = get_route_number(vehicle_class, info)
-
-        journey = VehicleJourney(
-            datetime=timezone.now(),
-            destination=destination,
-            route_name=route_number or "",
-            source=self.source,
-            vehicle=vehicle,
-            date=timezone.localdate(now),
-        )
-
-        # Try to match service
-        if route_number:
-            service = Service.objects.filter(
-                line_name__iexact=route_number,
-                operator=self.operator,
-                current=True
-            ).first()
-            if service:
-                journey.service = service
-
-        return journey
 
     def create_vehicle_location(self, item: dict) -> VehicleLocation | None:
         """
@@ -341,9 +277,12 @@ class Command(BaseCommand):
                 should_end_journey = True
         elif status == "On route to" or status == "On journey to":
             # Create a new journey if we don't have one or if the current one is different
-            if not latest_journey:
-                should_create_journey = True
-            elif latest_journey.destination != destination or latest_journey.route_name != route_number:
+            if (
+                not latest_journey
+                or latest_journey.date != timezone.localdate(now)
+                or latest_journey.destination != destination
+                or latest_journey.route_name != route_number
+            ):
                 should_create_journey = True
         elif status == "Not in service":
             # Only create a journey if we don't have one at all
@@ -388,10 +327,6 @@ class Command(BaseCommand):
                 # No journey and not creating one - don't save to database
                 location.journey = None
 
-        # Only save journey if we created a new one
-        if should_create_journey:
-            journey.save()
-
         # Set location id for Redis
         location.id = vehicle.id
 
@@ -434,13 +369,10 @@ class Command(BaseCommand):
                 logger.info(f"Processing {len(items)} vehicles")
 
                 for item in items:
-                    journey_identity = get_journey_identity(item)
-                    vehicle_id = item.get("id")
-
-                    # Check if journey has changed
-                    if self.journey_identities.get(vehicle_id) != journey_identity:
-                        self.handle_item(item)
-                        self.journey_identities[vehicle_id] = journey_identity
+                    # positions change every poll - journey creation
+                    # inside handle_item only fires when the journey
+                    # identity actually changes
+                    self.handle_item(item)
 
                 logger.info("Update complete")
 
