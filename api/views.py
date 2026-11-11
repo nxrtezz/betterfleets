@@ -437,11 +437,13 @@ class VehicleJourneyViewSet(viewsets.ReadOnlyModelViewSet):
             return parsed.astimezone(london).isoformat()
 
         crs_codes = [s.get("crs") for s in stops_data if s.get("crs")]
-        stoppoints = (
-            {sp.crs: sp for sp in StopPoint.objects.filter(crs__in=crs_codes)}
-            if crs_codes
-            else {}
-        )
+        stoppoints = {}
+        if crs_codes:
+            # prefer active stops when several share a CRS (dup admin areas)
+            for sp in StopPoint.objects.filter(crs__in=crs_codes).order_by(
+                "-active"
+            ):
+                stoppoints.setdefault(sp.crs, sp)
         times = []
         for i, stop in enumerate(stops_data):
             sp = stoppoints.get(stop.get("crs"))

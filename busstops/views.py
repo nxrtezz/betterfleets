@@ -816,6 +816,78 @@ stop_line_names = ArrayAgg("stopusage__line_name", distinct=True, default=None)
 operator_names = ArrayAgg("operator__name", distinct=True, default=None)
 
 
+def _rail_time(value):
+    if not value:
+        return None
+    try:
+        parsed = datetime.datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return timezone.localtime(parsed)
+
+
+def get_rail_departures(crs, limit=30):
+    """live/scheduled departures at a railway station (by CRS code)"""
+    today = timezone.localdate()
+    journeys = (
+        VehicleJourney.objects.filter(
+            source__name__in=["Signalbox", "Darwin"],
+            date__gte=today - datetime.timedelta(days=1),
+            data__contains={"stops": [{"crs": crs}]},
+        )
+        .select_related("vehicle", "operator")
+        .order_by("datetime")[:300]
+    )
+
+    now = timezone.localtime()
+    cutoff = now - datetime.timedelta(hours=1)
+    departures = []
+
+    for journey in journeys:
+        stop = next(
+            (
+                s
+                for s in (journey.data or {}).get("stops", [])
+                if s.get("crs") == crs
+            ),
+            None,
+        )
+        if stop is None:
+            continue
+        sched = _rail_time(stop.get("departure")) or _rail_time(stop.get("arrival"))
+        if sched is None or sched < cutoff:
+            continue
+        actual = _rail_time(stop.get("actual_departure")) or _rail_time(
+            stop.get("actual_arrival")
+        )
+        delay = None
+        if actual and sched:
+            delay = round((actual - sched).total_seconds() / 60)
+        vehicle = journey.vehicle
+        departures.append(
+            {
+                "journey_url": f"/journeys/{journey.id}",
+                "headcode": journey.route_name,
+                "destination": journey.destination,
+                "operator": journey.operator.name if journey.operator_id else None,
+                "sched": sched,
+                "actual": actual,
+                "delay": delay,
+                "platform": stop.get("platform"),
+                "cancelled": bool(stop.get("cancelled")),
+                "vehicle": str(vehicle) if vehicle else None,
+                "vehicle_url": (
+                    vehicle.get_absolute_url() if vehicle else None
+                ),
+            }
+        )
+
+    departures.sort(key=lambda d: d["sched"])
+    return departures[:limit]
+
+
 class StopPointDetailView(DetailView):
     """A stop, other stops in the same area, and the services servicing it"""
 
@@ -864,6 +936,9 @@ class StopPointDetailView(DetailView):
                     context["breadcrumb"].append(services[0])
 
         context.update(get_departures_context(self.object, services, self.request.GET))
+
+        if self.object.crs:
+            context["rail_departures"] = get_rail_departures(self.object.crs)
 
         text = ", ".join(
             part

@@ -1,0 +1,32 @@
+{% load tz %}
+{% if rail_departures %}
+<div class="aside" id="rail-departures">
+    <h2>Rail departures</h2>
+    <table>
+        <thead><tr>
+            <th scope="col">Service</th>
+            <th scope="col">To</th>
+            <th scope="col">Scheduled</th>
+            <th scope="col">Expected</th>
+            <th scope="col">Platform</th>
+        </tr></thead>
+        <tbody>
+        {% for d in rail_departures %}
+        <tr>
+            <td class="nowrap"><a href="{{ d.journey_url }}">{{ d.headcode }}</a></td>
+            <td>
+                {{ d.destination }}
+                {% if d.operator %}<div class="vehicle">{{ d.operator }}</div>{% endif %}
+                {% if d.vehicle %}
+                    <div class="vehicle">{% if d.vehicle_url %}<a href="{{ d.vehicle_url }}">{{ d.vehicle }}</a>{% else %}{{ d.vehicle }}{% endif %}</div>
+                {% endif %}
+            </td>
+            <td>{% if d.cancelled %}<s>{% endif %}{{ d.sched|time:"H:i" }}{% if d.cancelled %}</s>{% endif %}</td>
+            <td>{% if d.actual %}{{ d.actual|time:"H:i" }}{% if d.delay %} <span class="delay">{{ d.delay }}m</span>{% endif %}{% endif %}</td>
+            <td>{{ d.platform|default:"" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
