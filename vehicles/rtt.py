@@ -87,13 +87,19 @@ def allocation_summary(service: dict) -> dict | None:
     allocation = next(iter(service.get("allocationData") or []), None)
     if not allocation:
         return None
-    tops = None
+    units = []
     for item in allocation.get("allocationItems") or []:
         if item.get("identity"):
-            tops = item["identity"]
-            break
+            units.append(
+                {
+                    "tops": item["identity"],
+                    "cars": item.get("numberOfVehicles") or 1,
+                    "in_reverse": bool(item.get("inReverse")),
+                }
+            )
     return {
-        "tops": tops,
+        "tops": units[0]["tops"] if units else None,
+        "units": units,
         "leading_class": allocation.get("leadingClass"),
         "passenger_vehicles": allocation.get("passengerVehicles"),
     }

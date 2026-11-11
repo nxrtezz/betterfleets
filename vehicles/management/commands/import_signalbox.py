@@ -192,6 +192,7 @@ class Command(BaseCommand):
         summary = allocation_summary(service)
         if summary is None:
             return
+        units = summary.get("units") or []
         tops = summary["tops"]
         leading_class = summary["leading_class"]
 
@@ -199,20 +200,28 @@ class Command(BaseCommand):
         journey.data["rtt"] = summary
         update_fields = ["data"]
 
-        if tops and not journey.vehicle_id:
-            vehicle = self.get_rtt_vehicle(tops, leading_class, journey)
+        # ensure a Vehicle exists for every unit in the formation
+        vehicles = []
+        for unit in units:
+            vehicle = self.get_rtt_vehicle(
+                unit["tops"], leading_class, journey
+            )
             if vehicle:
-                old_negative_key = f"vehicle{-journey.id}"
-                journey.vehicle = vehicle
-                update_fields.append("vehicle")
-                if vehicle.latest_journey_id != journey.id:
-                    vehicle.latest_journey = journey
-                    vehicle.save(update_fields=["latest_journey"])
-                if redis_client:
-                    try:
-                        redis_client.delete(old_negative_key)
-                    except ConnectionError:
-                        pass
+                vehicles.append(vehicle)
+
+        if tops and not journey.vehicle_id and vehicles:
+            vehicle = vehicles[0]
+            old_negative_key = f"vehicle{-journey.id}"
+            journey.vehicle = vehicle
+            update_fields.append("vehicle")
+            if vehicle.latest_journey_id != journey.id:
+                vehicle.latest_journey = journey
+                vehicle.save(update_fields=["latest_journey"])
+            if redis_client:
+                try:
+                    redis_client.delete(old_negative_key)
+                except ConnectionError:
+                    pass
 
         journey.save(update_fields=update_fields)
 
