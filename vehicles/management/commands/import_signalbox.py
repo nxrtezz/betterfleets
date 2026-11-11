@@ -12,9 +12,13 @@ rolling stock allocations are enriched separately via the RTT API
 (vehicles/rtt.py) using the Darwin uid that train-information provides.
 """
 
+import heapq
 import json
 import logging
 import os
+import queue
+import re
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -55,7 +59,10 @@ POLL_INTERVAL = 30  # seconds between /api/locations polls
 INFO_CACHE_SIZE = 6000
 INFO_FETCH_BATCH = 15  # max train-information lookups per poll
 INFO_FETCH_WORKERS = 3
-RTT_LOOKUP_INTERVAL = 40  # ~90/hour, under the 100/hour plan limit
+RTT_LOOKUP_INTERVAL = 37  # ~97/hour, under the 100/hour plan limit
+SCRAPE_RETRY_SECONDS = 1200  # wait before re-scraping a journey
+SCRAPE_MIN_INTERVAL = 10  # seconds between page loads (politeness)
+RTT_SERVICE_URL = "https://www.realtimetrains.co.uk/service/gb-nr:{uid}/{date}/detailed"
 STATE_RETENTION_DAYS = 2
 
 
@@ -91,10 +98,15 @@ class Command(BaseCommand):
         self.infos: dict[str, dict] = {}
         self.operators = {}
         self.rtt = RttClient()
-        self.rtt_queue: list[tuple[str, VehicleJourney]] = []
+        # heap of (-departure_ts, uid, journey): most recent departures first
+        self.rtt_heap: list = []
         self.rtt_queued: set[str] = set()
         self.rtt_retries: dict[str, int] = {}
         self._rtt_next = 0.0
+        # playwright scraper fallback for journeys past halfway without a unit
+        self.scrape_queue: queue.Queue = queue.Queue()
+        self.scrape_eligible: dict[int, float] = {}
+        self._class_cache: dict[str, str | None] = {}
         self._pending_writes = []
         self._pending_appendages = []
         self._last_positions: dict[str, tuple[float, float]] = {}
@@ -170,13 +182,17 @@ class Command(BaseCommand):
         if not uid or uid in self.rtt_queued or journey.vehicle_id:
             return
         self.rtt_queued.add(uid)
-        self.rtt_queue.append((uid, journey))
+        departed = journey.datetime or timezone.now()
+        heapq.heappush(
+            self.rtt_heap,
+            (-departed.timestamp(), uid, journey),
+        )
 
     def _process_rtt(self):
-        if not self.rtt_queue or time.time() < self._rtt_next:
+        if not self.rtt_heap or time.time() < self._rtt_next:
             return
         self._rtt_next = time.time() + RTT_LOOKUP_INTERVAL
-        uid, journey = self.rtt_queue.pop(0)
+        _, uid, journey = heapq.heappop(self.rtt_heap)
         try:
             service = self.rtt.service(uid, journey.date.isoformat())
         except RttError as e:
@@ -184,7 +200,11 @@ class Command(BaseCommand):
             # retry once - transient failures shouldn't lose the unit
             if self.rtt_retries.get(uid, 0) < 1:
                 self.rtt_retries[uid] = self.rtt_retries.get(uid, 0) + 1
-                self.rtt_queue.append((uid, journey))
+                departed = journey.datetime or timezone.now()
+                heapq.heappush(
+                    self.rtt_heap,
+                    (-departed.timestamp(), uid, journey),
+                )
             return
         self._apply_rtt(journey, service)
 
@@ -271,6 +291,164 @@ class Command(BaseCommand):
             vehicle=vehicle, scheme="TOPS", code=tops
         )
         return vehicle
+
+    # -- playwright scraper fallback ----------------------------------------
+
+    @staticmethod
+    def _stop_time(stop: dict) -> datetime | None:
+        for key in (
+            "actual_arrival",
+            "arrival",
+            "actual_departure",
+            "departure",
+        ):
+            parsed = _parse_iso(stop.get(key))
+            if parsed:
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=ZoneInfo("UTC"))
+                return parsed
+        return None
+
+    def _past_halfway(self, journey: VehicleJourney, now: datetime) -> bool:
+        stops = (journey.data or {}).get("stops") or []
+        if len(stops) < 4:
+            return False
+        passed = 0
+        for stop in stops:
+            stop_time = self._stop_time(stop)
+            if stop_time is None:
+                continue
+            if stop_time <= now:
+                passed += 1
+            else:
+                break
+        return passed >= len(stops) / 2
+
+    def _check_scrape_candidates(self, live_rids: set):
+        now = timezone.now()
+        now_ts = now.timestamp()
+        for rid, journey in self.journeys.items():
+            if (
+                rid not in live_rids
+                or journey.vehicle_id
+                or (
+                    journey.id in self.scrape_eligible
+                    and now_ts < self.scrape_eligible[journey.id]
+                )
+            ):
+                continue
+            if not self._past_halfway(journey, now):
+                continue
+            self.scrape_eligible[journey.id] = now_ts + 300
+            self.scrape_queue.put(journey.id)
+
+    def _guess_class(self, tops: str) -> str | None:
+        if tops in self._class_cache:
+            return self._class_cache[tops]
+        guess = None
+        for length in (3, 2):
+            prefix = tops[:length]
+            if VehicleType.objects.filter(name=f"Class {prefix}").exists():
+                guess = prefix
+                break
+        self._class_cache[tops] = guess
+        return guess
+
+    def _scrape_worker(self):
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            logger.warning("playwright not installed - scrape fallback disabled")
+            return
+        from django.db import close_old_connections
+
+        close_old_connections()
+        user_agent = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/126.0.0.0 Safari/537.36"
+        )
+        while True:
+            try:
+                with sync_playwright() as p:
+                    browser = p.chromium.launch(headless=True)
+                    page = browser.new_page(user_agent=user_agent)
+                    while True:
+                        try:
+                            journey_id = self.scrape_queue.get(timeout=300)
+                        except queue.Empty:
+                            continue
+                        try:
+                            self._scrape_one(page, journey_id)
+                        except Exception:
+                            logger.exception(
+                                "rtt scrape failed for journey %s", journey_id
+                            )
+                        finally:
+                            self.scrape_eligible[journey_id] = (
+                                time.time() + SCRAPE_RETRY_SECONDS
+                            )
+                            time.sleep(SCRAPE_MIN_INTERVAL)
+            except Exception:
+                logger.exception("rtt scrape worker error - restarting in 60s")
+                time.sleep(60)
+
+    def _scrape_one(self, page, journey_id: int):
+        journey = (
+            VehicleJourney.objects.select_related("operator")
+            .filter(id=journey_id)
+            .first()
+        )
+        if journey is None or journey.vehicle_id:
+            return
+        uid = (journey.data or {}).get("uid")
+        if not uid:
+            return
+        url = RTT_SERVICE_URL.format(uid=uid, date=journey.date.isoformat())
+        page.goto(url, timeout=90000)
+        # the Anubis browser check redirects automatically - wait for content
+        try:
+            page.wait_for_selector(
+                ".additionaldata, .service, h1", timeout=45000
+            )
+        except Exception:
+            pass
+        page.wait_for_timeout(1500)
+        html = page.content()
+        identities = [
+            i.strip()
+            for i in re.findall(r'class="identity"[^>]*>\s*([^<]+?)\s*<', html)
+            if i.strip()
+        ]
+        if not identities:
+            logger.info("rtt scrape: no units found for uid %s", uid)
+            return
+        self._attach_scraped_units(journey, identities)
+
+    def _attach_scraped_units(self, journey: VehicleJourney, identities: list):
+        vehicles = []
+        for tops in identities:
+            vehicle = self.get_rtt_vehicle(tops, self._guess_class(tops), journey)
+            if vehicle:
+                vehicles.append(vehicle)
+        if not vehicles or journey.vehicle_id:
+            return
+        vehicle = vehicles[0]
+        journey.vehicle = vehicle
+        journey.data = journey.data or {}
+        journey.data["rtt_scrape"] = {"tops": identities}
+        journey.save(update_fields=["vehicle", "data"])
+        if vehicle.latest_journey_id != journey.id:
+            vehicle.latest_journey = journey
+            vehicle.save(update_fields=["latest_journey"])
+        if redis_client:
+            try:
+                redis_client.delete(f"vehicle{-journey.id}")
+            except ConnectionError:
+                pass
+        logger.info(
+            "rtt scrape: attached %s to journey %s", identities, journey.id
+        )
 
     # -- locations / redis ---------------------------------------------------
 
@@ -466,6 +644,7 @@ class Command(BaseCommand):
 
         self.flush_redis()
         self._process_rtt()
+        self._check_scrape_candidates(live_rids)
 
         # evict journeys for rids no longer reporting
         for rid in list(self.journeys):
@@ -490,4 +669,5 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.do_source()
+        threading.Thread(target=self._scrape_worker, daemon=True).start()
         self.update()

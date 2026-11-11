@@ -56,6 +56,7 @@ dependencies = [
     "django-modern-csrf>=1.0.1",
     "openpyxl>=3.1.0",
     "stomp.py>=8.1.0,<9",
+    "playwright>=1.49,<2",
 ]
 
 [dependency-groups]

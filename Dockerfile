@@ -20,6 +20,9 @@ WORKDIR /app/
 COPY uv.lock pyproject.toml /app/
 RUN uv sync --frozen
 
+# chromium for the signalbox importer's RTT scrape fallback
+RUN /app/.venv/bin/playwright install --with-deps chromium
+
 ENV PATH="/app/.venv/bin:$PATH"
 
 COPY --from=0 /app/node_modules/htmx.org/dist /app/node_modules/htmx.org/dist
