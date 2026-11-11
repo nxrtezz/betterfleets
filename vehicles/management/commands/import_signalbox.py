@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 
 from django.contrib.gis.geos import Point
 from django.core.management.base import BaseCommand
+from django.db import IntegrityError
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from redis.exceptions import ConnectionError
@@ -218,17 +219,28 @@ class Command(BaseCommand):
     def get_rtt_vehicle(
         self, tops: str, leading_class: str | None, journey: VehicleJourney
     ) -> Vehicle | None:
-        vehicle = Vehicle.objects.filter(
-            source=self.rtt_source, code=tops
-        ).first()
+        # uniqueness is (upper(code), operator) - the same TOPS can be
+        # reported for more than one service, so look up by both
+        vehicle = (
+            Vehicle.objects.filter(
+                code__iexact=tops, operator=journey.operator
+            )
+            .select_related("operator")
+            .first()
+        )
+        if vehicle is None and journey.operator_id is None:
+            vehicle = Vehicle.objects.filter(
+                source=self.rtt_source, code__iexact=tops, operator__isnull=True
+            ).first()
         if vehicle:
             if not vehicle.operator_id and journey.operator_id:
                 vehicle.operator = journey.operator
                 vehicle.save(update_fields=["operator"])
             return vehicle
 
+        suffix = journey.operator.noc if journey.operator_id else "x"
         vehicle = Vehicle(
-            slug=f"rtt-{tops}",
+            slug=f"rtt-{tops}-{suffix}",
             code=tops,
             name=tops_display_name(tops, leading_class),
             operator=journey.operator,
@@ -238,7 +250,13 @@ class Command(BaseCommand):
             name="train", defaults={"style": "train"}
         )
         vehicle.vehicle_type = vehicle_type
-        vehicle.save()
+        try:
+            vehicle.save()
+        except IntegrityError:
+            # lost a race with another journey for the same unit
+            return Vehicle.objects.filter(
+                code__iexact=tops, operator=journey.operator
+            ).first()
         VehicleCode.objects.get_or_create(
             vehicle=vehicle, scheme="TOPS", code=tops
         )
