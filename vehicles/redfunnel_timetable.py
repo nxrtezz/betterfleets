@@ -155,14 +155,36 @@ def parse_pdf(content: bytes):
     return validity, schedules
 
 
+SECTIONS = ("Vehicle Ferry Service", "Red Jet Hi-Speed Service")
+
+
 def find_pdfs(session):
-    """scrape the timetables page for pdf links -> {filename: url}"""
+    """scrape the timetables page for pdf links -> {filename: url}
+
+    only keeps links inside the Vehicle Ferry / Red Jet sections -
+    the page also links unrelated PDFs (privacy notices etc.)"""
     response = session.get(PAGE_URL, timeout=30)
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
     pdfs = {}
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        if ".pdf" in href.lower():
-            pdfs[href.rsplit("/", 1)[-1]] = urljoin(PAGE_URL, href)
+        if ".pdf" not in href.lower():
+            continue
+        # nearest ancestor mentioning a timetable section; the page
+        # body mentions both, so require exactly one marker
+        parent = a.parent
+        for _ in range(8):
+            if parent is None:
+                break
+            text = parent.get_text(" ", strip=True)
+            hits = [s for s in SECTIONS if s in text]
+            if len(hits) == 1:
+                break
+            parent = parent.parent
+        else:
+            continue
+        if parent is None or len(hits) != 1:
+            continue
+        pdfs[href.rsplit("/", 1)[-1]] = urljoin(PAGE_URL, href)
     return pdfs

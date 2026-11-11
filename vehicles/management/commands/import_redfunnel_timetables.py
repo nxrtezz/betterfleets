@@ -169,6 +169,7 @@ class Command(BaseCommand):
         route.timezone = TIMEZONE
         route.public_use = True
         route.file_hash = file_hash
+        route.save()
 
         trip_count = 0
         for direction, day_schedules in schedules.items():
