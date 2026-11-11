@@ -50,7 +50,7 @@ VEHICLE_POSITIONS_CHANNEL = "vehicle_positions"
 VEHICLE_WATCHERS_KEY = "vehicle_watchers"
 
 
-_operator_livery_cache: dict[int, tuple[float, int | None]] = {}
+_operator_livery_cache: dict = {}
 OPERATOR_LIVERY_TTL = 86400  # one day
 
 
@@ -61,7 +61,7 @@ def get_operator_livery(operator) -> int | None:
     trains whose allocation hasn't resolved yet)."""
     if operator is None:
         return None
-    cached = _operator_livery_cache.get(operator.id)
+    cached = _operator_livery_cache.get(operator.pk)
     if cached and time.time() - cached[0] < OPERATOR_LIVERY_TTL:
         return cached[1]
     livery_id = (
@@ -74,7 +74,7 @@ def get_operator_livery(operator) -> int | None:
         .values_list("livery_id", flat=True)
         .first()
     )
-    _operator_livery_cache[operator.id] = (time.time(), livery_id)
+    _operator_livery_cache[operator.pk] = (time.time(), livery_id)
     return livery_id
 
 
