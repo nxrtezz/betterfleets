@@ -444,6 +444,21 @@ class Vehicle(models.Model):
             search = f'{self.reg} or "{reg}"'
             return f"https://www.flickr.com/search/?text={quote(search)}&sort=date-taken-desc"
 
+        if (
+            self.vehicle_type_id
+            and self.vehicle_type.style == VehicleTypeType.TRAIN
+            and self.name
+        ):
+            # TOPS fleet numbers are displayed with a space ("700 114")
+            # but photos are often tagged without it ("700114")
+            terms = {self.name, self.name.replace(" ", "")}
+            terms.discard("")
+            if terms:
+                search = " or ".join(
+                    f'"{term}"' if " " in term else term for term in sorted(terms)
+                )
+                return f"https://www.flickr.com/search/?text={quote(search)}&sort=date-taken-desc"
+
     def get_flickr_link(self):
         if url := self.get_flickr_url():
             return format_html(
