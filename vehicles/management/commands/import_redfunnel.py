@@ -33,6 +33,9 @@ import logging
 from time import sleep
 
 import requests
+from asgiref.sync import async_to_sync
+from channels.exceptions import ChannelFull
+from channels.layers import get_channel_layer
 from django.contrib.gis.geos import Point
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -40,7 +43,7 @@ from redis.exceptions import ConnectionError
 
 from busstops.models import DataSource, Operator, Service
 from vehicles.models import Vehicle, VehicleJourney, VehicleLocation
-from vehicles.utils import redis_client
+from vehicles.utils import VEHICLE_POSITIONS_CHANNEL, redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -350,6 +353,29 @@ class Command(BaseCommand):
                     redis_client.expire(f"operator{vehicle.operator_id}vehicles", 600)
             except ConnectionError as e:
                 logger.exception(f"Redis error: {e}")
+
+        # feed the journey's trail polyline (same as other importers)
+        channel_layer = get_channel_layer()
+        if channel_layer is not None and location.journey:
+            try:
+                async_to_sync(channel_layer.send)(
+                    VEHICLE_POSITIONS_CHANNEL,
+                    {
+                        "type": "move_vehicles",
+                        "items": [
+                            (
+                                location.journey.get_redis_key(),
+                                int(location.datetime.timestamp()),
+                                location.latlong.x,
+                                location.latlong.y,
+                            )
+                        ],
+                    },
+                )
+            except ChannelFull as e:
+                # distribute_vehicle_locations worker isn't keeping up (or is down) -
+                # drop this update rather than blocking the importer
+                logger.error(e)
 
     def update(self):
         """
