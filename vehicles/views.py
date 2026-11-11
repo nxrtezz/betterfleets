@@ -177,6 +177,11 @@ def get_vehicle_order(vehicle) -> tuple[str, int, str]:
     if vehicle.fleet_number:
         return ("", vehicle.fleet_number)
 
+    # TOPS-style fleet codes like '701 019' sort numerically too
+    fleet_code = (vehicle.fleet_code or "").replace(" ", "")
+    if fleet_code.isdigit():
+        return ("", int(fleet_code))
+
     # age-based ordering
     if not vehicle.fleet_code and len(reg := vehicle.reg) == 7 and reg[-3:].isalpha():
         if reg[:2].isalpha() and reg[2:4].isdigit():
