@@ -298,6 +298,15 @@ class TripSerializer(serializers.ModelSerializer):
 
 class VehicleJourneySerializer(serializers.ModelSerializer):
     vehicle = serializers.SerializerMethodField()
+    operator = serializers.SerializerMethodField()
+
+    def get_operator(self, obj):
+        if obj.operator_id:
+            return {
+                "noc": obj.operator_id,
+                "slug": obj.operator.slug,
+                "name": obj.operator.name,
+            }
 
     def get_vehicle(self, obj):
         if obj.vehicle_id:
@@ -315,6 +324,7 @@ class VehicleJourneySerializer(serializers.ModelSerializer):
             "datetime",
             "date",
             "vehicle",
+            "operator",
             "route_name",
             "destination",
             "trip_id",

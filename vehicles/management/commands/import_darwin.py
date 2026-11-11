@@ -223,6 +223,7 @@ class Command(BaseCommand):
 
     def _redis_json(self, location, journey, vehicle, state) -> dict:
         redis_json = location.get_redis_json()
+        redis_json["rid"] = journey.code
 
         if vehicle is None:
             toc_name = get_toc_name(state.toc, self.reference)

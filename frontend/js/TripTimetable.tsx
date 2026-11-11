@@ -17,6 +17,7 @@ export type TripTime = {
   expected_departure_time?: string | null;
   actual_arrival_time?: string | null;
   actual_departure_time?: string;
+  platform?: string | null;
   timing_status: "PTP" | "OTH";
   pick_up?: boolean;
   set_down?: boolean;
@@ -221,6 +222,9 @@ function Row({
       >
         <td className="stop-name" rowSpan={rowSpan}>
           {stopName}
+          {stop.platform ? (
+            <span className="platform"> · {stop.platform}</span>
+          ) : null}
         </td>
         {aimed}
         {expected}

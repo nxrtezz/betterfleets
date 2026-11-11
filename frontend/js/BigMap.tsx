@@ -766,9 +766,9 @@ export default function BigMap(
             } else if (journey.vehicle?.id) {
               url = `?id=${journey.vehicle.id}`;
             } else {
-              // journey-based tracking with no vehicle (e.g. FlixBus) -
-              // the journey id is used in lieu of a vehicle id
-              url = `?id=${journey.id}`;
+              // journey-based tracking with no vehicle (e.g. rail, FlixBus) -
+              // the journey tracks under vehicle{-journey.id} in Redis
+              url = `?id=${-Number(journey.id)}`;
             }
           }
           break;

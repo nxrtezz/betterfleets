@@ -138,6 +138,7 @@ export default function VehiclePopup({
           {item.wheelchair}
         </div>
       )}
+      {item.rid && <div>RID {item.rid}</div>}
       <Delay item={item} />
       <div>
         <TimeAgo date={item.datetime} now={now} key={item.datetime} />

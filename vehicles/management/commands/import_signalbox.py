@@ -96,6 +96,7 @@ class Command(BaseCommand):
         self._rtt_next = 0.0
         self._pending_writes = []
         self._pending_appendages = []
+        self._last_positions: dict[str, tuple[float, float]] = {}
 
     def do_source(self):
         self.source, _ = DataSource.objects.get_or_create(
@@ -270,8 +271,11 @@ class Command(BaseCommand):
         info = self.infos.get(rid) or {}
         prev_stop, next_stop = self._stops_context(info, now)
 
+        heading = self._heading(rid, lon, lat)
+
         location = VehicleLocation(
             latlong=Point(lon, lat, srid=4326),
+            heading=heading,
             delay=timedelta(minutes=train.get("delay") or 0),
             prev_stop=prev_stop,
             next_stop=next_stop,
@@ -280,8 +284,30 @@ class Command(BaseCommand):
         location.journey = journey
         return location
 
+    @staticmethod
+    def _bearing(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
+        import math
+
+        phi1, phi2 = math.radians(lat1), math.radians(lat2)
+        dlam = math.radians(lon2 - lon1)
+        y = math.sin(dlam) * math.cos(phi2)
+        x = math.cos(phi1) * math.sin(phi2) - math.sin(phi1) * math.cos(phi2) * math.cos(dlam)
+        return (math.degrees(math.atan2(y, x)) + 360) % 360
+
+    def _heading(self, rid: str, lon: float, lat: float) -> float | None:
+        """bearing from the previous poll's position for this rid"""
+        prev = self._last_positions.get(rid)
+        self._last_positions[rid] = (lon, lat)
+        if len(self._last_positions) > 20000:
+            for key in list(self._last_positions)[:5000]:
+                del self._last_positions[key]
+        if prev is None or prev == (lon, lat):
+            return None
+        return self._bearing(prev[0], prev[1], lon, lat)
+
     def _redis_json(self, location, journey, vehicle, info) -> dict:
         redis_json = location.get_redis_json()
+        redis_json["rid"] = journey.code
 
         if vehicle is None:
             name = " ".join(

@@ -1,6 +1,7 @@
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import requests
@@ -191,7 +192,7 @@ class TripViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class VehicleJourneyViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = VehicleJourney.objects.select_related("vehicle")
+    queryset = VehicleJourney.objects.select_related("vehicle", "operator")
     serializer_class = serializers.VehicleJourneySerializer
     pagination_class = CursorPaginationWithSmallerPageSize
     filter_backends = (DjangoFilterBackend,)
@@ -202,6 +203,7 @@ class VehicleJourneyViewSet(viewsets.ReadOnlyModelViewSet):
         if self.action == "details":
             qs = qs.select_related(
                 "service",
+                "operator",
                 "trip__route__service",
                 "trip__route__source",
                 "trip__operator",
@@ -417,6 +419,71 @@ class VehicleJourneyViewSet(viewsets.ReadOnlyModelViewSet):
         for index in sorted(to_insert, reverse=True):
             stops[index:index] = to_insert[index]
 
+    @staticmethod
+    def rail_trip(instance, stops_data):
+        """synthesize a TripSerializer-shaped payload from rail calling points"""
+        london = ZoneInfo("Europe/London")
+
+        def local_time(value):
+            # feed times are UTC; the timetable shows UK local time
+            if not value:
+                return None
+            try:
+                parsed = datetime.fromisoformat(value)
+            except ValueError:
+                return value
+            if parsed.tzinfo is None:
+                return value
+            return parsed.astimezone(london).isoformat()
+
+        crs_codes = [s.get("crs") for s in stops_data if s.get("crs")]
+        stoppoints = (
+            {sp.crs: sp for sp in StopPoint.objects.filter(crs__in=crs_codes)}
+            if crs_codes
+            else {}
+        )
+        times = []
+        for i, stop in enumerate(stops_data):
+            sp = stoppoints.get(stop.get("crs"))
+            times.append(
+                {
+                    "id": i,
+                    "stop": {
+                        "atco_code": sp.atco_code if sp else None,
+                        "name": stop.get("name") or stop.get("crs") or "",
+                        "location": (
+                            sp.latlong.coords if sp and sp.latlong else None
+                        ),
+                        "bearing": None,
+                        "icon": None,
+                    },
+                    "platform": stop.get("platform"),
+                    "aimed_arrival_time": local_time(stop.get("arrival")),
+                    "aimed_departure_time": local_time(stop.get("departure")),
+                    "expected_arrival_time": local_time(stop.get("arrival")),
+                    "expected_departure_time": local_time(stop.get("departure")),
+                    "actual_arrival_time": local_time(stop.get("actual_arrival")),
+                    "actual_departure_time": local_time(
+                        stop.get("actual_departure")
+                    ),
+                    "timing_status": "PTP",
+                    "pick_up": True,
+                    "set_down": True,
+                    "call_condition": (
+                        "cancelled" if stop.get("cancelled") else None
+                    ),
+                    "note_codes": None,
+                }
+            )
+        trip = {"times": times}
+        if instance.operator_id:
+            trip["operator"] = {
+                "noc": instance.operator_id,
+                "slug": instance.operator.slug,
+                "name": instance.operator.name,
+            }
+        return trip
+
     @action(detail=True)
     def details(self, request, pk=None, **kwargs):
         instance = self.get_object()
@@ -550,6 +617,10 @@ class VehicleJourneyViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
             extra_data["trip"] = trip_serializer.data
+        elif stops_data := (instance.data or {}).get("stops"):
+            # rail journeys carry their calling points in journey.data
+            # (Signalbox/Darwin) rather than a Timetable Trip
+            extra_data["trip"] = self.rail_trip(instance, stops_data)
 
         if current_trip or not instance.vehicle_id:
             if instance.service_id:
@@ -557,7 +628,13 @@ class VehicleJourneyViewSet(viewsets.ReadOnlyModelViewSet):
                     "service_ids": [instance.service_id],
                 }
             else:
-                params = {"vehicle_ids": [instance.vehicle_id or instance.id]}
+                # vehicle-less journeys (rail, FlixBus) track under
+                # vehicle{-journey.id} in Redis
+                params = {
+                    "vehicle_ids": [
+                        instance.vehicle_id or -instance.id
+                    ]
+                }
             this = None
             if live := get_vehicle_locations(**params):
                 # check that this journey is actually tracking (not an old journey)
