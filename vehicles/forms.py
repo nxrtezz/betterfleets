@@ -231,6 +231,14 @@ link to a picture to prove it. Be polite.""",
             if not vehicle.features.all():
                 del self.fields["features"]
 
+        if (
+            vehicle.vehicle_type_id
+            and vehicle.vehicle_type.style == "train"
+        ):
+            # trains don't have number plates
+            self.fields.pop("reg", None)
+            self.fields.pop("previous_reg", None)
+
 
 class DebuggerForm(forms.Form):
     data = forms.CharField(widget=forms.Textarea(attrs={"rows": 6}))

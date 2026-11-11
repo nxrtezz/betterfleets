@@ -335,7 +335,11 @@ class Vehicle(models.Model):
             if update_fields is not None and "fleet_number" not in update_fields:
                 update_fields.append("fleet_number")
 
-        if update_fields is None and not self.reg:
+        is_train = (
+            self.vehicle_type_id
+            and self.vehicle_type.style == "train"
+        )
+        if update_fields is None and not self.reg and not is_train:
             reg = re.match(r"^[A-Z]\w_?\d\d?[ _-]?[A-Z]{3}$", self.code)
             if reg:
                 self.reg = re.sub("[-_ ]", "", self.code)

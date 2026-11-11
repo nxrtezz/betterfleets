@@ -242,7 +242,8 @@ class Command(BaseCommand):
         vehicle = Vehicle(
             slug=f"rtt-{tops}-{suffix}",
             code=tops,
-            name=tops_display_name(tops, leading_class),
+            fleet_number=int(tops) if tops.isdigit() else None,
+            fleet_code=tops_display_name(tops, leading_class),
             operator=journey.operator,
             source=self.rtt_source,
         )
