@@ -1790,3 +1790,65 @@ def driver_detail(request, pk: int):
             "journeys": journeys,
         },
     )
+
+
+@require_safe
+def train_unit(request, rid: str):
+    """rolling stock unit for a rail journey (Darwin rid).
+
+    Reads the allocation cached on the journey by the importers, or
+    fetches it live from the RTT API (server-side - tokens must never
+    reach the client).
+    """
+    from vehicles.rtt import (
+        RttClient,
+        RttError,
+        allocation_summary,
+        tops_display_name,
+    )
+
+    journey = (
+        VehicleJourney.objects.filter(code=rid, service=None)
+        .exclude(route_name="")
+        .order_by("-date")
+        .first()
+    )
+    if journey is None:
+        raise Http404
+
+    data = journey.data or {}
+    summary = data.get("rtt")
+
+    uid = data.get("uid")
+    if summary is None and uid and cache.add(f"train_unit_{rid}", 1, 120):
+        try:
+            service = RttClient().service(uid, journey.date.isoformat())
+        except RttError:
+            service = {}
+        if fetched := allocation_summary(service):
+            data["rtt"] = fetched
+            journey.data = data
+            journey.save(update_fields=["data"])
+            summary = fetched
+
+    payload = {
+        "rid": rid,
+        "headcode": data.get("headcode") or journey.route_name,
+        "destination": journey.destination,
+        "date": journey.date.isoformat(),
+    }
+    if journey.vehicle_id:
+        payload["vehicle"] = {
+            "name": str(journey.vehicle),
+            "url": journey.vehicle.get_absolute_url(),
+        }
+    if summary and summary.get("tops"):
+        payload["unit"] = {
+            "tops": summary["tops"],
+            "name": tops_display_name(
+                summary["tops"], summary.get("leading_class")
+            ),
+            "class": summary.get("leading_class"),
+            "passenger_vehicles": summary.get("passenger_vehicles"),
+        }
+    return JsonResponse(payload)

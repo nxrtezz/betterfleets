@@ -376,6 +376,7 @@ def status(request):
     statuses = {
         "bod_avl_status": get_statuses("bod_avl_status"),
         "darwin_status": get_statuses("darwin_status"),
+        "signalbox_status": get_statuses("signalbox_status"),
     } | cache.get_many(
         [
             f"{key}_status"

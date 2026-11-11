@@ -294,6 +294,7 @@ class Command(BaseCommand):
     def _log_journey_data(self, journey, state):
         """store the raw feed state on the journey for debugging"""
         data = {
+            "uid": state.uid,
             "toc": state.toc,
             "headcode": state.headcode,
             "train_cat": state.train_cat,

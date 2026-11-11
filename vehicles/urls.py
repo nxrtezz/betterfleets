@@ -26,6 +26,7 @@ urlpatterns = [
     ),
     path("vehicles", views.vehicles),
     path("vehicles.json", views.vehicles_json),
+    path("api/train-unit/<str:rid>", views.train_unit, name="train_unit"),
     path("vehicles/debug", views.debug),
     path("vehicles/history", views.vehicle_edits),
     path("vehicles/edits", views.vehicle_edits),
