@@ -466,11 +466,14 @@ def stops_mvt(request, z, x, y):
                 LEFT JOIN busstops_locality l ON sp.locality_id = l.id
                 WHERE
                     sp.latlong && ST_Transform(ST_TileEnvelope(%s, %s, %s), 4326)
-                    AND EXISTS (
-                        SELECT 1
-                        FROM busstops_stopusage su
-                        JOIN busstops_service svc ON su.service_id = svc.id
-                        WHERE su.stop_id = sp.atco_code AND svc.current = true
+                    AND (
+                        EXISTS (
+                            SELECT 1
+                            FROM busstops_stopusage su
+                            JOIN busstops_service svc ON su.service_id = svc.id
+                            WHERE su.stop_id = sp.atco_code AND svc.current = true
+                        )
+                        OR (sp.crs IS NOT NULL AND sp.crs <> '')
                     )
             ) AS tile
             WHERE geom IS NOT NULL
@@ -506,7 +509,8 @@ def stops_json(request):
 
     results = (
         StopPoint.objects.filter(
-            latlong__bboverlaps=bounding_box, service__current=True
+            Q(latlong__bboverlaps=bounding_box)
+            & (Q(service__current=True) | ~Q(crs=""))
         )
         .annotate(line_names=stop_line_names)
         .select_related("locality")
@@ -609,7 +613,7 @@ class AdminAreaDetailView(DetailView):
         context = super().get_context_data(**kwargs)
 
         stops = StopPoint.objects.filter(
-            Exists("service", filter=Q(service__current=True))
+            Q(service__current=True) | ~Q(crs="")
         )
 
         # Districts in this administrative area
@@ -960,7 +964,7 @@ class StopPointDetailView(DetailView):
         nearby = (
             StopPoint.objects.filter(active=True)
             .order_by("common_name", "indicator")
-            .filter(service__current=True)
+            .filter(Q(service__current=True) | ~Q(crs=""))
         )
 
         same_name = Q(common_name__iexact=self.object.common_name)
@@ -1042,7 +1046,7 @@ class StopAreaDetailView(DetailView):
         context = super().get_context_data(**kwargs)
 
         stops = (
-            self.object.stoppoint_set.filter(service__current=True)
+            self.object.stoppoint_set.filter(Q(service__current=True) | ~Q(crs=""))
             .annotate(line_names=stop_line_names)
             .order_by("common_name", "indicator")
         )
@@ -1079,7 +1083,7 @@ def stop_area_departures(request, pk):
 
     services = Service.objects.filter(current=True, stops__stop_area=stop_area)
 
-    stops = stop_area.stoppoint_set.filter(service__current=True)
+    stops = stop_area.stoppoint_set.filter(Q(service__current=True) | ~Q(crs=""))
 
     context = get_departures_context(stop_area, services, request.GET, stops)
 
