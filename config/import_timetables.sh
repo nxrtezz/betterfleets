@@ -35,6 +35,7 @@ run import_bod_timetables
 run import_ni
 run import_gtfs
 run import_redfunnel_timetables
+run cleanup_vehicle_codes
 
 if [ -n "$TNDS_USERNAME" ] && [ -n "$TNDS_PASSWORD" ]; then
     run import_tnds "$TNDS_USERNAME" "$TNDS_PASSWORD"
