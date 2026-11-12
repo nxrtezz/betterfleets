@@ -524,6 +524,31 @@ class VehicleHasFeature(models.Model):
         unique_together = ("vehicle", "vehiclefeature")
 
 
+VEHICLE_CODE_PREFIX_RE = re.compile(r"^([A-Za-z]+)[\-:]")
+
+
+def vehicle_code_prefix(code: str) -> str | None:
+    """operator NOC embedded in a vehicle code, if it has one
+    (BODS 'NOC:...', slug 'noc-...', 'My Tracking' 'NOC:...')"""
+    match = VEHICLE_CODE_PREFIX_RE.match(code)
+    return match.group(1).upper() if match else None
+
+
+def vehicle_code_matches_operator(code: str, operator_noc, known_nocs=None) -> bool:
+    """whether a feed identity may be attached to a vehicle of this operator.
+
+    Codes with an embedded operator prefix must match the vehicle's current
+    operator NOC; a prefix that isn't a known operator NOC is allowed through
+    (can't prove it's a different operator). Codes without a prefix always pass.
+    """
+    prefix = vehicle_code_prefix(code)
+    if prefix is None or prefix == operator_noc:
+        return True
+    if known_nocs is None:
+        return not Operator.objects.filter(noc=prefix).exists()
+    return prefix not in known_nocs
+
+
 class VehicleCode(models.Model):
     code = models.CharField(max_length=100)
     scheme = models.CharField(max_length=24)

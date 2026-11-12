@@ -3,24 +3,15 @@ Remove VehicleCodes that belong to a different operator.
 
 Feed identities sometimes end up attached to the wrong vehicle (e.g. a
 TfL identity on a bus now operated by another company), which causes
-mistracks when that operator's feed reports the identity. A code is
-considered mismatched when the operator prefix embedded in it
-(BODS 'NOC:...', slug 'noc-...', 'My Tracking' 'NOC:...') matches a
-*different* known operator NOC than the vehicle's current operator.
-
-Codes without an embedded operator prefix (TOPS numbers, TfE, jersey,
-RTCSNV etc.) are left alone.
+mistracks when that operator's feed reports the identity. Uses
+vehicles.models.vehicle_code_matches_operator - the same check the
+live importers apply before creating codes.
 """
 
-import re
-
 from django.core.management.base import BaseCommand
-from django.db.models import Count
 
 from busstops.models import Operator
-from vehicles.models import VehicleCode
-
-PREFIX_RE = re.compile(r"^([A-Za-z]+)[\-:]")
+from vehicles.models import VehicleCode, vehicle_code_matches_operator
 
 
 class Command(BaseCommand):
@@ -34,7 +25,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        nocs = set(Operator.objects.values_list("noc", flat=True))
+        known_nocs = set(Operator.objects.values_list("noc", flat=True))
         dry_run = options["dry_run"]
 
         mismatched = []
@@ -43,12 +34,9 @@ class Command(BaseCommand):
             .only("id", "code", "scheme", "vehicle_id", "vehicle__operator_id")
             .iterator()
         ):
-            operator_noc = code.vehicle.operator_id
-            match = PREFIX_RE.match(code.code)
-            if not match:
-                continue
-            prefix = match.group(1).upper()
-            if prefix in nocs and prefix != operator_noc:
+            if not vehicle_code_matches_operator(
+                code.code, code.vehicle.operator_id, known_nocs
+            ):
                 mismatched.append(code)
 
         by_scheme = {}

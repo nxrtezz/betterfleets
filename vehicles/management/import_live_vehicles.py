@@ -23,7 +23,12 @@ from busstops.models import DataSource
 from bustimes.models import Route, Trip
 
 from .. import rtpi
-from ..models import Vehicle, VehicleCode, VehicleJourney
+from ..models import (
+    Vehicle,
+    VehicleCode,
+    VehicleJourney,
+    vehicle_code_matches_operator,
+)
 from ..utils import VEHICLE_POSITIONS_CHANNEL, calculate_bearing, redis_client
 
 logger = logging.getLogger(__name__)
@@ -614,12 +619,24 @@ class ImportLiveVehiclesCommand(BaseCommand):
                 vehicle, _created = self.get_vehicle(item)
                 # print(vehicle_identity, vehicle, created)
                 if vehicle:
-                    VehicleCode.objects.create(
-                        code=vehicle_identity,
-                        scheme=self.vehicle_code_scheme,
-                        vehicle=vehicle,
-                    )
-                    vehicles_by_identity[vehicle_identity] = vehicle
+                    if vehicle_code_matches_operator(
+                        vehicle_identity, vehicle.operator_id
+                    ):
+                        VehicleCode.objects.create(
+                            code=vehicle_identity,
+                            scheme=self.vehicle_code_scheme,
+                            vehicle=vehicle,
+                        )
+                        vehicles_by_identity[vehicle_identity] = vehicle
+                    else:
+                        logger.info(
+                            "skipping %s code %s for vehicle %s "
+                            "(operator %s)",
+                            self.vehicle_code_scheme,
+                            vehicle_identity,
+                            vehicle.id,
+                            vehicle.operator_id,
+                        )
 
             keep_journey = False
             if not concurrent and vehicle_identity in self.journeys_ids_ids:
