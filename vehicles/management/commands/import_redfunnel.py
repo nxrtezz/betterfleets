@@ -209,18 +209,20 @@ class Command(BaseCommand):
         return vehicle, True
 
     # destination name -> timetable stop point, per service
-    # (ferry runs identical times in both directions, so the
-    # destination terminal is what disambiguates the sailing)
+    # (the feed calls both Cowes terminals "Isle of Wight"; the
+    # service disambiguates which one it is)
     DESTINATION_STOPS = {
         "RedJet": {
             "Southampton": "RF-SOU-T2",
             "West Cowes": "RF-WES",
             "Cowes": "RF-WES",
+            "Isle of Wight": "RF-WES",
         },
         "RedFunnel": {
             "Southampton": "RF-SOU-T1",
             "East Cowes": "RF-EAS",
             "Cowes": "RF-EAS",
+            "Isle of Wight": "RF-EAS",
         },
     }
 
@@ -241,7 +243,7 @@ class Command(BaseCommand):
             & (Q(route__start_date__isnull=True) | Q(route__start_date__lte=date))
             & (Q(route__end_date__isnull=True) | Q(route__end_date__gte=date)),
             destination=atco,
-            start__range=(start - timedelta(minutes=10), start + timedelta(minutes=5)),
+            start__range=(start - timedelta(minutes=15), start + timedelta(minutes=10)),
             calendar__in=Calendar.objects.active_on(date),
         ).first()
 

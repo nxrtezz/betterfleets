@@ -21,8 +21,8 @@ USER_AGENT = "betterfleets/1.0 (+https://eeveeit.uk)"
 TERMINALS = {
     "southampton t1": ("RF-SOU-T1", "Southampton (Red Funnel Terminal)", -1.4054, 50.8944),
     "southampton t2": ("RF-SOU-T2", "Southampton (Red Jet Terminal)", -1.4045, 50.9018),
-    "east cowes": ("RF-EAS", "East Cowes (Vehicle Ferry)", -1.2904, 50.7592),
-    "west cowes": ("RF-WES", "West Cowes (Red Jet)", -1.2225, 50.7763),
+    "east cowes": ("RF-EAS", "East Cowes (Vehicle Ferry)", -1.2907, 50.7595),
+    "west cowes": ("RF-WES", "West Cowes (Red Jet)", -1.2215, 50.7765),
 }
 
 # which service/line each direction belongs to, terminal keys, crossing time (mins)
