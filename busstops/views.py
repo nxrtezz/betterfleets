@@ -305,6 +305,15 @@ Disallow: /
     return HttpResponse(content, content_type="text/plain")
 
 
+def ads_txt(request):
+    "ads.txt"
+
+    content = """google.com, pub-2443485777945270, DIRECT, f08c47fec0942fa0
+"""
+
+    return HttpResponse(content, content_type="text/plain")
+
+
 def contact(request):
     """Contact page with form"""
     submitted = False
