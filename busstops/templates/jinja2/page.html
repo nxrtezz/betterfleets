@@ -20,8 +20,8 @@
 {% block head %}{% endblock %}
 
 {% block fuse %}
-{% if ad %}
 <script src="{{ static('consent.js') }}"></script>
+{% if ad %}
 <script>(function(){
     if(window.top!==window.self||!window.__tcfapi||!Array.prototype.toSorted){window.noAds=true;return}
     var s=document.getElementsByTagName("script")[0];
@@ -47,12 +47,37 @@
     });
 })();</script>
 {% endif %}
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-J368PWM0YZ"></script>
 <script>
 window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
+gtag('consent', 'default', {
+    ad_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied',
+    analytics_storage: 'denied'
+});
+gtag('set', 'ads_data_redaction', true);
+gtag('set', 'url_passthrough', true);
+</script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-J368PWM0YZ"></script>
+<script>
 gtag('js', new Date());
 gtag('config', 'G-J368PWM0YZ');
+if(window.__tcfapi){
+window.__tcfapi("addEventListener", 2, function(tcData, success){
+    if(!success)return;
+    if(tcData.eventStatus!=="tcloaded"&&tcData.eventStatus!=="useractioncomplete")return;
+    var consents=tcData.purpose&&tcData.purpose.consents,
+        granted=!tcData.gdprApplies;
+    if(!granted&&consents){
+        granted=true;
+        for(var i=7;i<=11;i++){
+            if(!consents[i]){granted=false;break;}
+        }
+    }
+    gtag('consent', 'update', {analytics_storage: granted ? 'granted' : 'denied'});
+});
+}
 </script>
 {% endblock fuse %}
 
