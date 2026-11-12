@@ -345,7 +345,7 @@ def before_send_transaction(event, hint):
 
 
 if not TEST:  # pragma: nocover
-    if "SENTRY_DSN" in os.environ:
+    if os.environ.get("SENTRY_DSN"):
         import sentry_sdk
         from sentry_sdk.integrations.django import DjangoIntegration
         from sentry_sdk.integrations.huey import HueyIntegration
