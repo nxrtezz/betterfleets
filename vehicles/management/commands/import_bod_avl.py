@@ -341,6 +341,12 @@ class Command(ImportLiveVehiclesCommand):
             | Q(noc=operator_ref) & ~Exists(operator_codes)
         )
 
+    def trust_stationary_timestamps(self, item):
+        # NATX reports rounded coordinates, so a stopped coach can publish
+        # many genuine observations at exactly the same point. Freezing its
+        # timestamp makes the live entry expire despite fresh observations.
+        return item.get("MonitoredVehicleJourney", {}).get("OperatorRef") == "NATX"
+
     def get_vehicle(self, item):
         monitored_vehicle_journey = item["MonitoredVehicleJourney"]
         operator_ref = monitored_vehicle_journey["OperatorRef"]

@@ -113,6 +113,10 @@ class ImportLiveVehiclesCommand(BaseCommand):
     def get_datetime():
         return
 
+    def trust_stationary_timestamps(self, item):
+        """Whether a fresh observation at identical coordinates is a heartbeat."""
+        return False
+
     def get_progress_journey(self, item, journey):
         """for journeys without a Trip - something with .date, .stop_times and .pairs"""
         return
@@ -203,10 +207,11 @@ class ImportLiveVehiclesCommand(BaseCommand):
                 location = self.create_vehicle_location(item)
                 if not location or location.latlong.equals_exact(latest_latlong):
                     if dt:
-                        # location hasn't changed
-                        # - so assume the data is old
-                        # – if the vehicle was really stationary the location would "drift" a bit
-                        dt = latest_datetime
+                        # Most feeds can replay a stale position with a new
+                        # timestamp. Allow trusted stationary heartbeats (for
+                        # example NATX's rounded coordinates) to stay fresh.
+                        if not location or not self.trust_stationary_timestamps(item):
+                            dt = latest_datetime
                         location_unchanged = location is not None
                     else:
                         return
