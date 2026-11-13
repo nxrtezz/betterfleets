@@ -60,6 +60,7 @@ class Command(BaseCommand):
             host="ftp.tnds.basemap.co.uk", user=username, passwd=password, timeout=120
         )
 
+        settings.TNDS_DIR.mkdir(parents=True, exist_ok=True)
         self.changed_files = []
         self.ftp.cwd("TNDSV2.5")
         v2_files = self.list_files()

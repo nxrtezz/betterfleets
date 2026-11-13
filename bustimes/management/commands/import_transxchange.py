@@ -527,6 +527,8 @@ class Command(BaseCommand):
                     return operator
             elif operator := get_operator_by("National Operator Codes", operator_code):
                 return operator
+            elif operator := Operator.objects.filter(noc=operator_code).first():
+                return operator
 
         licence_number = operator_element.findtext("LicenceNumber")
         if licence_number:
@@ -865,6 +867,10 @@ class Command(BaseCommand):
         services = services.annotate(operator_count=Count("operator"))
 
         for service in services:
+            if service.operator_count == 1:
+                Trip.objects.filter(route__service=service, operator__isnull=True).update(
+                    operator=service.operator.first()
+                )
             trip_chaining = self.merge_split_trips(service.id)
             if service.trip_chaining not in ("any", trip_chaining) and not (
                 service.trip_chaining == "merge" and not trip_chaining
@@ -1656,10 +1662,9 @@ class Command(BaseCommand):
                 ticket_machine_service_code
                 and ticket_machine_service_code != line.line_name
             ):
-                with contextlib.suppress(IntegrityError):
-                    ServiceCode.objects.create(
-                        scheme="SIRI", code=ticket_machine_service_code, service=service
-                    )
+                ServiceCode.objects.get_or_create(
+                    scheme="SIRI", code=ticket_machine_service_code, service=service
+                )
 
             # a code used in Traveline Cymru URLs:
             if self.source.name == "W" and "_" not in txc_service.service_code:

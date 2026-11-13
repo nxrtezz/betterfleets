@@ -994,19 +994,6 @@ export default function BigMap(
     [loadVehicles],
   );
 
-  // a superuser watching a journey for >10s boosts its RTT lookup
-  React.useEffect(() => {
-    if (props.mode !== MapMode.Journey || !props.journeyId) {
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      fetch(`/journeys/${props.journeyId}/boost`, {
-        credentials: "include",
-      }).catch(() => {});
-    }, 10000);
-    return () => window.clearTimeout(timer);
-  }, [props.mode, props.journeyId]);
-
   // (re)load vehicles on tab visibility change
   React.useEffect(() => {
     const handleVisibilityChange = () => {

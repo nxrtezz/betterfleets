@@ -115,6 +115,16 @@ class Command(ImportLiveVehiclesCommand):
         if vehicle or item.get("hg") == "0":
             return vehicle, False
 
+        from vehicles.utils import reuse_tracking_vehicle
+        candidates = Vehicle.objects.filter(operator__in=self.operators).filter(
+            Q(code__iexact=vehicle_code) | Q(fleet_code__iexact=vehicle_code)
+        ).order_by("-locked", "withdrawn", "id")
+        existing = candidates.first()
+        if existing:
+            if not existing.fleet_code:
+                existing.fleet_code = vehicle_code
+                existing.save(update_fields=["fleet_code"])
+            return reuse_tracking_vehicle(existing), False
         return Vehicle.objects.filter(operator__in=self.operators).get_or_create(
             {"operator": operator, "source": self.source, "fleet_code": vehicle_code},
             code=vehicle_code,

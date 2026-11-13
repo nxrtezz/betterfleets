@@ -1397,22 +1397,6 @@ class VehicleJourneyDetailView(DetailView):
     model = VehicleJourney
 
 
-def journey_rtt_boost(request, pk):
-    """a superuser is watching this journey - bump its RTT lookup
-    to the front of the importer's queue. GET allowed so the map
-    beacon doesn't need a CSRF token."""
-    if not request.user.is_superuser:
-        raise PermissionDenied
-    journey = get_object_or_404(VehicleJourney, pk=pk)
-    uid = (journey.data or {}).get("uid")
-    if uid and redis_client is not None:
-        pipe = redis_client.pipeline(transaction=False)
-        pipe.sadd("rtt_boosted", uid)
-        pipe.expire("rtt_boosted", 900)
-        pipe.execute()
-    return HttpResponse(status=204)
-
-
 @require_safe
 def latest_journey_debug(request, **kwargs):
     queryset = Vehicle.objects.filter(latest_journey_data__isnull=False)

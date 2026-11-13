@@ -29,7 +29,7 @@ from ..models import (
     VehicleJourney,
     vehicle_code_matches_operator,
 )
-from ..utils import VEHICLE_POSITIONS_CHANNEL, calculate_bearing, redis_client
+from ..utils import VEHICLE_POSITIONS_CHANNEL, calculate_bearing, redis_client, reuse_tracking_vehicle
 
 logger = logging.getLogger(__name__)
 fifteen_minutes = timedelta(minutes=15)
@@ -170,7 +170,9 @@ class ImportLiveVehiclesCommand(BaseCommand):
         location = None
         if vehicle is None:
             try:
-                vehicle, _ = self.get_vehicle(item)
+                vehicle, created = self.get_vehicle(item)
+                if created and vehicle:
+                    vehicle = reuse_tracking_vehicle(vehicle)
             except Vehicle.MultipleObjectsReturned:
                 logger.exception("multiple vehicles found")
                 return
@@ -617,6 +619,8 @@ class ImportLiveVehiclesCommand(BaseCommand):
                 vehicle = vehicles_by_identity[vehicle_identity]
             else:
                 vehicle, _created = self.get_vehicle(item)
+                if vehicle and _created:
+                    vehicle = reuse_tracking_vehicle(vehicle)
                 # print(vehicle_identity, vehicle, created)
                 if vehicle:
                     if vehicle_code_matches_operator(

@@ -152,6 +152,16 @@ def handle_alert(situation_number, alert, feed, source, operator, current_situat
         (get_datetime(period.start), get_datetime(period.end))
         for period in alert.active_period
     ]
+    invalid = sum(1 for start, end in periods if start and end and end < start)
+    if invalid:
+        logger.warning("Ignoring %s reversed GTFS alert validity periods", invalid)
+        periods = [(start, end) for start, end in periods
+                   if not start or not end or start <= end]
+        if not periods:
+            if situation.pk:
+                situation.current = False
+                situation.save(update_fields=["current"])
+            return
     starts = [start for start, _ in periods]
     ends = [end for _, end in periods]
     situation.publication_window = DateTimeTZRange(

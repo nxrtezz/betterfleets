@@ -238,14 +238,32 @@ class Command(BaseCommand):
         now = timezone.localtime(journey.datetime)
         start = timedelta(hours=now.hour, minutes=now.minute)
         date = journey.date
-        return Trip.objects.filter(
+        candidates = Trip.objects.filter(
             Q(route__service=journey.service)
             & (Q(route__start_date__isnull=True) | Q(route__start_date__lte=date))
             & (Q(route__end_date__isnull=True) | Q(route__end_date__gte=date)),
             destination=atco,
             start__range=(start - timedelta(minutes=15), start + timedelta(minutes=10)),
             calendar__in=Calendar.objects.active_on(date),
-        ).first()
+        )
+        # Prefer a close departure first. On process restart the vessel may
+        # already be at sea: allow a single sailing whose crossing is still
+        # in progress rather than treating first observation as departure.
+        nearest = min(candidates, key=lambda trip: abs(trip.start - start), default=None)
+        if nearest:
+            return nearest
+        underway = Trip.objects.filter(
+            route__service=journey.service,
+            destination=atco,
+            start__lte=start,
+            end__gte=start,
+            calendar__in=Calendar.objects.active_on(date),
+        ).filter(
+            Q(route__start_date__isnull=True) | Q(route__start_date__lte=date),
+            Q(route__end_date__isnull=True) | Q(route__end_date__gte=date),
+        )
+        matches = list(underway[:2])
+        return matches[0] if len(matches) == 1 else None
 
     def create_vehicle_location(self, item: dict) -> VehicleLocation | None:
         """
@@ -372,6 +390,13 @@ class Command(BaseCommand):
             else:
                 # No journey and not creating one - don't save to database
                 location.journey = None
+
+        # A timetable may have arrived after the journey started.
+        if location.journey and not location.journey.trip_id and location.journey.service_id:
+            trip = self.match_trip(location.journey)
+            if trip:
+                location.journey.trip = trip
+                location.journey.save(update_fields=["trip"])
 
         # Set location id for Redis
         location.id = vehicle.id

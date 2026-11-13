@@ -119,7 +119,7 @@ class ImportBusOpenDataTest(TestCase):
                 call_command("import_bod_timetables", api_key, "POOP")
 
             # no changes
-            with self.assertNumQueries(6):
+            with self.assertNumQueries(9):
                 call_command("import_bod_timetables", api_key)
 
             route = Route.objects.get()
@@ -392,7 +392,7 @@ Lynx/Bus Open Data Service (BODS)</a>, <time datetime="2020-04-01">1 April 2020<
                 ) as cm:
                     call_command("import_bod_timetables", "ticketer")
 
-                with self.assertNumQueries(2):
+                with self.assertNumQueries(4):
                     call_command("import_bod_timetables", "ticketer")  # not modified
 
                 with self.assertNumQueries(1):
@@ -493,7 +493,7 @@ Lynx/Bus Open Data Service (BODS)</a>, <time datetime="2020-04-01">1 April 2020<
                     datetime.datetime.fromisoformat("2020-06-10T12:00:00+01:00"),
                 ),
             ) as download_if_modified:
-                with self.assertNumQueries(128):
+                with self.assertNumQueries(134):
                     call_command("import_bod_timetables", "stagecoach")
                 download_if_modified.assert_called_with(
                     path, DataSource.objects.get(name="Stagecoach East"), ANY
@@ -507,13 +507,13 @@ Lynx/Bus Open Data Service (BODS)</a>, <time datetime="2020-04-01">1 April 2020<
                 )
                 route_link.save()
 
-                with self.assertNumQueries(6):
+                with self.assertNumQueries(8):
                     call_command("import_bod_timetables", "stagecoach")
 
                 with self.assertNumQueries(1):
                     call_command("import_bod_timetables", "stagecoach", "SCOX")
 
-                with self.assertNumQueries(64):
+                with self.assertNumQueries(70):
                     call_command("import_bod_timetables", "stagecoach", "SCCM")
 
                 route_link.refresh_from_db()

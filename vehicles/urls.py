@@ -53,7 +53,6 @@ urlpatterns = [
         name="latest_journey_debug",
     ),
     path("vehicles/<slug>/debug", views.latest_journey_debug),
-    path("journeys/<int:pk>/boost", views.journey_rtt_boost),
     path("journeys/<int:pk>", views.VehicleJourneyDetailView.as_view()),
     path("drivers/<int:pk>", views.driver_detail, name="driver_detail"),
     path("liveries.<int:version>.css", views.liveries_css),

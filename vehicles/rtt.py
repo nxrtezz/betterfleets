@@ -97,6 +97,8 @@ def allocation_summary(service: dict) -> dict | None:
                     "in_reverse": bool(item.get("inReverse")),
                 }
             )
+    if not units:
+        return None
     return {
         "tops": units[0]["tops"] if units else None,
         "units": units,

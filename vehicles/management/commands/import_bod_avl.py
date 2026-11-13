@@ -20,7 +20,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry
-from django.db import IntegrityError, connection
+from django.db import transaction, IntegrityError, connection
 from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_duration
@@ -427,22 +427,35 @@ class Command(ImportLiveVehiclesCommand):
             if vehicle_unique_id.isdigit():
                 defaults["fleet_number"] = vehicle_unique_id
 
+        if operators:
+            fleet_codes = {str(value).strip() for value in (
+                vehicle_ref, vehicle_unique_id, defaults.get("fleet_code"),
+                defaults.get("fleet_number"),
+            ) if value}
+            for fleet_code in fleet_codes:
+                condition |= Q(fleet_code__iexact=fleet_code)
+                if fleet_code.isdigit():
+                    condition |= Q(fleet_number=int(fleet_code))
         vehicles = vehicles.filter(condition)
 
-        # Before creating a new vehicle, check if there's a vehicle with the expected slug
-        # This handles the case where AVL sends VehicleRef like "FHAM-63601" which becomes "63601"
-        # but there's already a vehicle with slug "fham-63601"
-        if operators and len(operators) == 1:
-            operator = operators[0]
-            expected_slug = f"{operator.noc.lower()}-{vehicle_ref.lower()}"
-            try:
-                existing_vehicle = self.vehicles.get(
-                    slug__iexact=expected_slug,
-                    operator=operator,
-                )
-                return existing_vehicle, False
-            except (Vehicle.DoesNotExist, Vehicle.MultipleObjectsReturned):
-                pass
+        # Reconcile candidates before creating another tracking identity.
+        # Existing metadata and all related journeys/codes/photos survive.
+        from vehicles.utils import _merge_duplicate_vehicle
+        with transaction.atomic():
+            candidates = list(vehicles.select_for_update(of=("self",)).order_by(
+                "-locked", "withdrawn", "id"
+            ))
+            if candidates:
+                vehicle = candidates[0]
+                changed_fields = []
+                for duplicate in candidates[1:]:
+                    duplicate_id = duplicate.pk
+                    _merge_duplicate_vehicle(vehicle, duplicate, changed_fields)
+                    logger.info("Merged duplicate tracking vehicle %s into %s",
+                                duplicate_id, vehicle.pk)
+                if changed_fields:
+                    vehicle.save(update_fields=changed_fields)
+                return vehicle, False
 
         try:
             vehicle, created = vehicles.get_or_create(defaults)
@@ -829,8 +842,8 @@ class Command(ImportLiveVehiclesCommand):
 
         # Handle driver references
         try:
-            extensions = item.get("Extensions", {})
-            vehicle_journey_ext = extensions.get("VehicleJourney", {})
+            extensions = item.get("Extensions") or {}
+            vehicle_journey_ext = extensions.get("VehicleJourney") or {}
             driver_ref = vehicle_journey_ext.get("DriverRef")
             if driver_ref:
                 journey_operator = None

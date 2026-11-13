@@ -257,6 +257,39 @@ def _merge_duplicate_vehicle(vehicle, duplicate, changed_fields):
     duplicate.delete()
 
 
+
+def reuse_tracking_vehicle(vehicle):
+    """Merge a newly discovered fleet identity into its operator/group record."""
+    if not vehicle.operator_id or not (vehicle.fleet_code or vehicle.fleet_number):
+        return vehicle
+    from django.db.models import Q
+    operator = vehicle.operator
+    scope = (Q(operator__group_id=operator.group_id) if operator.group_id
+             else Q(operator_id=operator.pk))
+    identity = Q(fleet_code__iexact=vehicle.fleet_code) if vehicle.fleet_code else Q(pk__in=[])
+    if vehicle.fleet_number is not None:
+        identity |= Q(fleet_number=vehicle.fleet_number)
+    with transaction.atomic():
+        candidates = list(Vehicle.objects.select_for_update().filter(
+            scope, identity,
+        ).order_by("-locked", "withdrawn", "id"))
+        if len(candidates) < 2:
+            return vehicle
+        canonical = candidates[0]
+        changed_fields = []
+        for duplicate in candidates[1:]:
+            duplicate_id = duplicate.pk
+            _merge_duplicate_vehicle(canonical, duplicate, changed_fields)
+            if redis_client:
+                transaction.on_commit(
+                    lambda pk=duplicate_id: redis_client.delete(f"vehicle{pk}"),
+                    robust=True,
+                )
+        if changed_fields:
+            canonical.save(update_fields=changed_fields)
+        return canonical
+
+
 def apply_revision(revision, features=None):
     from .models import Vehicle
 

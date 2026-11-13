@@ -14,7 +14,8 @@ from datetime import timedelta
 
 import requests
 from django.contrib.gis.geos import Point
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 
 from busstops.models import DataSource, Operator, Service, StopPoint
 from bustimes.models import (
@@ -119,12 +120,17 @@ class Command(BaseCommand):
 
         stops = {key: get_stop(source, key) for key in TERMINALS}
 
+        failures = []
         for filename, url in pdfs.items():
             try:
                 self.import_pdf(session, source, operator, stops, filename, url)
             except Exception:
                 logger.exception("failed to import %s", filename)
+                failures.append(filename)
+        if failures:
+            raise CommandError(f"Failed PDFs: {failures}")
 
+    @transaction.atomic
     def import_pdf(self, session, source, operator, stops, filename, url):
         response = session.get(url, timeout=60)
         response.raise_for_status()
@@ -138,11 +144,9 @@ class Command(BaseCommand):
 
         validity, schedules = parse_pdf(content)
         if validity is None:
-            logger.error("%s: could not parse validity dates", filename)
-            return
+            raise CommandError(f"{filename}: could not parse validity dates")
         if not schedules:
-            logger.error("%s: no schedules parsed", filename)
-            return
+            raise CommandError(f"{filename}: no schedules parsed")
 
         start_date, end_date = validity
         logger.info(

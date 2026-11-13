@@ -29,6 +29,7 @@ class AllocationSummaryTest(SimpleTestCase):
             allocation_summary(service),
             {
                 "tops": "700114",
+                "units": [{"tops": "700114", "cars": 12, "in_reverse": False}],
                 "leading_class": "700",
                 "passenger_vehicles": 12,
             },

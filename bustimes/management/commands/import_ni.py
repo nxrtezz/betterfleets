@@ -28,9 +28,15 @@ class Command(BaseCommand):
 
         for _id in ids:
             response = requests.get(base_url, params={"id": _id})
+            response.raise_for_status()
             data = response.json()
+            if not data.get("success"):
+                from django.core.management.base import CommandError
+                raise CommandError(f"Open Data NI dataset unavailable: {_id}")
 
-            source = DataSource.objects.get(url__endswith=_id)
+            source = DataSource.objects.filter(url__endswith=_id).first()
+            if source is None:
+                source = DataSource.objects.create(name=_id, url=f"https://www.opendatani.gov.uk/dataset/{_id}")
 
             for resource in data["result"]["resources"]:
                 dt = resource["last_modified"] or resource["created"]

@@ -21,8 +21,8 @@ USER_AGENT = "betterfleets/1.0 (+https://eeveeit.uk)"
 TERMINALS = {
     "southampton t1": ("RF-SOU-T1", "Southampton (Red Funnel Terminal)", -1.4054, 50.8944),
     "southampton t2": ("RF-SOU-T2", "Southampton (Red Jet Terminal)", -1.4045, 50.9018),
-    "east cowes": ("RF-EAS", "East Cowes (Vehicle Ferry)", -1.2907, 50.7595),
-    "west cowes": ("RF-WES", "West Cowes (Red Jet)", -1.2215, 50.7765),
+    "east cowes": ("RF-EAS", "East Cowes (Vehicle Ferry)", -1.2899635, 50.7582183),
+    "west cowes": ("RF-WES", "West Cowes (Red Jet)", -1.2968372, 50.7627391),
 }
 
 # which service/line each direction belongs to, terminal keys, crossing time (mins)
@@ -138,7 +138,7 @@ def parse_pdf(content: bytes):
             continue
 
         day_type = next(
-            (label for label in DAY_TYPES if text.lower().startswith(label)),
+            (label for label in sorted(DAY_TYPES, key=len, reverse=True) if text.lower().startswith(label)),
             None,
         )
         if day_type is None:

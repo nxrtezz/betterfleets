@@ -1,51 +1,49 @@
 #!/bin/sh
-# Daily timetable import. Run inside the app container:
-#   docker exec django_web sh /app/config/import_timetables.sh
-# (mounted checkout means /app is the repo root)
-#
-# Each step runs even if a previous one failed; exit status is non-zero
-# if any step failed. Requires BODS_API_KEY in the environment for the
-# Bus Open Data step. TNDS credentials are read from /app/.env when present.
-
 cd /app || exit 1
-
+# Lock inherited by the complete run; concurrent cron/manual runs are refused.
+if [ "$BF_IMPORT_LOCKED" != 1 ]; then
+    export BF_IMPORT_LOCKED=1
+    exec python -c 'import fcntl,os; f=open("/app/data/nightly-import.lock","w"); fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB); os.set_inheritable(f.fileno(),True); os.execvp("sh",["sh","/app/config/import_timetables.sh"])'
+fi
 if [ -f /app/.env ]; then
     set -a
     . /app/.env
     set +a
 fi
-
 FAILED=""
-
+status() {
+    BF_IMPORT_STATE="$1" BF_IMPORT_FAILURES="$FAILED" python -c 'import json,os,time; from pathlib import Path; p=Path("/app/data/nightly-import-status.json"); t=p.with_suffix(".tmp"); t.write_text(json.dumps({"state":os.environ["BF_IMPORT_STATE"],"updated":time.time(),"failures":os.environ["BF_IMPORT_FAILURES"]})); t.replace(p)'
+}
 run() {
-    echo ""
-    echo "=== $(date -Is) START: $* ==="
-    if python manage.py "$@"; then
-        echo "=== $(date -Is) OK: $* ==="
+    label="$1"
+    shift
+    echo "=== $(date -Is) START: $label ==="
+    status running
+    if timeout --signal=TERM --kill-after=60s 4h python manage.py "$@"; then
+        echo "=== $(date -Is) OK: $label ==="
     else
-        echo "=== $(date -Is) FAILED ($?): $* ==="
-        FAILED="$FAILED $*"
+        rc=$?
+        echo "=== $(date -Is) FAILED ($rc): $label ==="
+        FAILED="$FAILED $label"
     fi
 }
-
-run import_bod_timetables stagecoach
-run import_bod_timetables ticketer
-run import_passenger
-run import_bod_timetables
-run import_ni
-run import_gtfs
-run import_redfunnel_timetables
-run cleanup_vehicle_codes
-
+status running
+run stagecoach import_bod_timetables stagecoach
+run ticketer import_bod_timetables ticketer
+run passenger import_passenger
+# Dataset IDs are stable; discover all operators actually producing tracking.
+run bods-tracking import_bod_timetables --auto-discover --tracking-only
+run northern-ireland import_ni
+run gtfs import_gtfs
+run redfunnel import_redfunnel_timetables
+run vehicle-codes cleanup_vehicle_codes
 if [ -n "$TNDS_USERNAME" ] && [ -n "$TNDS_PASSWORD" ]; then
-    run import_tnds "$TNDS_USERNAME" "$TNDS_PASSWORD"
-else
-    echo "=== $(date -Is) SKIP: import_tnds (no TNDS credentials in .env) ==="
+    run tnds import_tnds "$TNDS_USERNAME" "$TNDS_PASSWORD"
 fi
-
-echo ""
 if [ -n "$FAILED" ]; then
+    status failed
     echo "$(date -Is) completed with failures:$FAILED"
     exit 1
 fi
+status succeeded
 echo "$(date -Is) all done"
