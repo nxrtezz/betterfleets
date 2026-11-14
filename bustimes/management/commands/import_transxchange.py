@@ -1897,6 +1897,16 @@ class Command(BaseCommand):
                     ad_hoc_stops[atco_code_upper] = stoppoint
                     stops[atco_code_upper] = stoppoint
 
+        if ad_hoc_stops:
+            # Reimporting a timetable without NaPTAN short codes must not erase
+            # the official SMS aliases restored separately for these stops.
+            existing_codes = dict(StopPoint.objects.filter(
+                atco_code__in=[stop.pk for stop in ad_hoc_stops.values()],
+            ).values_list("atco_code", "naptan_code"))
+            for stop in ad_hoc_stops.values():
+                if not stop.naptan_code:
+                    stop.naptan_code = existing_codes.get(stop.pk)
+
         StopPoint.objects.bulk_create(
             ad_hoc_stops.values(),
             update_conflicts=True,

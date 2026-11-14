@@ -225,6 +225,7 @@ class TflScopedStopMatchTest(TestCase):
         match = journey.get_trip(operator_ref="TFLO",origin_ref="490000001",destination_ref="490000002",departure_time=now)
         self.assertEqual(match,trip)
         self.assertEqual(journey.date,now.date()-timedelta(days=1))
+        self.assertEqual(journey.get_trip(operator_ref="TFLO", origin_ref="490000001", departure_time=now),trip)
         # An identically named stop in another source is not an alias here.
         other_origin = StopPoint.objects.create(atco_code=f"{other.pk}:490000001", active=True)
         StopTime.objects.filter(trip=trip,sequence=1).update(stop=other_origin)

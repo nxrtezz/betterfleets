@@ -42,6 +42,10 @@ run vehicle-codes cleanup_vehicle_codes
 if [ -n "$TNDS_USERNAME" ] && [ -n "$TNDS_PASSWORD" ]; then
     run tnds import_tnds "$TNDS_USERNAME" "$TNDS_PASSWORD"
 fi
+# Preserve NaPTAN short-code matching for source-scoped timetable stops.
+if [ -f /app/data/NaPTAN_stops.xml ]; then
+    run stop-codes backfill_stop_codes /app/data/NaPTAN_stops.xml --apply
+fi
 if [ -n "$FAILED" ]; then
     status failed
     echo "$(date -Is) completed with failures:$FAILED"

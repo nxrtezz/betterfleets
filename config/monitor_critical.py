@@ -71,7 +71,7 @@ def checks(state, now):
     for mount in ("/", "/srv"):
         if Path(mount).exists():
             usage = shutil.disk_usage(mount)
-            if usage.free < 1024**3 and usage.used / usage.total > 0.95:
+            if usage.free < min(1024**3, usage.total * 0.05):
                 faults["disk:" + mount] = f"Critical disk space on {mount}: {usage.free // (1024**2)} MiB free"
     for container in ("django_web", "django_bod_avl", "django_signalbox",
                       "betterfleets-postgres-1", "betterfleets-redis-1"):

@@ -79,7 +79,7 @@ class Command(BaseCommand):
                         vehicle.operator_id=noc
                         vehicle.save(update_fields=['operator'])
             if options['apply']:
-                manifest_path = Path(settings.DATA_DIR)/'tfl-operator-repair-manifest.json'
+                manifest_path = Path(settings.DATA_DIR)/('tfl-operator-repair-'+timezone.now().strftime('%Y%m%dT%H%M%S')+'.json')
                 manifest_path.write_text(json.dumps(manifest))
                 for row in manifest['vehicles']:
                     redis_client.srem('operatorTFLOvehicles',row['id'])

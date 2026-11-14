@@ -301,21 +301,36 @@ def get_trip(
                 )
             )
 
-    # TfL endpoint refs are publisher-specific stop identifiers.
-    if operator_ref == "TFLO" and departure_time and origin_ref and destination:
-        candidates = trips.filter(
-            Exists("stoptime", filter=Q(stop__in=stop_refs(origin_ref))),
-            Exists("stoptime", filter=Q(stop__in=stop_refs(destination_ref))),
-            start,
-        )
-        candidates = candidates.filter(
-            Q(start__lt=timedelta(days=1), calendar__in=Calendar.objects.active_on(date))
-            | Q(start__gte=timedelta(days=1), calendar__in=Calendar.objects.active_on(date - timedelta(days=1)))
-        )
-        try:
-            trip = candidates.get()
-        except (Trip.DoesNotExist, Trip.MultipleObjectsReturned):
+    # Resolve TfL's small set of departures first. Evaluating unscoped
+    # calendar/stop EXISTS subqueries per observation scans whole timetables
+    # and stalls the complete AVL import cycle after a timetable recovery.
+    if operator_ref == "TFLO" and departure_time:
+        starts = [start_timedelta]
+        if start_time.hour < 6:
+            starts.append(start_timedelta + timedelta(days=1))
+        candidates = list(trips.filter(start__in=starts))
+        calendar_ids = {trip.calendar_id for trip in candidates}
+        if not calendar_ids:
             return
+        today = set(Calendar.objects.active_on(date, calendar_ids=calendar_ids).values_list("pk", flat=True))
+        previous = set()
+        if any(trip.start >= timedelta(days=1) for trip in candidates):
+            previous = set(Calendar.objects.active_on(date - timedelta(days=1), calendar_ids=calendar_ids).values_list("pk", flat=True))
+        candidates = [trip for trip in candidates
+                      if trip.calendar_id in (previous if trip.start >= timedelta(days=1) else today)]
+        if origin_ref or destination:
+            origins, destinations = set(stop_refs(origin_ref)), set(stop_refs(destination_ref)) if destination else set()
+            stops = {}
+            for trip_id, stop_id in StopTime.objects.filter(
+                trip_id__in=[trip.pk for trip in candidates], stop_id__in=origins | destinations,
+            ).values_list("trip_id", "stop_id"):
+                stops.setdefault(trip_id, set()).add(stop_id)
+            candidates = [trip for trip in candidates
+                          if (not origin_ref or stops.get(trip.pk, set()) & origins)
+                          and (not destinations or stops.get(trip.pk, set()) & destinations)]
+        if len(candidates) != 1:
+            return
+        trip = candidates[0]
         journey.date = date - timedelta(days=1) if trip.start >= timedelta(days=1) else date
         return trip
 
