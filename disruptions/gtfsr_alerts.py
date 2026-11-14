@@ -237,7 +237,7 @@ def import_alerts(feed_name: str):
 
 def gtfsr_alerts():
     for feed_name, feed in FEEDS.items():
-        if feed.alerts_url:
+        if feed.enabled and feed.alerts_url:
             try:
                 import_alerts(feed_name)
             except requests.RequestException as e:

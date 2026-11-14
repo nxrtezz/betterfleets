@@ -28,7 +28,7 @@ config/monitor_critical.py runs every five minutes from noel's crontab.
 - Alerts cover web/database/Redis availability, critical worker/container failure, unhandled exceptions in core tracking workers, FHAM/BHBC timetable loss, and nightly failure/staleness.
 - Each fault sends once and repeats at most hourly while recurring. Recovery notifications are sent once. Raw logs, tokens and mentions are not sent.
 - Optional disruption-feed task exceptions are excluded from log alerts; the Huey worker being absent is still critical.
-- Uses CRITICAL_ERROR_WEBHOOK_URL when supplied; otherwise the existing Discord NEW_VEHICLE_WEBHOOK_URL. This deployment currently uses the existing destination.
+- Uses the dedicated CRITICAL_ERROR_WEBHOOK_URL from the host environment file. The destination was replaced and delivery verified on 14 November; it does not fall back to the vehicle-notification channel.
 - State and file offsets persist in betterfleets-logs/critical-monitor-state.json.
 - Monitoring runs on the same host, so a total host/network outage requires external monitoring.
 

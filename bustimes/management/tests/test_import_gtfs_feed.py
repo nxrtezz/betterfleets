@@ -25,7 +25,8 @@ FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
 
 # test data in `rtcsnv.zip` dir (not a real zipfile) in fixtures dir
-@override_settings(DATA_DIR=FIXTURES_DIR)
+@patch.dict(FEEDS, rtcsnv=dataclasses.replace(FEEDS["rtcsnv"], enabled=True))
+@override_settings(DATA_DIR=FIXTURES_DIR, EXCLUDED_OPERATOR_NOCS=frozenset())
 class NevadaTest(TestCase):
     def test_not_modified(self):
         with (
@@ -33,9 +34,9 @@ class NevadaTest(TestCase):
                 "bustimes.management.commands.import_gtfs_feed.download_if_modified",
                 return_value=(False, None),
             ),
-            self.assertNumQueries(4),
         ):
             call_command("import_gtfs_feed", "rtcsnv")
+        self.assertEqual(Service.objects.count(), 2)  # recover absent data even with an unchanged download
 
     @time_machine.travel("2026-08-04", tick=False)
     def test_import_gtfs_feed(self):

@@ -35,6 +35,8 @@ run passenger import_passenger
 run bods-tracking import_bod_timetables --auto-discover --tracking-only
 run northern-ireland import_ni
 run gtfs import_gtfs
+run ember-timetables import_gtfs_ember
+run flixbus-timetables import_gtfs_flixbus
 run redfunnel import_redfunnel_timetables
 run vehicle-codes cleanup_vehicle_codes
 if [ -n "$TNDS_USERNAME" ] && [ -n "$TNDS_PASSWORD" ]; then

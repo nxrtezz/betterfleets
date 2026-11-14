@@ -5,7 +5,7 @@ from pathlib import Path
 
 import gtfs_kit
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from busstops.models import DataSource, Operator, Service, ServiceColour, StopPoint
@@ -44,7 +44,7 @@ def get_platform_code(stop) -> str:
 class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
-            "feed", choices=[name for name, feed in FEEDS.items() if feed.static_url]
+            "feed", choices=[name for name, feed in FEEDS.items() if feed.static_url and feed.enabled]
         )
         parser.add_argument(
             "--force",
@@ -55,6 +55,8 @@ class Command(BaseCommand):
     def handle(self, feed, force, *args, **options):
         path = settings.DATA_DIR / Path(f"{feed}_gtfs.zip")
         feed_config = FEEDS[feed]
+        if not feed_config.enabled:
+            raise CommandError(f"Feed {feed} has been removed from this site")
         prefix = feed_config.stop_id_prefix
         timezone = feed_config.timezone
 
@@ -63,7 +65,7 @@ class Command(BaseCommand):
 
         modified, last_modified = download_if_modified(path, source)
 
-        if not modified and not force:
+        if not modified and not force and source.route_set.filter(service__current=True, trip__isnull=False).exists():
             return  # no new data to import
         source.datetime = last_modified
 

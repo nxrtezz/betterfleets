@@ -30,6 +30,8 @@ from tqdm import tqdm
 from txc import TransXChange
 
 from busstops.management.commands.naptan_new import get_stop
+from tfl.operators import TFL_OPERATOR_NOCS
+
 from busstops.models import (
     DataSource,
     Operator,
@@ -176,6 +178,14 @@ def get_open_data_operators():
         timetable_data_sources.filter(timetabledatasource__complete=False)
     )
 
+    # Configured sources are not evidence of an imported timetable. A missing
+    # or failed BODS dataset must not suppress the TNDS fallback entirely.
+    covered = set(Service.objects.filter(
+        current=True, route__trip__isnull=False,
+    ).exclude(route__source__url__startswith="ftp://").order_by().values_list(
+        "operator", flat=True
+    ).distinct())
+    open_data_operators &= covered
     return open_data_operators, incomplete_operators
 
 
@@ -469,6 +479,13 @@ class Command(BaseCommand):
         self.today = localdate()
 
     @cached_property
+    def london_bus_colour(self):
+        # A database imported elsewhere may not contain the legacy colour PK.
+        return ServiceColour.objects.filter(pk=127).first() or ServiceColour.objects.get_or_create(
+            background="#dc241f", foreground="#fff", use_name_as_brand=False,
+        )[0]
+
+    @cached_property
     def service_overrides(self):
         overrides = defaultdict(list)
         for o in ServiceOverride.objects.all():
@@ -523,11 +540,20 @@ class Command(BaseCommand):
 
         if operator_code:
             if self.source.name == "L":
+                from tfl.operators import operator_noc
+                # TfL's internal operator code distinguishes subsidiaries which
+                # share an umbrella NationalOperatorCode.
+                regional_code = operator_element.findtext("OperatorCode")
+                if operator := get_operator_by("L", regional_code):
+                    return operator
                 if operator := get_operator_by("L", operator_code):
                     return operator
-            elif operator := get_operator_by("National Operator Codes", operator_code):
+                noc = operator_noc(operator_code, regional_code)
+                if operator := Operator.objects.filter(pk=noc).first():
+                    return operator
+            if operator := get_operator_by("National Operator Codes", operator_code):
                 return operator
-            elif operator := Operator.objects.filter(noc=operator_code).first():
+            if operator := Operator.objects.filter(noc=operator_code).first():
                 return operator
 
         licence_number = operator_element.findtext("LicenceNumber")
@@ -1560,9 +1586,10 @@ class Command(BaseCommand):
                     foreground=foreground,
                     use_name_as_brand=False,
                 )
-            elif service_code and service.mode == "bus" and service_code[:4] == "tfl_":
+            elif (service_code and service.mode == "bus" and service_code[:4] == "tfl_"
+                  and any(operator.pk in TFL_OPERATOR_NOCS for operator in operators.values())):
                 # London bus red
-                service.colour_id = 127
+                service.colour = self.london_bus_colour
             else:
                 # use the operator's colour
                 for operator in operators.values():

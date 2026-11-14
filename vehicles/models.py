@@ -544,9 +544,18 @@ def vehicle_code_matches_operator(code: str, operator_noc, known_nocs=None) -> b
     prefix = vehicle_code_prefix(code)
     if prefix is None or prefix == operator_noc:
         return True
+    if prefix == "TFLO":
+        from tfl.operators import TFL_OPERATOR_NOCS
+        if operator_noc in TFL_OPERATOR_NOCS:
+            return True
+    if known_nocs is not None and prefix not in known_nocs:
+        return True
+    source_group = Operator.objects.filter(noc=prefix).values_list("group_id", flat=True).first()
+    if source_group and Operator.objects.filter(noc=operator_noc, group_id=source_group).exists():
+        return True
     if known_nocs is None:
         return not Operator.objects.filter(noc=prefix).exists()
-    return prefix not in known_nocs
+    return False
 
 
 class VehicleCode(models.Model):
@@ -654,6 +663,7 @@ class VehicleRevision(models.Model):
     is_request = models.BooleanField(default=False, help_text="True if this is a request to add a new vehicle")
 
     class Meta:
+        permissions = [("approve_vehicle_edits", "Approve and decline edits")]
         constraints = (
             UniqueConstraint(
                 fields=["vehicle", "to_operator"],

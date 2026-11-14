@@ -95,7 +95,7 @@ class VehicleTypeViewSet(viewsets.ReadOnlyModelViewSet):
 
 class OperatorViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = (
-        Operator.objects.filter(
+        Operator.objects.exclude(noc__in=settings.EXCLUDED_OPERATOR_NOCS).filter(
             Exists("vehicle") | Exists("service", filter=Q(service__current=True))
         )
         .order_by("noc")

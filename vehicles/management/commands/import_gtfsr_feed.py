@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 from django.core.cache import cache
+from django.core.management.base import CommandError
 from django.utils.dateparse import parse_duration
 from google.protobuf import json_format
 from google.protobuf.message import DecodeError
@@ -74,7 +75,7 @@ class Command(GTFSRCommand):
         parser.add_argument(
             "feed",
             choices=[
-                name for name, feed in FEEDS.items() if feed.vehicle_positions_url
+                name for name, feed in FEEDS.items() if feed.vehicle_positions_url and feed.enabled
             ],
         )
 
@@ -85,6 +86,8 @@ class Command(GTFSRCommand):
     def set_feed(self, feed_name):
         self.feed_name = feed_name
         self.feed = FEEDS[feed_name]
+        if not self.feed.enabled:
+            raise CommandError(f"Feed {feed_name} has been removed from this site")
         self.source_name = self.vehicle_code_scheme = self.feed.source_name
         self.stop_id_prefix = self.feed.stop_id_prefix
 

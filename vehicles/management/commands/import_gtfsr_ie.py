@@ -96,7 +96,7 @@ class Command(ImportLiveVehiclesCommand):
         ) = super().get_changed_items()
 
         # prefetch trips
-        trips = {item.vehicle.trip.trip_id for item in changed_journey_items}
+        trips = {item.vehicle.trip.trip_id for item in changed_journey_items + changed_items}
         trips = Trip.objects.filter(
             **{f"{self.trip_id_field}__in": trips},
             route__source=self.source,
@@ -133,7 +133,7 @@ class Command(ImportLiveVehiclesCommand):
 
         if (
             latest_journey := vehicle.latest_journey
-        ) and latest_journey.code == journey.code:
+        ) and latest_journey.code == journey.code and latest_journey.trip_id:
             return latest_journey
 
         journey.datetime = start_date_time

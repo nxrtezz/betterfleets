@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import shutil
 import sys
 import time
 import urllib.request
@@ -16,9 +17,10 @@ STATE = LOGS / "critical-monitor-state.json"
 REPEAT_SECONDS = 3600
 CRITICAL_PROGRAMS = (
     "listen", "distribute_vehicle_locations", "run_huey", "import_redfunnel", "import_stagecoach_avl",
+    "lothian", "import_translink_avl",
 )
 CRITICAL_LOGS = (
-    "listen", "distribute_vehicle_locations", "redfunnel", "stagecoach",
+    "listen", "distribute_vehicle_locations", "redfunnel", "stagecoach", "lothian", "translink_avl",
 )
 ERROR = re.compile(r"Traceback \(most recent call last\):|^(?:ERROR|CRITICAL|FATAL)\b", re.M)
 
@@ -32,10 +34,20 @@ def load_state():
         return {"faults": {}, "offsets": {}}
 
 def webhook():
-    # Keep tokens inside this process, never in log output.
-    result = run(["docker", "exec", "django_web", "python", "-c",
-                  "import os; print(os.environ.get('CRITICAL_ERROR_WEBHOOK_URL') or os.environ.get('NEW_VEHICLE_WEBHOOK_URL',''))"])
-    url = result.stdout.strip()
+    # The host cron must see updated secrets without recreating tracking containers.
+    url = os.environ.get("CRITICAL_ERROR_WEBHOOK_URL", "")
+    if not url:
+        try:
+            for line in (ROOT / ".env").read_text().splitlines():
+                if line.startswith("CRITICAL_ERROR_WEBHOOK_URL="):
+                    url = line.partition("=")[2].strip().strip("\"'")
+                    break
+        except FileNotFoundError:
+            pass
+    if not url:
+        result = run(["docker", "exec", "django_web", "python", "-c",
+                      "import os; print(os.environ.get('CRITICAL_ERROR_WEBHOOK_URL', ''))"])
+        url = result.stdout.strip()
     if not url.startswith(("https://discord.com/api/webhooks/",
                            "https://discordapp.com/api/webhooks/")):
         raise RuntimeError("A Discord CRITICAL_ERROR_WEBHOOK_URL is required")
@@ -56,12 +68,17 @@ def send(url, content):
 
 def checks(state, now):
     faults = {}
+    for mount in ("/", "/srv"):
+        if Path(mount).exists():
+            usage = shutil.disk_usage(mount)
+            if usage.free < 1024**3 and usage.used / usage.total > 0.95:
+                faults["disk:" + mount] = f"Critical disk space on {mount}: {usage.free // (1024**2)} MiB free"
     for container in ("django_web", "django_bod_avl", "django_signalbox",
                       "betterfleets-postgres-1", "betterfleets-redis-1"):
         result = run(["docker", "inspect", "-f", "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}", container])
         if result.returncode or not result.stdout.startswith("running") or "unhealthy" in result.stdout:
             faults["container:" + container] = "Critical container unavailable: " + container
-    result = run(["docker", "top", "django_web", "-eo", "args"])
+    result = run(["docker", "top", "django_web", "-eo", "pid,args"])
     if result.returncode == 0:
         for program in CRITICAL_PROGRAMS:
             if not re.search(r"manage\.py\s+" + re.escape(program) + r"(?:\s|$)", result.stdout):
@@ -92,6 +109,17 @@ print(json.dumps([noc for noc in ("FHAM","BHBC") if not Service.objects.filter(o
                 faults["coverage:" + noc] = noc + " has lost timetable services/trips"
         except (ValueError, IndexError):
             faults["data-health"] = "Timetable health probe returned invalid output"
+    result = run(["docker", "exec", "django_web", "python", "manage.py",
+                  "audit_tracking_coverage", "--json"], timeout=60)
+    if result.returncode == 0:
+        rows = json.loads(result.stdout)
+        missing = [row for row in rows if row["timetable_expected"] and row["tracking"] >= 10
+                   and (row["services"] == 0 or row["trips"] == 0) and row["live_with_trip"] == 0]
+        if missing:
+            examples = ", ".join(f'{row["noc"]} ({row["tracking"]} live)' for row in missing[:8])
+            faults["timetable-coverage"] = f"{len(missing)} tracking operators lack timetable services/trips: {examples}"
+    else:
+        faults["coverage-audit"] = "Live operator timetable coverage audit failed"
     status_path = ROOT / "data/nightly-import-status.json"
     if status_path.exists():
         try:

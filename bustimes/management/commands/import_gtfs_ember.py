@@ -48,7 +48,7 @@ class Command(BaseCommand):
 
         modified, last_modified = download_if_modified(path, source)
 
-        if not modified:
+        if not modified and source.route_set.filter(service__current=True, trip__isnull=False).exists():
             return  # no new data to import
         source.datetime = last_modified
 

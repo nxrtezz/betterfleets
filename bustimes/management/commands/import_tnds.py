@@ -17,13 +17,15 @@ class Command(BaseCommand):
     def add_arguments(parser):
         parser.add_argument("username", type=str)
         parser.add_argument("password", type=str)
+        parser.add_argument("--regions", nargs="+", help="Only import these TNDS regions, e.g. L S")
 
     def list_files(self) -> dict:
-        # excluding London - we use original TfL data instead
+        # Include London: a separate original TfL timetable importer is not
+        # configured in this deployment, while London vehicles are tracking.
         files = [
             (name, details)
             for name, details in self.ftp.mlsd()
-            if name.endswith(".zip") and name != "L.zip"
+            if name.endswith(".zip")
         ]
         files.sort(key=lambda item: int(item[1]["size"]))  # smallest files first
         return dict(files)
@@ -33,9 +35,17 @@ class Command(BaseCommand):
             self.do_file(name, details)
 
     def do_file(self, name, details):
-        source, _ = DataSource.objects.get_or_create(
-            url=f"ftp://{self.ftp.host}/{name}"
-        )
+        url = f"ftp://{self.ftp.host}/{name}"
+        region_name = name.removesuffix(".zip").upper()
+        if region_name == "IOM":
+            region_name = "IM"
+        # Historical download-only rows may share a URL with the named
+        # source used by TransXChange. Reuse the named source deterministically.
+        source = DataSource.objects.filter(url=url, name=region_name).first()
+        if source is None:
+            source = DataSource.objects.filter(url=url).order_by("id").first()
+        if source is None:
+            source = DataSource.objects.create(url=url, name=region_name)
 
         path = settings.TNDS_DIR / name
 
@@ -64,6 +74,10 @@ class Command(BaseCommand):
         self.changed_files = []
         self.ftp.cwd("TNDSV2.5")
         v2_files = self.list_files()
+        if options.get("regions"):
+            regions = {value.upper() for value in options["regions"]}
+            v2_files = {name: details for name, details in v2_files.items()
+                        if name.removesuffix(".zip").upper() in regions}
         self.do_files(v2_files)
 
         self.ftp.quit()

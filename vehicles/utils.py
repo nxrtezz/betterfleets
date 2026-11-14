@@ -258,6 +258,26 @@ def _merge_duplicate_vehicle(vehicle, duplicate, changed_fields):
 
 
 
+def compatible_tracking_identity(incoming, candidate):
+    """Do not merge conflicting registrations or independently tracked fleets."""
+    normalise = lambda value: "".join(c for c in (value or "").upper() if c.isalnum())
+    incoming_reg, candidate_reg = normalise(incoming.reg), normalise(candidate.reg)
+    if incoming_reg and candidate_reg and incoming_reg != candidate_reg:
+        return False
+    if incoming.operator_id == candidate.operator_id:
+        return True
+    from tfl.operators import TFL_OPERATOR_NOCS
+    if candidate.operator_id == "TFLO" and incoming.operator_id in TFL_OPERATOR_NOCS:
+        return True
+    if incoming_reg and incoming_reg == candidate_reg:
+        return True
+    # Group fallback is for unbound fleet-list records. An established feed
+    # identity under another operator is evidence against fleet-number reuse.
+    from .models import vehicle_code_prefix
+    return not any(vehicle_code_prefix(code) not in (None, incoming.operator_id)
+                   for code in candidate.vehiclecode_set.filter(scheme="BODS").values_list("code", flat=True))
+
+
 def reuse_tracking_vehicle(vehicle):
     """Merge a newly discovered fleet identity into its operator/group record."""
     if not vehicle.operator_id or not (vehicle.fleet_code or vehicle.fleet_number):
@@ -273,6 +293,8 @@ def reuse_tracking_vehicle(vehicle):
         candidates = list(Vehicle.objects.select_for_update().filter(
             scope, identity,
         ).order_by("-locked", "withdrawn", "id"))
+        candidates = [candidate for candidate in candidates
+                      if compatible_tracking_identity(vehicle, candidate)]
         if len(candidates) < 2:
             return vehicle
         canonical = candidates[0]

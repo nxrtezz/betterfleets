@@ -6,6 +6,7 @@ class GTFSFeed:
     source_name: str
     noc: str
     timezone: str
+    enabled: bool = True
     static_url: str = ""
     vehicle_positions_url: str = ""
     trip_updates_url: str = ""
@@ -18,6 +19,7 @@ class GTFSFeed:
 
 FEEDS = {
     "rtcsnv": GTFSFeed(
+        enabled=False,
         source_name="RTCSNV",
         noc="RTCSNV",
         timezone="America/Los_Angeles",
@@ -27,6 +29,7 @@ FEEDS = {
         stop_id_prefix="rtcsnv-",
     ),
     "zditm": GTFSFeed(
+        enabled=False,
         source_name="ZDiTM Szczecin",
         noc="ZDITM",
         timezone="Europe/Warsaw",
@@ -37,6 +40,7 @@ FEEDS = {
         stop_id_prefix="zditm-",
     ),
     "capcotentin": GTFSFeed(
+        enabled=False,
         source_name="Cap Cotentin",
         noc="CAPCOT",
         timezone="Europe/Paris",

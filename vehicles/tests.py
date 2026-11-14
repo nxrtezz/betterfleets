@@ -740,7 +740,8 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
 
         del initial["colours"]
 
-        # apply edit
+        # A global reviewer needs the explicit edit approval permission.
+        self.trusted_user.user_permissions.add(Permission.objects.get(codename="approve_vehicle_edits"))
         self.client.force_login(self.trusted_user)
         response = self.client.post(f"/vehicles/revisions/{revision.id}/apply")
         revision.refresh_from_db()
@@ -991,6 +992,7 @@ https://www.flickr.com/photos/goodwinjoshua/51046126023/ blah""",
             )
             self.assertContains(response, "Your changes")
 
+        self.trusted_user.user_permissions.add(Permission.objects.get(codename="approve_vehicle_edits"))
         self.client.force_login(self.trusted_user)
 
         # apply

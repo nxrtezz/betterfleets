@@ -2,7 +2,7 @@ import json
 import logging
 from collections import defaultdict, namedtuple
 from datetime import datetime, timedelta
-from time import sleep
+from time import monotonic, sleep
 
 import requests
 import sentry_sdk
@@ -19,7 +19,7 @@ from django.utils import timezone
 from redis.exceptions import ConnectionError
 from tenacity import before_sleep_log, retry, wait_exponential
 
-from busstops.models import DataSource
+from busstops.models import DataSource, Operator, Service
 from bustimes.models import Route, Trip
 
 from .. import rtpi
@@ -108,6 +108,9 @@ class ImportLiveVehiclesCommand(BaseCommand):
         self.recent_positions = {}  # vehicle id: hashes of last few coordinates
         self.max_datetime = None  # newest item timestamp in the current update
         self.driver_associations = []  # list of (journey_key, driver_ref, operator) tuples
+        self._trip_match_retry_after = {}
+        self._timetable_operators = set()
+        self._timetable_operators_refresh_after = 0
 
     @staticmethod
     def get_datetime():
@@ -116,6 +119,32 @@ class ImportLiveVehiclesCommand(BaseCommand):
     def trust_stationary_timestamps(self, item):
         """Whether a fresh observation at identical coordinates is a heartbeat."""
         return False
+
+    def should_retry_trip_match(self, vehicle):
+        """Retry unresolved live workings after timetable imports, at most once/minute."""
+        journey = vehicle.latest_journey
+        if not journey or journey.trip_id:
+            self._trip_match_retry_after.pop(vehicle.pk, None)
+            return False
+        now = monotonic()
+        if now < self._trip_match_retry_after.get(vehicle.pk, 0):
+            return False
+        if now >= self._timetable_operators_refresh_after:
+            trips = Trip.objects.filter(route__service_id=OuterRef("pk"))
+            self._timetable_operators = set(Service.objects.filter(
+                current=True,
+            ).filter(Exists(trips)).order_by().values_list("operator", flat=True))
+            groups = Operator.objects.filter(
+                noc__in=self._timetable_operators,
+            ).exclude(group_id=None).values_list("group_id", flat=True)
+            self._timetable_operators.update(Operator.objects.filter(
+                group_id__in=groups,
+            ).values_list("noc", flat=True))
+            self._timetable_operators_refresh_after = now + 60
+        if not journey.service_id and vehicle.operator_id not in self._timetable_operators:
+            return False
+        self._trip_match_retry_after[vehicle.pk] = now + 60
+        return True
 
     def get_progress_journey(self, item, journey):
         """for journeys without a Trip - something with .date, .stop_times and .pairs"""
@@ -590,6 +619,9 @@ class ImportLiveVehiclesCommand(BaseCommand):
             self.url = self.source.url
         return self
 
+    def vehicle_matches_item(self, vehicle, item):
+        return True
+
     def handle_items(self, items, identities):
         if not items:
             return
@@ -620,15 +652,23 @@ class ImportLiveVehiclesCommand(BaseCommand):
             journey_identity = self.get_journey_identity(item)
             concurrent = vehicle_identity in self.duplicate_vehicles
 
-            if vehicle_identity in vehicles_by_identity:
-                vehicle = vehicles_by_identity[vehicle_identity]
+            cached_vehicle = vehicles_by_identity.get(vehicle_identity)
+            if cached_vehicle and not self.vehicle_matches_item(cached_vehicle, item):
+                VehicleCode.objects.filter(code=vehicle_identity, scheme=self.vehicle_code_scheme,
+                                           vehicle=cached_vehicle).delete()
+                vehicles_by_identity.pop(vehicle_identity, None)
+                self.journeys_ids_ids.pop(vehicle_identity, None)
+                logger.warning("Rejected cross-operator feed identity for vehicle %s", cached_vehicle.pk)
+                cached_vehicle = None
+            if cached_vehicle:
+                vehicle = cached_vehicle
             else:
                 vehicle, _created = self.get_vehicle(item)
                 if vehicle and _created:
                     vehicle = reuse_tracking_vehicle(vehicle)
                 # print(vehicle_identity, vehicle, created)
                 if vehicle:
-                    if vehicle_code_matches_operator(
+                    if self.vehicle_matches_item(vehicle, item) and vehicle_code_matches_operator(
                         vehicle_identity, vehicle.operator_id
                     ):
                         VehicleCode.objects.create(
@@ -654,7 +694,7 @@ class ImportLiveVehiclesCommand(BaseCommand):
                     journey_identity,
                     vehicle.latest_journey_id,
                 ):
-                    keep_journey = True  # can dumbly keep same latest_journey
+                    keep_journey = not self.should_retry_trip_match(vehicle)
 
             if vehicle:
                 result = self.handle_item(

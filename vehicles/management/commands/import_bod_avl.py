@@ -335,6 +335,10 @@ class Command(ImportLiveVehiclesCommand):
     def get_operator(self, operator_ref):
         # all operators with a matching OperatorCode,
         # or (if no such OperatorCode) the one with a matching id
+        if operator_ref == "UNIB":
+            # Uno's publisher code is different from its fleet-list NOC.
+            # Historical route guesses incorrectly mapped it to unrelated fleets.
+            return Operator.objects.filter(noc="UNOE")
         operator_codes = self.source.operatorcode_set.filter(code=operator_ref)
         return Operator.objects.filter(
             Exists(operator_codes.filter(operator=OuterRef("pk")))
@@ -346,6 +350,29 @@ class Command(ImportLiveVehiclesCommand):
         # many genuine observations at exactly the same point. Freezing its
         # timestamp makes the live entry expire despite fresh observations.
         return item.get("MonitoredVehicleJourney", {}).get("OperatorRef") == "NATX"
+
+    def vehicle_matches_item(self, vehicle, item):
+        ref = item["MonitoredVehicleJourney"]["OperatorRef"]
+        operators = list(self.get_operator(ref))
+        if ref == "TFLO":
+            # TfL is the feed publisher; the vehicle belongs to its contractor.
+            return vehicle.operator_id == "TFLO" or vehicle.operator_id in self.tfl_operator_nocs()
+        if vehicle.operator_id in {op.pk for op in operators}:
+            return True
+        if ref == "NATX":
+            # National Express publishes subcontractors' coaches. An exact
+            # registration verifies those existing bindings without accepting
+            # an unrelated fleet number or broad global registration lookup.
+            reported = item["MonitoredVehicleJourney"].get("VehicleRef", "")
+            normalise = lambda value: re.sub(r"[^A-Z0-9]", "", (value or "").upper())
+            if vehicle.reg and normalise(reported) == normalise(vehicle.reg):
+                return True
+        return not operators and vehicle.operator_id is None
+
+    @staticmethod
+    def tfl_operator_nocs():
+        from tfl.operators import TFL_OPERATOR_NOCS
+        return TFL_OPERATOR_NOCS
 
     def get_vehicle(self, item):
         monitored_vehicle_journey = item["MonitoredVehicleJourney"]
@@ -362,34 +389,33 @@ class Command(ImportLiveVehiclesCommand):
         if not vehicle_ref and vehicle_unique_id:
             vehicle_ref = vehicle_unique_id
 
-        if (
-            not vehicle_ref.isdigit()
-            and vehicle_ref.isupper()
-            and len(vehicle_ref) > 6
-            and not vehicle_ref.startswith("BUS")
-        ):
-            # assume vehicle ref is globally unique (cos it looks like a vehicle reg?)
-            try:
-                return self.vehicles.get(code__iexact=vehicle_ref), False
-            except (Vehicle.DoesNotExist, Vehicle.MultipleObjectsReturned):
-                pass
-
         # ffs
         if operator_ref == "MARS" and vehicle_unique_id:
             vehicle_ref = vehicle_unique_id
 
         defaults = {"code": vehicle_ref, "source": self.source}
+        plate = re.match(r"^([A-Z]{2})[_ ]?(\d{2})[_ ]?([A-Z]{3})(?:_|$)", vehicle_ref)
+        if plate:
+            defaults["reg"] = "".join(plate.groups())
 
         operators = self.get_operator(operator_ref)
 
         if operator_ref == "TFLO":
             defaults["livery_id"] = 262
-            defaults["operator_id"] = operator_ref
+            defaults["operator_id"] = "TFLO"
+            line = monitored_vehicle_journey.get("PublishedLineName") or monitored_vehicle_journey.get("LineRef")
+            if line:
+                contractors = list(self.services.filter(
+                    line_name__iexact=line, route__source__name="L",
+                    operator__in=self.tfl_operator_nocs(),
+                ).order_by().values_list("operator", flat=True).distinct()[:2])
+                if len(contractors) == 1:
+                    defaults["operator_id"] = contractors[0]
             if vehicle_ref.startswith("TMP"):
                 defaults["notes"] = "Spare ticket machine"
                 defaults["locked"] = True
             vehicles = self.vehicles.filter(
-                Q(operator__in=operators) | Q(operator=None)
+                operator_id__in={"TFLO", defaults["operator_id"]}
             )
         elif not operators:
             vehicles = self.vehicles.filter(operator=None)
@@ -451,9 +477,18 @@ class Command(ImportLiveVehiclesCommand):
             candidates = list(vehicles.select_for_update(of=("self",)).order_by(
                 "-locked", "withdrawn", "id"
             ))
+            # A fleet number alone must not join two concurrently identified
+            # fleets in the same corporate group (e.g. Arriva regional fleets).
+            from vehicles.utils import compatible_tracking_identity
+            prototype = Vehicle(**defaults)
+            candidates = [candidate for candidate in candidates
+                          if compatible_tracking_identity(prototype, candidate)]
             if candidates:
                 vehicle = candidates[0]
                 changed_fields = []
+                if prototype.operator_id and prototype.operator_id != "TFLO" and vehicle.operator_id != prototype.operator_id:
+                    vehicle.operator_id = prototype.operator_id
+                    changed_fields.append("operator")
                 for duplicate in candidates[1:]:
                     duplicate_id = duplicate.pk
                     _merge_duplicate_vehicle(vehicle, duplicate, changed_fields)
@@ -464,11 +499,18 @@ class Command(ImportLiveVehiclesCommand):
                 return vehicle, False
 
         try:
-            vehicle, created = vehicles.get_or_create(defaults)
-        except (Vehicle.MultipleObjectsReturned, IntegrityError) as e:
-            logger.warning("%s %s %s", e, operator_ref, vehicle_ref)
-            vehicle = vehicles.first()
-            created = False
+            operator_id = defaults.get("operator_id") or getattr(defaults.get("operator"), "pk", None)
+            vehicle, created = self.vehicles.get_or_create(
+                operator_id=operator_id, code=vehicle_ref,
+                defaults={key: value for key, value in defaults.items()
+                          if key not in {"operator", "operator_id", "code"}},
+            )
+            if not created and not compatible_tracking_identity(Vehicle(**defaults), vehicle):
+                logger.warning("Conflicting registration for vehicle %s; rejecting feed association", vehicle.pk)
+                return None, False
+        except (Vehicle.MultipleObjectsReturned, IntegrityError):
+            logger.warning("Unable to resolve unique scoped vehicle for operator %s", operator_ref)
+            return None, False
         else:
             if "fleet_code" in defaults and not vehicle.fleet_code:
                 vehicle.fleet_code = defaults["fleet_code"]
@@ -499,7 +541,7 @@ class Command(ImportLiveVehiclesCommand):
         services = self.services.filter(line_name_query).defer("geometry")
 
         if item["MonitoredVehicleJourney"]["OperatorRef"] == "TFLO":
-            return services.filter(route__source__name="L").first()
+            return services.filter(route__source__name="L", operator__in=self.tfl_operator_nocs()).distinct().first()
 
         if not operators:
             pass
@@ -779,63 +821,69 @@ class Command(ImportLiveVehiclesCommand):
                 operators, item, route_name, vehicle.operator_id
             )
 
-            if not operators and journey.service and journey.service.operator.all():
-                # create new OperatorCode
-                operator = journey.service.operator.all()[0]
-                with contextlib.suppress(IntegrityError):
-                    OperatorCode.objects.create(
-                        source=self.source, operator=operator, code=operator_ref
+        if operator_ref == "TFLO" and journey.service_id:
+            contractors = list(journey.service.operator.filter(pk__in=self.tfl_operator_nocs())[:2])
+            if len(contractors) == 1 and vehicle.operator_id != contractors[0].pk:
+                previous_operator_id = vehicle.operator_id
+                vehicle.operator = contractors[0]
+                try:
+                    with transaction.atomic():
+                        vehicle.save(update_fields=["operator"])
+                except IntegrityError:
+                    # A fleet-list record may already have this identity. The
+                    # reconciliation command merges it while preserving history.
+                    vehicle.operator_id = previous_operator_id
+
+        # match trip (timetable) to journey:
+        if not journey.trip_id and journey.service_id and (origin_aimed_departure_time or journey_ref):
+            block_ref = monitored_vehicle_journey.get("BlockRef")
+
+            arrival_time = monitored_vehicle_journey.get(
+                "DestinationAimedArrivalTime"
+            )
+            if arrival_time:
+                arrival_time = datetime.fromisoformat(arrival_time)
+
+            if trip := journey.get_trip(
+                datetime=dt,
+                operator_ref=operator_ref,
+                origin_ref=monitored_vehicle_journey.get("OriginRef"),
+                destination_ref=destination_ref,
+                departure_time=origin_aimed_departure_time,
+                arrival_time=arrival_time,
+                journey_code=journey_code,
+                block_ref=block_ref,
+            ):
+                journey.trip = trip
+
+                if (
+                    not (destination_ref and journey.destination)
+                    and trip.destination_id
+                ):
+                    journey.destination = (
+                        trip.headsign
+                        or get_destination_name(trip.destination_id)
+                        or journey.destination
                     )
 
-                if not vehicle.operator_id:
-                    vehicle.operator = operator
-                    with contextlib.suppress(IntegrityError):
-                        vehicle.save(update_fields=["operator"])
-
-            # match trip (timetable) to journey:
-            if journey.service and (origin_aimed_departure_time or journey_ref):
-                block_ref = monitored_vehicle_journey.get("BlockRef")
-
-                arrival_time = monitored_vehicle_journey.get(
-                    "DestinationAimedArrivalTime"
-                )
-                if arrival_time:
-                    arrival_time = datetime.fromisoformat(arrival_time)
-
-                if trip := journey.get_trip(
-                    datetime=dt,
-                    operator_ref=operator_ref,
-                    origin_ref=monitored_vehicle_journey.get("OriginRef"),
-                    destination_ref=destination_ref,
-                    departure_time=origin_aimed_departure_time,
-                    arrival_time=arrival_time,
-                    journey_code=journey_code,
-                    block_ref=block_ref,
+                if (
+                    (vehicle.operator_id is None or vehicle.operator_id == "TFLO")
+                    and trip.operator_id
+                    or (
+                        vehicle.operator_id == "PLYC"
+                        and trip.operator_id == "TFCN"
+                        or vehicle.operator_id == "TFCN"
+                        and trip.operator_id == "PLYC"
+                    )
                 ):
-                    journey.trip = trip
-
-                    if (
-                        not (destination_ref and journey.destination)
-                        and trip.destination_id
-                    ):
-                        journey.destination = (
-                            trip.headsign
-                            or get_destination_name(trip.destination_id)
-                            or journey.destination
-                        )
-
-                    if (
-                        (vehicle.operator_id is None or vehicle.operator_id == "TFLO")
-                        and trip.operator_id
-                        or (
-                            vehicle.operator_id == "PLYC"
-                            and trip.operator_id == "TFCN"
-                            or vehicle.operator_id == "TFCN"
-                            and trip.operator_id == "PLYC"
-                        )
-                    ):
-                        vehicle.operator_id = trip.operator_id
-                        vehicle.save(update_fields=["operator"])
+                    previous_operator_id = vehicle.operator_id
+                    vehicle.operator_id = trip.operator_id
+                    try:
+                        with transaction.atomic():
+                            vehicle.save(update_fields=["operator"])
+                    except IntegrityError:
+                        vehicle.operator_id = previous_operator_id
+                        logger.warning("Operator transfer needs duplicate reconciliation for vehicle %s", vehicle.pk)
 
         if (
             not journey.date

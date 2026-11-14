@@ -82,6 +82,56 @@ class FleetIdentityTest(TestCase):
         self.assertTrue(created)
         self.assertNotEqual(found.pk, other.pk)
 
+    def test_registration_like_code_never_reuses_unrelated_operator(self):
+        other = Vehicle.objects.create(operator=self.other, code="SN11BSZ", reg="SN11BSZ", slug="unrelated-registration")
+        found, created = self.command.get_vehicle(self.item("SN11BSZ"))
+        self.assertTrue(created)
+        self.assertNotEqual(found.pk, other.pk)
+
+    def test_cached_feed_identity_rejects_unrelated_operator(self):
+        self.command.get_operator = lambda code: [self.operator]
+        other = Vehicle.objects.create(operator=self.other, code="123", slug="wrong-cached")
+        self.assertFalse(self.command.vehicle_matches_item(other, self.item()))
+        other.operator = self.sibling
+        self.assertFalse(self.command.vehicle_matches_item(other, self.item()))
+
+    def test_does_not_merge_established_group_fleets_with_shared_number(self):
+        from vehicles.models import VehicleCode
+        existing = Vehicle.objects.create(operator=self.sibling,code="123",fleet_code="123",slug="established-sibling")
+        VehicleCode.objects.create(vehicle=existing,scheme="BODS",code="SIBL:123")
+        found, created = self.command.get_vehicle(self.item())
+        self.assertTrue(created)
+        self.assertNotEqual(found.pk,existing.pk)
+
+    def test_national_express_contractor_requires_exact_registration(self):
+        self.command.get_operator = lambda code: [self.operator]
+        coach = Vehicle.objects.create(operator=self.other,code="coach",reg="BV73ZTG",slug="contractor-coach")
+        report = {"MonitoredVehicleJourney": {"OperatorRef": "NATX", "VehicleRef": "BV73ZTG"}}
+        self.assertTrue(self.command.vehicle_matches_item(coach,report))
+        report["MonitoredVehicleJourney"]["VehicleRef"] = "123"
+        self.assertFalse(self.command.vehicle_matches_item(coach,report))
+
+    def test_tfl_publisher_identity_is_allowed_on_a_contractor_only(self):
+        contractor = Operator.objects.create(noc="MTLN")
+        vehicle = Vehicle.objects.create(operator=contractor,code="london",slug="london-test")
+        report = {"MonitoredVehicleJourney": {"OperatorRef": "TFLO", "VehicleRef": "1"}}
+        self.assertTrue(self.command.vehicle_matches_item(vehicle,report))
+        vehicle.operator=self.other
+        self.assertFalse(self.command.vehicle_matches_item(vehicle,report))
+
+    def test_tfl_resolves_contractor_before_creating_a_duplicate(self):
+        contractor = Operator.objects.create(noc="MTLN")
+        source = DataSource.objects.create(name="L")
+        service = Service.objects.create(source=source,line_name="N1",current=True)
+        service.operator.add(contractor)
+        Route.objects.create(source=source,service=service,code="tfl-n1")
+        existing = Vehicle.objects.create(operator=contractor,code="LF24ABC",reg="LF24ABC",slug="tfl-existing")
+        report = {"MonitoredVehicleJourney": {"OperatorRef": "TFLO", "VehicleRef": "LF24ABC", "PublishedLineName": "N1"}}
+        found,created = self.command.get_vehicle(report)
+        self.assertFalse(created)
+        self.assertEqual(found.pk,existing.pk)
+        self.assertEqual(Vehicle.objects.filter(code="LF24ABC").count(),1)
+
     def test_alphanumeric_fleet_code(self):
         existing = Vehicle.objects.create(operator=self.operator, code="legacy",
                                           fleet_code="AB12", slug="legacy")

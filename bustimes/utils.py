@@ -11,11 +11,13 @@ from django.db.models import (
     ExpressionWrapper,
     F,
     IntegerField,
+    OuterRef,
+    Subquery,
     Q,
     Value,
     When,
 )
-from django.db.models.functions import Abs, Least
+from django.db.models.functions import Abs, Coalesce, Least
 from django.utils import timezone
 from sql_util.utils import Exists
 
@@ -236,13 +238,22 @@ def get_trip(
     else:
         trips = Trip.objects.filter(route__service=journey.service)
 
+    # TNDS may create source-scoped stops when NaPTAN lacks a native code.
+    # Only aliases belonging to this service's sources may participate.
+    source_ids = {route.source_id for route in routes}
+    if not source_ids:
+        source_ids = set(trips.values_list("route__source_id", flat=True).distinct())
+
+    def stop_refs(ref):
+        return [ref] + [f"{source_id}:{ref.upper()}" for source_id in source_ids] if ref else []
+
     if destination_ref and " " not in destination_ref and destination_ref[:3].isdigit():
-        destination = Q(destination=destination_ref)
+        destination = Q(destination__in=stop_refs(destination_ref))
     else:
         destination = Q()
 
     if origin_ref and " " not in origin_ref and origin_ref[:3].isdigit():
-        origin = Exists("stoptime", filter=Q(stop=origin_ref))
+        origin = Exists("stoptime", filter=Q(stop__in=stop_refs(origin_ref)))
     else:
         origin = Q()
 
@@ -259,7 +270,7 @@ def get_trip(
         start = Q(start=start_timedelta)
         if origin:
             start |= Exists(
-                "stoptime", filter=Q(stop=origin_ref, departure=start_timedelta)
+                "stoptime", filter=Q(stop__in=stop_refs(origin_ref), departure=start_timedelta)
             )
         if start_time.hour < 6:
             start |= Q(start=start_timedelta + timedelta(days=1))
@@ -267,7 +278,7 @@ def get_trip(
                 start |= Exists(
                     "stoptime",
                     filter=Q(
-                        stop=origin_ref, departure=start_timedelta + timedelta(days=1)
+                        stop__in=stop_refs(origin_ref), departure=start_timedelta + timedelta(days=1)
                     ),
                 )
 
@@ -290,21 +301,23 @@ def get_trip(
                 )
             )
 
-    # special strategy for TfL data
+    # TfL endpoint refs are publisher-specific stop identifiers.
     if operator_ref == "TFLO" and departure_time and origin_ref and destination:
+        candidates = trips.filter(
+            Exists("stoptime", filter=Q(stop__in=stop_refs(origin_ref))),
+            Exists("stoptime", filter=Q(stop__in=stop_refs(destination_ref))),
+            start,
+        )
+        candidates = candidates.filter(
+            Q(start__lt=timedelta(days=1), calendar__in=Calendar.objects.active_on(date))
+            | Q(start__gte=timedelta(days=1), calendar__in=Calendar.objects.active_on(date - timedelta(days=1)))
+        )
         try:
-            try:
-                trips = trips.filter(
-                    Exists("stoptime", filter=Q(stop=origin_ref)),
-                    Exists("stoptime", filter=Q(stop=destination_ref)),
-                    start,
-                )
-                return trips.get()
-            except Trip.MultipleObjectsReturned:
-                trips = trips.active_on(date)
-                return trips.get()
+            trip = candidates.get()
         except (Trip.DoesNotExist, Trip.MultipleObjectsReturned):
             return
+        journey.date = date - timedelta(days=1) if trip.start >= timedelta(days=1) else date
+        return trip
 
     if journey.code:
         code = Q(ticket_machine_code=journey.code)
@@ -338,12 +351,15 @@ def get_trip(
             start_times = (start_time,)
 
         if next_stop:
-            if next_stop[3:4] == "0":
-                stop_q = Q(stop=next_stop)  # translink
-            else:
-                stop_q = Q(stop__naptan_code=next_stop)  # lothian
+            stop_q = Q(stop__in=stop_refs(next_stop)) | Q(stop__naptan_code__iexact=next_stop)
         else:
             stop_q = None
+
+        trips = trips.filter(
+            Q(start__lt=timedelta(days=1), calendar__in=Calendar.objects.active_on(date))
+            | Q(start__gte=timedelta(days=1),
+                calendar__in=Calendar.objects.active_on(date - timedelta(days=1)))
+        )
 
         condition = Q()
         score = None
@@ -352,20 +368,26 @@ def get_trip(
                 start_time - timedelta(minutes=10),
                 start_time + timedelta(minutes=5),
             )
-            start_condition = Q(start__range=start_range)
             if stop_q:
-                start_condition &= Q(
-                    Exists(
-                        "stoptime",
-                        filter=Q(
-                            stop_q,
-                            departure__range=start_range,
-                        ),
-                    )
-                )
+                # Match the time at the reported next stop, not the trip's
+                # origin departure. A bus halfway through a long journey can
+                # have left its origin an hour ago.
+                start_condition = Q(Exists(
+                    "stoptime",
+                    filter=Q(stop_q, departure__range=start_range),
+                ))
+                times = StopTime.objects.filter(
+                    stop_q, trip_id=OuterRef("pk"), departure__range=start_range,
+                ).annotate(distance=ExpressionWrapper(
+                    Abs(int(start_time.total_seconds()) - F("departure")),
+                    output_field=IntegerField(),
+                )).order_by("distance").values("distance")[:1]
+                distance = Coalesce(Subquery(times, output_field=IntegerField()), Value(10**9))
+            else:
+                start_condition = Q(start__range=start_range)
+                distance = Abs(int(start_time.total_seconds()) - F("start"))
             condition |= start_condition
 
-            distance = Abs(int(start_time.total_seconds()) - F("start"))
             score = distance if score is None else Least(score, distance)
 
         score = ExpressionWrapper(-score, output_field=IntegerField())

@@ -1,4 +1,5 @@
-{% load humanize %}
+{% load humanize vehicle_permissions %}
+{% can_review_revision user revision as can_review %}
 <li id="revision-{{ revision.id }}">
     <form method="GET" action="/contact"><p>
         {% if not vehicle %}
@@ -30,7 +31,7 @@ https://bustimes.org{% url 'admin:vehicles_vehiclerevision_change' revision.pk %
             <strong>
                 {% if revision.disapproved %}Disa{% else %}A{% endif %}pproved
             </strong>
-            {% if revision.approved_by_id and user.trusted %}
+            {% if revision.approved_by_id and can_review %}
                 by <a href="{% url 'user_detail' revision.approved_by_id %}">user {{ revision.approved_by_id }}</a>
             {% endif %}
             {% if revision.disapproved_reason %}
@@ -42,13 +43,13 @@ https://bustimes.org{% url 'admin:vehicles_vehiclerevision_change' revision.pk %
         {% if revision.pending %}
             {% if revision.user_id == user.id %}
                 <button type="button" class="button" data-hx-post="{% url 'vehicle_revision_action' revision.id 'disapprove' %}">⚠️ Cancel</button>
-            {% elif user.trusted %}
+            {% elif can_review %}
                 <button type="button" class="button" data-hx-post="{% url 'vehicle_revision_action' revision.id 'apply' %}" data-hx-prompt="Reason for approving">👍 Apply changes</button>
                 <button type="button" class="button" data-hx-post="{% url 'vehicle_revision_action' revision.id 'disapprove' %}" data-hx-prompt="Reason for declining">⚠️ Decline</button>
             {% else %}
                 Pending
             {% endif %}
-        {% elif user.trusted and revision.disapproved and revision.approved_by_id == user.id or user.is_superuser %}
+        {% elif can_review and revision.disapproved %}
             <button type="button" class="button" data-hx-post="{% url 'vehicle_revision_action' revision.id 'apply' %}" data-hx-prompt="Reason for approving">👍 Apply changes</button>
         {% endif %}
 </li>

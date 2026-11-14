@@ -74,6 +74,12 @@ from .models import (
     VehicleRevisionFeature,
     get_text_colour,
 )
+from .permissions import (
+    REVIEW_PERMISSION,
+    can_auto_approve_revision,
+    can_review_revision,
+    operator_ids,
+)
 from .tasks import queue_siri_post
 from .utils import apply_revision, get_revision, redis_client
 
@@ -380,7 +386,7 @@ def operator_vehicles(request, slug=None, group_slug=None):
 
 @require_safe
 def operator_map(request, slug):
-    operator = get_object_or_404(Operator.objects.select_related("region"), slug=slug)
+    operator = get_object_or_404(Operator.objects.exclude(noc__in=settings.EXCLUDED_OPERATOR_NOCS).select_related("region"), slug=slug)
 
     return render(
         request,
@@ -1091,10 +1097,12 @@ def edit_vehicle(request, **kwargs):
                     revision.save()
                     VehicleRevisionFeature.objects.bulk_create(features)
 
-                    if request.user.trusted:
+                    if can_auto_approve_revision(request.user, revision):
                         apply_revision(revision, features)
                         revision.pending = False
-                        revision.save(update_fields=["pending"])
+                        revision.approved_by = request.user
+                        revision.approved_at = timezone.now()
+                        revision.save(update_fields=["pending", "approved_by", "approved_at"])
 
                     context["revision"] = revision
                     form = None
@@ -1221,10 +1229,12 @@ def vehicle_request(request, operator_noc):
                     revision.save()
                     VehicleRevisionFeature.objects.bulk_create(features)
 
-                    if request.user.trusted:
+                    if can_auto_approve_revision(request.user, revision):
                         apply_revision(revision, features)
                         revision.pending = False
-                        revision.save(update_fields=["pending"])
+                        revision.approved_by = request.user
+                        revision.approved_at = timezone.now()
+                        revision.save(update_fields=["pending", "approved_by", "approved_at"])
 
             except IntegrityError as e:
                 raise
@@ -1317,19 +1327,24 @@ def merge_vehicle(request):
 @login_required
 @transaction.atomic
 def vehicle_revision_action(request, revision_id, action):
+    if action not in {"apply", "disapprove"}:
+        return HttpResponse(status=400)
     revision = get_object_or_404(
         VehicleRevision.objects.select_related(
             *revision_display_related_fields, "vehicle", "to_operator"
         )
-        .filter(Q(pending=True) | Q(approved_by=request.user))
+        .filter(Q(pending=True) | Q(disapproved=True))
         .select_for_update(of=["self"]),
         id=revision_id,
     )
 
-    if action == "disapprove" and request.user.id == revision.user_id:
+    if action == "disapprove" and revision.pending and request.user.id == revision.user_id:
         revision.delete()  # cancel one's own edit
         return HttpResponse("")
-    if not request.user.trusted:
+    if revision.vehicle_id:
+        # Keep the operator scope stable until the decision is committed.
+        revision.vehicle = Vehicle.objects.select_for_update().get(pk=revision.vehicle_id)
+    if not can_review_revision(request.user, revision):
         raise PermissionDenied
 
     revision.disapproved_reason = unquote(request.headers.get("HX-Prompt", ""))
@@ -1366,13 +1381,21 @@ def vehicle_edits(request):
         .order_by("-id")
     )
 
+    if not request.user.is_authenticated:
+        revisions = revisions.filter(pending=False, disapproved=False)
+    elif not request.user.has_perm(REVIEW_PERMISSION):
+        scope = operator_ids(request.user)
+        scoped = (Q(vehicle__operator_id__in=scope) | Q(vehicle__isnull=True)) & (Q(from_operator_id__in=scope) | Q(from_operator__isnull=True)) & (Q(to_operator_id__in=scope) | Q(to_operator__isnull=True))
+        scoped &= Q(vehicle__operator_id__in=scope) | Q(from_operator_id__in=scope) | Q(to_operator_id__in=scope)
+        revisions = revisions.filter(Q(pending=False, disapproved=False) | Q(user=request.user) | scoped)
+
     data = request.GET.copy()
     data.setdefault("status", "approved")
 
     f = filters.VehicleRevisionFilter(data, queryset=revisions)
     if request.user.is_anonymous or not (
-        request.user.trusted
-        or request.user.is_superuser
+        request.user.has_perm(REVIEW_PERMISSION)
+        or operator_ids(request.user)
         or request.GET.get("user") == str(request.user.id)
     ):
         f.filters["status"].field.choices = [("approved", "approved")]

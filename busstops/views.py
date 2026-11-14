@@ -1105,6 +1105,9 @@ class OperatorDetailView(DetailView):
     model = Operator
     queryset = model.objects.select_related("region").prefetch_related("licences")
 
+    def get_queryset(self):
+        return super().get_queryset().exclude(noc__in=settings.EXCLUDED_OPERATOR_NOCS)
+
     def get_object(self):
         try:
             return super().get_object()
@@ -1112,7 +1115,7 @@ class OperatorDetailView(DetailView):
             if "slug" in self.kwargs:
                 try:
                     return get_object_or_404(
-                        self.queryset,
+                        self.get_queryset(),
                         operatorcode__code=self.kwargs["slug"],
                         operatorcode__source__name="slug",
                     )

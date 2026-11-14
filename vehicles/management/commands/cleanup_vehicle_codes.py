@@ -28,15 +28,23 @@ class Command(BaseCommand):
         known_nocs = set(Operator.objects.values_list("noc", flat=True))
         dry_run = options["dry_run"]
 
+        from .import_bod_avl import Command as BodCommand
+        from busstops.models import DataSource
+        bod = BodCommand()
+        bod.source = DataSource.objects.filter(name="BODS AVL").first()
         mismatched = []
         for code in (
             VehicleCode.objects.select_related("vehicle")
-            .only("id", "code", "scheme", "vehicle_id", "vehicle__operator_id")
+            .only("id", "code", "scheme", "vehicle_id", "vehicle__operator_id", "vehicle__reg")
             .iterator()
         ):
-            if not vehicle_code_matches_operator(
-                code.code, code.vehicle.operator_id, known_nocs
-            ):
+            if code.scheme == "BODS" and bod.source:
+                parts = code.code.split(":")
+                matches = bod.vehicle_matches_item(code.vehicle, {"MonitoredVehicleJourney": {
+                    "OperatorRef": parts[0], "VehicleRef": parts[1] if len(parts)>1 else ""}})
+            else:
+                matches = vehicle_code_matches_operator(code.code, code.vehicle.operator_id, known_nocs)
+            if not matches:
                 mismatched.append(code)
 
         by_scheme = {}
