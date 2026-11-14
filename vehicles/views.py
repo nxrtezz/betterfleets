@@ -1250,6 +1250,16 @@ def vehicle_request(request, operator_noc):
                 },
             )
 
+    return render(
+        request,
+        "edit_vehicle.html",
+        {
+            "form": form,
+            "vehicle": None,
+            "object": operator,
+        },
+    )
+
 
 @login_required
 def merge_vehicle(request):
@@ -1311,16 +1321,6 @@ def merge_vehicle(request):
     }
 
     return render(request, "merge_vehicle.html", context)
-
-    return render(
-        request,
-        "edit_vehicle.html",
-        {
-            "form": form,
-            "vehicle": None,
-            "object": operator,
-        },
-    )
 
 
 @require_POST
