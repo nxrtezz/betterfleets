@@ -7,7 +7,7 @@ interactions:
       Connection: [keep-alive]
       User-Agent: [python-requests/2.19.1]
     method: GET
-    uri: http://sojbuslivetimespublic.azurewebsites.net/api/Values?secondsAgo=360
+    uri: https://sojbuslivetimespublic.azurewebsites.net/api/Values?secondsAgo=360
   response:
     body: {string: '{"updates":[
       {"DeviceId":"bus-12-1030-J143002","AssetType":"Public Bus","AssetRegistrationNumber":"J143002","ServiceNumber":"12","ServiceName":"12","ServiceOperator":"LibertyBus","OriginalStartTime":"2025-10-15T11:06:00","TimeOfUpdate":"2025-10-15T10:13:39","Direction":"inbound","Latitude":49.1942302,"Longitude":-2.1988764,"Bearing":193,"SecondsAgo":34},
@@ -25,7 +25,7 @@ interactions:
       Connection: [keep-alive]
       User-Agent: [python-requests/2.19.1]
     method: GET
-    uri: http://sojbuslivetimespublic.azurewebsites.net/api/Values?secondsAgo=360
+    uri: https://sojbuslivetimespublic.azurewebsites.net/api/Values?secondsAgo=360
   response:
     body: {string: '{"updates":[{
         "DeviceId": "bus-12-1030-J143002",

@@ -13,7 +13,7 @@ from ..import_live_vehicles import ImportLiveVehiclesCommand
 class Command(ImportLiveVehiclesCommand):
     source_name = vehicle_code_scheme = "jersey"
     operator = "libertybus"
-    url = "http://sojbuslivetimespublic.azurewebsites.net/api/Values?secondsAgo=360"
+    url = "https://sojbuslivetimespublic.azurewebsites.net/api/Values?secondsAgo=360"
 
     @staticmethod
     def get_datetime(item):
