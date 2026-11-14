@@ -35,6 +35,7 @@ from busstops.models import (
     ServiceCode,
     StopPoint,
 )
+from busstops.service_selection import prefer_svct_timetables
 from bustimes.models import Route, Trip
 from bustimes.utils import cache_routes
 from tfl import utils as tfl_utils
@@ -539,6 +540,8 @@ class Command(ImportLiveVehiclesCommand):
                 line_name_query |= get_line_name_query(ticket_machine_service_code)
 
         services = self.services.filter(line_name_query).defer("geometry")
+        if vehicle_operator_id == "SVCT" or any(o.pk == "SVCT" for o in (operators or ())):
+            services = prefer_svct_timetables(services)
 
         if item["MonitoredVehicleJourney"]["OperatorRef"] == "TFLO":
             return services.filter(route__source__name="L", operator__in=self.tfl_operator_nocs()).distinct().first()

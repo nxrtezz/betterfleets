@@ -53,6 +53,7 @@ from vehicles.models import Vehicle, VehicleJourney
 from vehicles.utils import get_statuses, redis_client
 from vosa.models import Registration
 
+from .service_selection import prefer_svct_timetables
 from . import forms
 from .models import (
     AdminArea,
@@ -1187,6 +1188,8 @@ class OperatorDetailView(DetailView):
                 .filter(current=True)
                 .defer("geometry", "search_vector")
             )
+            if self.object.pk == "SVCT":
+                services = prefer_svct_timetables(services)
             services = services.annotate(start_date=SubqueryMin("route__start_date"))
 
             # Apply filters

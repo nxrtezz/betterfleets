@@ -203,26 +203,14 @@ class RegistrationTest(TransactionTestCase):
         other_user.refresh_from_db()
         self.assertFalse(other_user.is_active)
 
-    def test_password_reset(self):
-        with self.assertNumQueries(0):
-            response = self.client.get("/accounts/password_reset/")
-        self.assertContains(response, "Reset your password")
-        self.assertContains(response, "Email address")
-
-        with self.assertNumQueries(1):
-            response = self.client.post(
-                "/accounts/password_reset/",
-                {
-                    "email": "rufus@herring.pizza",
-                },
-            )
-        self.assertEqual(response.url, "/accounts/password_reset/done/")
-
-        with self.assertNumQueries(0):
-            response = self.client.get(response.url)
-        self.assertContains(
-            response,
-            "<p>We’ve emailed you instructions for setting your password, if an account exists with the email you "
-            "entered. You should receive them shortly.</p>",
-        )
+    def test_password_reset_is_removed(self):
+        for path in (
+            "/accounts/password_reset/",
+            "/accounts/password_reset/done/",
+            "/accounts/reset/test/token/",
+            "/accounts/reset/done/",
+        ):
+            self.assertEqual(self.client.get(path).status_code, 404)
+            self.assertEqual(self.client.post(path, {"email": "test@example.com"}).status_code, 404)
         self.assertEqual([], mail.outbox)
+        self.assertNotContains(self.client.get("/accounts/login/"), "Lost password?")

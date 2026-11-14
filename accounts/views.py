@@ -33,13 +33,6 @@ class LoginView(auth_views.LoginView):
     form_class = forms.LoginForm
 
 
-class PasswordResetView(auth_views.PasswordResetView):
-    def get_context_data(self, *args, **kwargs):
-        context_data = super().get_context_data(*args, **kwargs)
-        context_data["form"].fields["email"].label = "Email address"
-        return context_data
-
-
 @login_required
 def user_detail(request, pk):
     users = UserModel.objects.annotate(
